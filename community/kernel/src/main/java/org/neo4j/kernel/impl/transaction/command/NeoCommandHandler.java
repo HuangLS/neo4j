@@ -32,10 +32,12 @@ import org.neo4j.kernel.impl.transaction.command.Command.LabelTokenCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.NeoStoreCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.NodeCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.NodeCountsCommand;
+import org.neo4j.kernel.impl.transaction.command.Command.NodeDynProCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.PropertyCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.PropertyKeyTokenCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.RelationshipCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.RelationshipCountsCommand;
+import org.neo4j.kernel.impl.transaction.command.Command.RelationshipDynProCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.RelationshipGroupCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.RelationshipTypeTokenCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.SchemaRuleCommand;
@@ -59,6 +61,10 @@ import org.neo4j.kernel.impl.transaction.command.Command.SchemaRuleCommand;
 public interface NeoCommandHandler extends AutoCloseable
 {
     public static final NeoCommandHandler EMPTY = new NeoCommandHandler.Adapter();
+    
+    boolean visitNodeDynProCommand( Command.NodeDynProCommand command ) throws IOException;
+    
+    boolean visitRelationshipDynProCommand( Command.RelationshipDynProCommand command ) throws IOException;
 
     // NeoStore commands
     boolean visitNodeCommand( Command.NodeCommand command ) throws IOException;
@@ -222,6 +228,18 @@ public interface NeoCommandHandler extends AutoCloseable
         public void close()
         {
         }
+
+        @Override
+        public boolean visitNodeDynProCommand( NodeDynProCommand command ) throws IOException
+        {
+            return false;
+        }
+
+        @Override
+        public boolean visitRelationshipDynProCommand( RelationshipDynProCommand command ) throws IOException
+        {
+            return false;
+        }
     }
 
     public static class Delegator implements NeoCommandHandler
@@ -345,6 +363,18 @@ public interface NeoCommandHandler extends AutoCloseable
         public void close()
         {
             delegate.close();
+        }
+
+        @Override
+        public boolean visitNodeDynProCommand( NodeDynProCommand command ) throws IOException
+        {
+            return delegate.visitNodeDynProCommand( command );
+        }
+
+        @Override
+        public boolean visitRelationshipDynProCommand( RelationshipDynProCommand command ) throws IOException
+        {
+            return delegate.visitRelationshipDynProCommand( command );
         }
     }
 

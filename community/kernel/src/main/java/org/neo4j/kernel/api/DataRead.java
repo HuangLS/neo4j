@@ -21,6 +21,7 @@ package org.neo4j.kernel.api;
 
 import java.util.Iterator;
 
+import org.act.dynproperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
@@ -30,6 +31,7 @@ import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.IndexBrokenKernelException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.util.register.NeoRegister;
@@ -108,6 +110,14 @@ interface DataRead
     PrimitiveIntIterator nodeGetRelationshipTypes( long nodeId ) throws EntityNotFoundException;
 
     Property nodeGetProperty( long nodeId, int propertyKeyId ) throws EntityNotFoundException;
+    
+    DynamicProperty nodeGetProperty( long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException;
+    
+    DynamicProperty nodeGetProperty( long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback ) throws EntityNotFoundException;
+    
+    DynamicProperty relationshipGetProperty( long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException;
+    
+    DynamicProperty relationshipGetProperty( long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback ) throws EntityNotFoundException;
 
     Property relationshipGetProperty( long relationshipId, int propertyKeyId ) throws EntityNotFoundException;
 

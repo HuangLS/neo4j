@@ -61,6 +61,10 @@ import org.neo4j.kernel.Traversal;
  */
 public interface Node extends PropertyContainer
 {
+    
+    
+    
+    
     /**
      * Returns the unique id of this node. Ids are garbage collected over time
      * so they are only guaranteed to be unique during a specific time span: if

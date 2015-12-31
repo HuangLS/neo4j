@@ -22,7 +22,7 @@ package org.neo4j.kernel.api.properties;
 import java.lang.reflect.Array;
 
 class PropertyConversion
-{
+{    
     static DefinedProperty convertProperty( int propertyKeyId, Object value )
     {
         if ( value instanceof String )

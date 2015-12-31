@@ -22,6 +22,8 @@ package org.neo4j.kernel.impl.transaction.command;
 import java.io.IOException;
 import java.util.Collection;
 
+import org.act.dynproperty.impl.InternalKey;
+import org.act.dynproperty.util.Slice;
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.LabelTokenRecord;
@@ -38,7 +40,6 @@ import org.neo4j.kernel.impl.transaction.state.PropertyRecordChange;
 
 import static java.lang.String.format;
 import static java.util.Collections.unmodifiableCollection;
-
 import static org.neo4j.helpers.collection.IteratorUtil.first;
 import static org.neo4j.kernel.impl.util.IdPrettyPrinter.label;
 import static org.neo4j.kernel.impl.util.IdPrettyPrinter.relationshipType;
@@ -49,6 +50,119 @@ import static org.neo4j.kernel.impl.util.IdPrettyPrinter.relationshipType;
  */
 public abstract class Command
 {
+    
+    
+    public static class NodeDynProCommand extends Command
+    {
+
+        private InternalKey key;
+        private byte[] value;
+        
+        public int getProId()
+        {
+            Slice Id = key.getId();
+            return Id.getInt( 8 );
+        }
+        
+        public long getProContainerKey()
+        {
+            Slice Id = key.getId();
+            return Id.getLong( 0 );
+        }
+        
+        public int getTime()
+        {
+            return (int)key.getStartTime();
+        }
+        
+        public byte[] getValue()
+        {
+            return value;
+        }
+        
+        public NodeDynProCommand(InternalKey key, byte[] value )
+        {
+            this.key = key;
+            this.value = value;
+        }
+        
+        @Override
+        public void accept( CommandRecordVisitor visitor )
+        {
+            // FIXME Auto-generated method stub
+            
+        }
+
+        @Override
+        public String toString()
+        {
+            // FIXME Auto-generated method stub
+            return null;
+        }
+
+        @Override
+        public boolean handle( NeoCommandHandler handler ) throws IOException
+        {
+            return handler.visitNodeDynProCommand( this );
+        }
+        
+    }
+    
+    public static class RelationshipDynProCommand extends Command
+    {
+
+        private InternalKey key;
+        private byte[] value;
+        
+        public RelationshipDynProCommand(InternalKey key, byte[] value )
+        {
+            this.key = key;
+            this.value = value;
+        }
+        
+        public int getProId()
+        {
+            Slice Id = key.getId();
+            return Id.getInt( 8 );
+        }
+        
+        public long getProContainerKey()
+        {
+            Slice Id = key.getId();
+            return Id.getLong( 0 );
+        }
+        
+        public int getTime()
+        {
+            return (int)key.getStartTime();
+        }
+        
+        public byte[] getValue()
+        {
+            return value;
+        }
+        
+        @Override
+        public void accept( CommandRecordVisitor visitor )
+        {
+            //FIXME Auto-generated method stub
+        }
+
+        @Override
+        public String toString()
+        {
+            // FIXME Auto-generated method stub
+            return null;
+        }
+
+        @Override
+        public boolean handle( NeoCommandHandler handler ) throws IOException
+        {
+            return handler.visitRelationshipDynProCommand( this );
+        }
+        
+    }
+    
     private int keyHash;
     private long key;
     private Mode mode;

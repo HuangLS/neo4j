@@ -31,6 +31,7 @@ import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.txstate.UpdateTriState;
 import org.neo4j.kernel.impl.api.state.RelationshipChangesForNode.DiffStrategy;
 import org.neo4j.kernel.impl.util.diffsets.DiffSets;
@@ -313,6 +314,13 @@ public interface NodeState extends PropertyContainerState
 
         private static final NodeState DEFAULT = new NodeState()
         {
+            
+            @Override
+            public Iterator<DynamicProperty> appendedDynamicProperties()
+            {
+                return IteratorUtil.emptyIterator();
+            }
+            
             @Override
             public Iterator<DefinedProperty> addedProperties()
             {

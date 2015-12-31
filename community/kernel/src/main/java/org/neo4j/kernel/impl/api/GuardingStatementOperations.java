@@ -21,16 +21,19 @@ package org.neo4j.kernel.impl.api;
 
 import java.util.Iterator;
 
+import org.act.dynproperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.graphdb.Direction;
+import org.neo4j.kernel.api.KernelStatement;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
 import org.neo4j.kernel.api.exceptions.schema.IndexBrokenKernelException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.guard.Guard;
 import org.neo4j.kernel.impl.api.operations.EntityReadOperations;
@@ -42,6 +45,39 @@ public class GuardingStatementOperations implements
         EntityWriteOperations,
         EntityReadOperations
 {
+    
+    
+    @Override
+    public DynamicProperty nodeGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException
+    {
+        this.guard.check();
+        return this.entityReadDelegate.nodeGetProperty( statment, nodeId, propertyKeyId, time );
+    }
+
+    @Override
+    public DynamicProperty nodeGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int startTime, int endTime,
+            RangeQueryCallBack callback ) throws EntityNotFoundException
+    {
+        this.guard.check();
+        return this.entityReadDelegate.nodeGetProperty( statment, nodeId, propertyKeyId, startTime, endTime, callback );
+    }
+
+    @Override
+    public DynamicProperty relationshipGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int time )
+            throws EntityNotFoundException
+    {
+        this.guard.check();
+        return this.entityReadDelegate.relationshipGetProperty( statment, nodeId, propertyKeyId, time );
+    }
+
+    @Override
+    public DynamicProperty relationshipGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int startTime, int endTime,
+            RangeQueryCallBack callback ) throws EntityNotFoundException
+    {
+        this.guard.check();
+        return this.entityReadDelegate.relationshipGetProperty( statment, nodeId, propertyKeyId, startTime, endTime, callback );
+    }
+    
     private final EntityWriteOperations entityWriteDelegate;
     private final EntityReadOperations entityReadDelegate;
     private final Guard guard;

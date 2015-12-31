@@ -74,6 +74,8 @@ import org.neo4j.kernel.impl.api.scan.LabelScanStoreProvider;
 import org.neo4j.kernel.impl.api.state.ConstraintIndexCreator;
 import org.neo4j.kernel.impl.api.store.CacheLayer;
 import org.neo4j.kernel.impl.api.store.DiskLayer;
+import org.neo4j.kernel.impl.api.store.DynamicPropertyRead;
+import org.neo4j.kernel.impl.api.store.DynamicPropertyStore;
 import org.neo4j.kernel.impl.api.store.PersistenceCache;
 import org.neo4j.kernel.impl.api.store.SchemaCache;
 import org.neo4j.kernel.impl.api.store.StoreReadLayer;
@@ -162,6 +164,36 @@ import static org.neo4j.kernel.impl.transaction.state.CacheLoaders.relationshipL
 
 public class NeoStoreDataSource implements NeoStoreProvider, Lifecycle, IndexProviders
 {
+    
+    private DynamicPropertyModule bulidDynamicPropertyModule( final Config configs, final File dbDir )
+    {
+        return new DynamicPropertyModule()
+        {
+            @Override
+            public DynamicPropertyStore getStore()
+            {
+                DynamicPropertyStore toret = DynamicPropertyStore.instence( configs, dbDir );
+                life.add( toret );
+                return  toret;
+            }
+            
+            @Override
+            public DynamicPropertyRead getReadStore()
+            {
+                return new DynamicPropertyRead( DynamicPropertyStore.instence( configs, dbDir ) );
+            }
+        };
+    }
+    
+    private DynamicPropertyModule dynamicPropertyModule;
+    
+    private interface DynamicPropertyModule
+    {
+        DynamicPropertyStore getStore();
+        
+        DynamicPropertyRead getReadStore();
+    }
+    
     private interface NeoStoreModule
     {
         NeoStore neoStore();
@@ -467,6 +499,8 @@ public class NeoStoreDataSource implements NeoStoreProvider, Lifecycle, IndexPro
             // TODO The only reason this is here is because of the provider-stuff for DiskLayer. Remove when possible:
             this.neoStoreModule = neoStoreModule;
 
+            this.dynamicPropertyModule = bulidDynamicPropertyModule(config,storeDir);
+            
             CacheModule cacheModule = buildCaches( neoStoreModule.neoStore(), cacheProvider, nodeManager,
                     labelTokens, relationshipTypeTokens, propertyKeyTokenHolder );
 
@@ -792,7 +826,7 @@ public class NeoStoreDataSource implements NeoStoreProvider, Lifecycle, IndexPro
                 new TransactionRepresentationStoreApplier(
                         indexingService, alwaysCreateNewWriter( labelScanStore ), neoStore,
                         cacheAccess, lockService, new LegacyIndexApplierLookup.Direct( legacyIndexProviderLookup ),
-                        indexConfigStore, legacyIndexTransactionOrdering ) );
+                        indexConfigStore, legacyIndexTransactionOrdering, dynamicPropertyModule.getStore() ) );
 
         final PhysicalLogFile logFile = new PhysicalLogFile( fileSystemAbstraction, logFiles,
                 config.get( GraphDatabaseSettings.logical_log_rotation_threshold ), neoStore,
@@ -911,7 +945,7 @@ public class NeoStoreDataSource implements NeoStoreProvider, Lifecycle, IndexPro
         final TransactionRepresentationStoreApplier storeRecoverer =
                 new TransactionRepresentationStoreApplier(
                         indexingService, labelScanWriters, neoStore, cacheAccess, lockService,
-                        legacyIndexApplierLookup, indexConfigStore, IdOrderingQueue.BYPASS );
+                        legacyIndexApplierLookup, indexConfigStore, IdOrderingQueue.BYPASS, dynamicPropertyModule.getStore() );
 
         RecoveryVisitor recoveryVisitor = new RecoveryVisitor( neoStore, storeRecoverer, indexUpdatesValidator,
                 recoveryVisitorMonitor );
@@ -1255,7 +1289,7 @@ public class NeoStoreDataSource implements NeoStoreProvider, Lifecycle, IndexPro
         // + Transaction state handling
         StateHandlingStatementOperations stateHandlingContext = new StateHandlingStatementOperations( storeReadLayer,
                 legacyPropertyTrackers, constraintIndexCreator,
-                legacyIndexStore );
+                legacyIndexStore, dynamicPropertyModule.getReadStore() );
         StatementOperationParts parts = new StatementOperationParts( stateHandlingContext, stateHandlingContext,
                 stateHandlingContext, stateHandlingContext, stateHandlingContext, stateHandlingContext,
                 new SchemaStateConcern( updateableSchemaState ), null, stateHandlingContext, stateHandlingContext,

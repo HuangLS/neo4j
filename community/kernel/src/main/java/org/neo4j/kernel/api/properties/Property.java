@@ -26,6 +26,11 @@ import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 
 public abstract class Property
 {
+    public static DefinedProperty property( int propertyKeyId, int time, byte[] value )
+    {
+        return new DynamicProperty( propertyKeyId, time, value );
+    }
+    
     public static Property noNodeProperty( long nodeId, int propertyKeyId )
     {
         return noProperty( propertyKeyId, EntityType.NODE, nodeId );

@@ -22,8 +22,10 @@ package org.neo4j.kernel.impl.api;
 import java.io.IOException;
 
 import org.neo4j.helpers.Provider;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.api.index.ValidatedIndexUpdates;
+import org.neo4j.kernel.impl.api.store.DynamicPropertyStore;
 import org.neo4j.kernel.impl.core.CacheAccessBackDoor;
 import org.neo4j.kernel.impl.index.IndexConfigStore;
 import org.neo4j.kernel.impl.locking.LockGroup;
@@ -55,13 +57,16 @@ public class TransactionRepresentationStoreApplier
     private final IndexConfigStore indexConfigStore;
     private final LegacyIndexApplierLookup legacyIndexProviderLookup;
     private final IdOrderingQueue legacyIndexTransactionOrdering;
+    private final DynamicPropertyStore propertyStore;
 
     private final WorkSync<Provider<LabelScanWriter>,IndexTransactionApplier.LabelUpdateWork> labelScanStoreSync;
 
     public TransactionRepresentationStoreApplier(
             IndexingService indexingService, Provider<LabelScanWriter> labelScanWriters, NeoStore neoStore,
             CacheAccessBackDoor cacheAccess, LockService lockService, LegacyIndexApplierLookup legacyIndexProviderLookup,
-            IndexConfigStore indexConfigStore, IdOrderingQueue legacyIndexTransactionOrdering )
+            IndexConfigStore indexConfigStore, IdOrderingQueue legacyIndexTransactionOrdering
+            , DynamicPropertyStore propretyStore 
+            )
     {
         this.indexingService = indexingService;
         this.labelScanWriters = labelScanWriters;
@@ -72,6 +77,7 @@ public class TransactionRepresentationStoreApplier
         this.indexConfigStore = indexConfigStore;
         this.legacyIndexTransactionOrdering = legacyIndexTransactionOrdering;
         labelScanStoreSync = new WorkSync<>( labelScanWriters );
+        this.propertyStore = propretyStore;
     }
 
     public void apply( TransactionRepresentation representation, ValidatedIndexUpdates indexUpdates, LockGroup locks,
@@ -100,10 +106,13 @@ public class TransactionRepresentationStoreApplier
 
         // Counts store application
         NeoCommandHandler countsStoreApplier = getCountsStoreApplier( transactionId, mode );
+        
+        // Dynamic Property store application
+        DynamicPropertyStoreHandler dynProHandler = new DynamicPropertyStoreHandler( this.propertyStore );
 
         // Perform the application
         try ( CommandApplierFacade applier = new CommandApplierFacade(
-                storeApplier, indexApplier, legacyIndexApplier, countsStoreApplier ) )
+                storeApplier, indexApplier, legacyIndexApplier, countsStoreApplier, dynProHandler ) )
         {
             representation.accept( applier );
         }
@@ -125,6 +134,6 @@ public class TransactionRepresentationStoreApplier
     {
         return new TransactionRepresentationStoreApplier( indexingService, labelScanWriters, neoStore, cacheAccess,
                                                           lockService, legacyIndexProviderLookup, indexConfigStore,
-                                                          legacyIndexTransactionOrdering );
+                                                          legacyIndexTransactionOrdering, propertyStore );
     }
 }

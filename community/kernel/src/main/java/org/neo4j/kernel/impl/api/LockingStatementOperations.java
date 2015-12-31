@@ -37,6 +37,7 @@ import org.neo4j.kernel.api.exceptions.schema.SchemaRuleNotFoundException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.operations.EntityReadOperations;
 import org.neo4j.kernel.impl.api.operations.EntityWriteOperations;
@@ -318,9 +319,15 @@ public class LockingStatementOperations implements
         //
         // It would be cleaner if the schema and data cakes were separated so that the SchemaReadOperations object used
         // by ConstraintEnforcingEntityOperations included the full cake, with locking included.
-        state.locks().acquireShared( ResourceTypes.SCHEMA, schemaResource() );
-
-        state.locks().acquireExclusive( ResourceTypes.NODE, nodeId );
+        if( !(property instanceof DynamicProperty) )
+        {
+            state.locks().acquireShared( ResourceTypes.SCHEMA, schemaResource() );
+            state.locks().acquireExclusive( ResourceTypes.NODE, nodeId );
+        }
+        else
+        {
+            //FIXME
+        }
         return entityWriteDelegate.nodeSetProperty( state, nodeId, property );
     }
 
@@ -336,7 +343,14 @@ public class LockingStatementOperations implements
     public Property relationshipSetProperty( KernelStatement state, long relationshipId, DefinedProperty property )
             throws EntityNotFoundException
     {
-        state.locks().acquireExclusive( ResourceTypes.RELATIONSHIP, relationshipId );
+        if( !(property instanceof DynamicProperty) )
+        {
+            state.locks().acquireExclusive( ResourceTypes.RELATIONSHIP, relationshipId );
+        }
+        else
+        {
+            
+        }
         return entityWriteDelegate.relationshipSetProperty( state, relationshipId, property );
     }
 

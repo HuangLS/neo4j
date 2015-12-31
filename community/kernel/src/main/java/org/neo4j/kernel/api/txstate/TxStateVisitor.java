@@ -26,6 +26,7 @@ import java.util.Set;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.impl.api.state.RelationshipChangesForNode;
 
 /**
@@ -33,6 +34,10 @@ import org.neo4j.kernel.impl.api.state.RelationshipChangesForNode;
  */
 public interface TxStateVisitor
 {
+    void visitNodeAppendDynamicProperty( long id, Iterator<DynamicProperty> appended );
+    
+    void visitRelationshipAppendDynamicProperty( long id, Iterator<DynamicProperty> appended );
+    
     void visitCreatedNode( long id );
 
     void visitDeletedNode( long id );
@@ -167,6 +172,16 @@ public interface TxStateVisitor
 
         @Override
         public void visitCreatedRelationshipLegacyIndex( String name, Map<String, String> config )
+        {   // Ignore
+        }
+
+        @Override
+        public void visitNodeAppendDynamicProperty( long id, Iterator<DynamicProperty> appended )
+        {   // Ignore
+        }
+
+        @Override
+        public void visitRelationshipAppendDynamicProperty( long id, Iterator<DynamicProperty> appended )
         {   // Ignore
         }
     }

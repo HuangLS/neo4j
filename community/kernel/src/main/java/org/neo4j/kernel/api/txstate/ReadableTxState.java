@@ -27,6 +27,7 @@ import org.neo4j.graphdb.Direction;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.api.state.NodeState;
 import org.neo4j.kernel.impl.api.state.RelationshipState;
@@ -46,7 +47,17 @@ public interface ReadableTxState
     boolean hasChanges();
 
     // ENTITY RELATED
-
+    
+    Iterator<DynamicProperty> appendedNodePropertyInThisTxByProId( long nodeId, int proId );
+    
+    Iterator<DynamicProperty> appendedRelationshipPropertyInThisTxByProId( long relId, int proId );
+    
+    /** Returns the latest value of a dynamic property if there is any. */
+    DynamicProperty nodeDynamicPropertyGetLatest( long nodeId, int dynamicPropertyId );
+    
+    /** Returns the latest value of a dynamic property if there is any. */
+    DynamicProperty relationshipDynamicPropertyGetLatest( long relId, int dynamicPropertyId );
+    
     /** Returns all nodes that, in this tx, have had labelId removed. */
     ReadableDiffSets<Long> nodesWithLabelChanged( int labelId );
 

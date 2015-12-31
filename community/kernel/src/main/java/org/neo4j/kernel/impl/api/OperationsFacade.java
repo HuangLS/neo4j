@@ -22,6 +22,7 @@ package org.neo4j.kernel.impl.api;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.act.dynproperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
@@ -54,6 +55,7 @@ import org.neo4j.kernel.api.exceptions.schema.TooManyLabelsException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.operations.CountsOperations;
 import org.neo4j.kernel.impl.api.operations.EntityReadOperations;
@@ -72,6 +74,54 @@ import org.neo4j.register.Register;
 
 public class OperationsFacade implements ReadOperations, DataWriteOperations, SchemaWriteOperations
 {
+    @Override
+    public DynamicProperty nodeGetProperty( long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        if ( propertyKeyId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        return dataRead().nodeGetProperty( statement, nodeId, propertyKeyId, time );
+    }
+
+    @Override
+    public DynamicProperty nodeGetProperty( long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback )
+            throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        if ( propertyKeyId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        return dataRead().nodeGetProperty( statement, nodeId, propertyKeyId, startTime, endTime, callback );
+    }
+
+    @Override
+    public DynamicProperty relationshipGetProperty( long nodeId, int propertyKeyId, int time )
+            throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        if ( propertyKeyId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        return dataRead().relationshipGetProperty( statement, nodeId, propertyKeyId, time );
+    }
+
+    @Override
+    public DynamicProperty relationshipGetProperty( long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback )
+            throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        if ( propertyKeyId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        return dataRead().relationshipGetProperty( statement, nodeId, propertyKeyId, startTime, endTime, callback );
+    }
+    
+    
     final KernelStatement statement;
     private final StatementOperationParts operations;
 
@@ -997,6 +1047,7 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
         statement.assertOpen();
         return counting().countsForRelationship( statement, startLabelId, typeId, endLabelId );
     }
+
 
     // </Counts>
 }

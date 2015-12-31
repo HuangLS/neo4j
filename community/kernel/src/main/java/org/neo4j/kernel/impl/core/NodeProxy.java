@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import org.act.dynproperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.function.primitive.FunctionFromPrimitiveInt;
 import org.neo4j.graphdb.ConstraintViolationException;
@@ -60,7 +61,6 @@ import org.neo4j.kernel.impl.api.operations.KeyReadOperations;
 import org.neo4j.kernel.impl.traversal.OldTraverserWrapper;
 
 import static java.lang.String.format;
-
 import static org.neo4j.collection.primitive.PrimitiveIntCollections.map;
 import static org.neo4j.graphdb.DynamicLabel.label;
 import static org.neo4j.helpers.collection.IteratorUtil.asList;
@@ -69,6 +69,85 @@ import static org.neo4j.kernel.impl.core.TokenHolder.NO_ID;
 
 public class NodeProxy implements Node
 {
+    
+
+    @Override
+    public void setProperty( String key, int time, byte[] value )
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().nodeSetProperty( nodeId, Property.property( propertyKeyId, time, value ) );
+                
+                //FIXME
+                statement.dataWriteOperations().nodeSetProperty( nodeId, Property.property( propertyKeyId, propertyKeyId ) );
+            }
+            catch ( ConstraintValidationKernelException e )
+            {
+                throw new ConstraintViolationException(
+                        e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
+    @Override
+    public byte[] getProperty( String key, int time )
+    {
+        if ( null == key )
+        {
+            throw new IllegalArgumentException( "(null) property key is not allowed" );
+        }
+
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
+            return (byte[]) statement.readOperations().nodeGetProperty( nodeId, propertyKeyId, time ).value();
+        }
+        catch ( EntityNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+    }
+
+    @Override
+    public byte[] getProperty( String key, int startTime, int endTime, RangeQueryCallBack callback )
+    {
+        if ( null == key )
+        {
+            throw new IllegalArgumentException( "(null) property key is not allowed" );
+        }
+
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
+            return (byte[]) statement.readOperations().nodeGetProperty( nodeId, propertyKeyId, startTime, endTime, callback ).value();
+        }
+        catch ( EntityNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+    }
+    
     public interface NodeActions
     {
         Statement statement();

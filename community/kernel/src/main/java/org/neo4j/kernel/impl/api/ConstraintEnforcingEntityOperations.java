@@ -21,6 +21,7 @@ package org.neo4j.kernel.impl.api;
 
 import java.util.Iterator;
 
+import org.act.dynproperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
@@ -34,6 +35,7 @@ import org.neo4j.kernel.api.exceptions.schema.UnableToValidateConstraintKernelEx
 import org.neo4j.kernel.api.exceptions.schema.UniqueConstraintViolationKernelException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.operations.EntityOperations;
 import org.neo4j.kernel.impl.api.operations.EntityReadOperations;
@@ -49,6 +51,36 @@ import static org.neo4j.kernel.impl.locking.ResourceTypes.indexEntryResourceId;
 
 public class ConstraintEnforcingEntityOperations implements EntityOperations
 {
+    
+    
+    @Override
+    public DynamicProperty nodeGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException
+    {
+        return this.entityReadOperations.nodeGetProperty( statment, nodeId, propertyKeyId, time );
+    }
+
+    @Override
+    public DynamicProperty nodeGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int startTime, int endTime,
+            RangeQueryCallBack callback ) throws EntityNotFoundException
+    {
+        return this.entityReadOperations.nodeGetProperty( statment, nodeId, propertyKeyId, startTime, endTime, callback );
+    }
+
+    @Override
+    public DynamicProperty relationshipGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int time )
+            throws EntityNotFoundException
+    {
+        return this.entityReadOperations.relationshipGetProperty( statment, nodeId, propertyKeyId, time );
+    }
+
+    @Override
+    public DynamicProperty relationshipGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int startTime, int endTime,
+            RangeQueryCallBack callback ) throws EntityNotFoundException
+    {
+        return this.entityReadOperations.relationshipGetProperty( statment, nodeId, propertyKeyId, startTime, endTime, callback );
+    }
+    
+    
     private final EntityWriteOperations entityWriteOperations;
     private final EntityReadOperations entityReadOperations;
     private final SchemaReadOperations schemaReadOperations;
@@ -85,17 +117,24 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations
     public Property nodeSetProperty( KernelStatement state, long nodeId, DefinedProperty property )
             throws EntityNotFoundException, ConstraintValidationKernelException
     {
-        PrimitiveIntIterator labelIds = entityReadOperations.nodeGetLabels( state, nodeId );
-        while ( labelIds.hasNext() )
+        if( !(property instanceof DynamicProperty) )
         {
-            int labelId = labelIds.next();
-            int propertyKeyId = property.propertyKeyId();
-            Iterator<UniquenessConstraint> constraintIterator =
-                    schemaReadOperations.constraintsGetForLabelAndPropertyKey( state, labelId, propertyKeyId );
-            if ( constraintIterator.hasNext() )
+            PrimitiveIntIterator labelIds = entityReadOperations.nodeGetLabels( state, nodeId );
+            while ( labelIds.hasNext() )
             {
-                validateNoExistingNodeWithLabelAndProperty( state, labelId, property, nodeId );
+                int labelId = labelIds.next();
+                int propertyKeyId = property.propertyKeyId();
+                Iterator<UniquenessConstraint> constraintIterator =
+                        schemaReadOperations.constraintsGetForLabelAndPropertyKey( state, labelId, propertyKeyId );
+                if ( constraintIterator.hasNext() )
+                {
+                    validateNoExistingNodeWithLabelAndProperty( state, labelId, property, nodeId );
+                }
             }
+        }
+        else
+        {
+            
         }
         return entityWriteOperations.nodeSetProperty( state, nodeId, property );
     }

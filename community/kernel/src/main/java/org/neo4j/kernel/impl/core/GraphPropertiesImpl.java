@@ -60,6 +60,28 @@ import static org.neo4j.kernel.api.properties.Property.property;
  */
 public class GraphPropertiesImpl extends Primitive implements GraphProperties
 {
+    //FIXME GraphProperties Dynamic Problems
+    @Override
+    public void setProperty( String key, int time, byte[] value )
+    {
+        // TODO Auto-generated method stub
+        
+    }
+
+    @Override
+    public byte[] getProperty( String key, int time )
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public byte[] getProperty( String key, int startTime, int endTime )
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    
     private final long epoch;
     private final ThreadToStatementContextBridge statementContextProvider;
     private Map<Integer,DefinedProperty> properties;

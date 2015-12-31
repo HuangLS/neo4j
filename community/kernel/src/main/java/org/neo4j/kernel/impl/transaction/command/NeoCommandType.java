@@ -23,6 +23,10 @@ public interface NeoCommandType
 {
     // means the first byte of the command record was only written but second
     // (saying what type) did not get written but the file still got expanded
+    
+    public static final byte NODE_DYN_PROPERTY_COMMAND = (byte) 18;
+    public static final byte REL_DYN_PROPERTY_COMAND = (byte) 19;
+    
     public static final byte NONE = (byte) 0;
 
     public static final byte NODE_COMMAND = (byte) 1;

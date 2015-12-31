@@ -19,7 +19,15 @@
  */
 package org.neo4j.kernel.impl.api.state;
 
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.SortedSet;
+import java.util.TreeMap;
 
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.helpers.Predicate;
@@ -27,6 +35,7 @@ import org.neo4j.helpers.collection.CombiningIterator;
 import org.neo4j.helpers.collection.FilteringIterator;
 import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.impl.util.VersionedHashMap;
 
 import static org.neo4j.helpers.collection.IteratorUtil.emptyIterator;
@@ -42,6 +51,14 @@ import static org.neo4j.helpers.collection.IteratorUtil.emptyIterator;
 interface PropertyContainerState
 {
     Iterator<DefinedProperty> addedProperties();
+    
+    /**
+     * 
+     * @return null means no appended.......
+     */
+    Iterator<DynamicProperty> appendedDynamicProperties();
+    
+    Iterator<DynamicProperty> appendDynamicPropertyById( int proId );
 
     Iterator<DefinedProperty> changedProperties();
 
@@ -58,10 +75,15 @@ interface PropertyContainerState
         void visitPropertyChanges( long entityId, Iterator<DefinedProperty> added,
                                    Iterator<DefinedProperty> changed,
                                    Iterator<Integer> removed );
+        
+        void visiteAppendedDynamicProperty( long entityId, Iterator<DynamicProperty> appended );
     }
 
     class Mutable implements PropertyContainerState
     {
+        
+        private Map<Integer, List<DynamicProperty>> appendedDynamicProperties;
+        
         private final long id;
         private static final ResourceIterator<DefinedProperty> NO_PROPERTIES = emptyIterator();
 
@@ -92,11 +114,30 @@ interface PropertyContainerState
 
         public void clear()
         {
+            if ( null != appendedDynamicProperties ) appendedDynamicProperties.clear();
             if ( changedProperties != null ) changedProperties.clear();
             if ( addedProperties != null ) addedProperties.clear();
             if ( removedProperties != null ) removedProperties.clear();
         }
 
+        public void appendDynamicProperty( DynamicProperty property )
+        {
+            if( null == this.appendedDynamicProperties )
+                this.appendedDynamicProperties = new HashMap<Integer,List<DynamicProperty>>();
+            List<DynamicProperty> list = this.appendedDynamicProperties.get( property.propertyKeyId() );
+            if( null == list )
+            {
+                list = new LinkedList<DynamicProperty>();
+                this.appendedDynamicProperties.put( property.propertyKeyId(), list );
+            }
+            list.add(property);
+        }
+        
+        public Iterator<DynamicProperty> appendDynamicPropertyById( int proId )
+        {
+            return this.appendedDynamicProperties == null ? null : this.appendedDynamicProperties.get( proId ).iterator();
+        }
+        
         public void changeProperty( DefinedProperty property )
         {
             if ( addedProperties != null )
@@ -159,6 +200,32 @@ interface PropertyContainerState
             }
         }
 
+        
+        @Override
+        public Iterator<DynamicProperty> appendedDynamicProperties()
+        {
+            if( null != appendedDynamicProperties )
+            {
+                List<DynamicProperty> list = new LinkedList<DynamicProperty>();
+                for( List<DynamicProperty> l : appendedDynamicProperties.values() )
+                {
+                    list.addAll( l );
+                }
+                list.sort( new Comparator<DynamicProperty>()
+                {
+
+                    @Override
+                    public int compare( DynamicProperty o1, DynamicProperty o2 )
+                    {
+                        return o1.time() - o2.time();
+                    }
+                } );
+                return list.iterator();
+            }
+            else
+                return null;
+        }
+        
         @Override
         public Iterator<DefinedProperty> addedProperties()
         {
@@ -229,6 +296,25 @@ interface PropertyContainerState
             if ( addedProperties != null || removedProperties != null || changedProperties != null )
             {
                 visitor.visitPropertyChanges( id, addedProperties(), changedProperties(), removedProperties() );
+            }
+            
+            if( null != appendedDynamicProperties )
+            {
+                List<DynamicProperty> list = new LinkedList<DynamicProperty>();
+                for( List<DynamicProperty> l : appendedDynamicProperties.values() )
+                {
+                    list.addAll( l );
+                }
+                list.sort( new Comparator<DynamicProperty>()
+                {
+
+                    @Override
+                    public int compare( DynamicProperty o1, DynamicProperty o2 )
+                    {
+                        return o1.time() - o2.time();
+                    }
+                } );
+                visitor.visiteAppendedDynamicProperty( id, list.iterator() );
             }
         }
     }

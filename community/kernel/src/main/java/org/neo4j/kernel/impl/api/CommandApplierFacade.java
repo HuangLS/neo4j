@@ -44,6 +44,35 @@ import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
 
 public class CommandApplierFacade implements NeoCommandHandler, Visitor<Command,IOException>
 {
+    
+    @Override 
+    public boolean visitNodeDynProCommand(Command.NodeDynProCommand command) throws IOException 
+    {
+        boolean result = false;
+        for ( NeoCommandHandler handler : handlers )
+        {
+            if ( handler.visitNodeDynProCommand( command ) )
+            {
+                result = true;
+            }
+        }
+        return result;
+    }
+    
+    @Override 
+    public boolean visitRelationshipDynProCommand(Command.RelationshipDynProCommand command) throws IOException 
+    {
+        boolean result = false;
+        for ( NeoCommandHandler handler : handlers )
+        {
+            if ( handler.visitRelationshipDynProCommand( command ) )
+            {
+                result = true;
+            }
+        }
+        return result;
+    }
+    
     private final NeoCommandHandler[] handlers;
 
     public CommandApplierFacade( NeoCommandHandler... handlers )

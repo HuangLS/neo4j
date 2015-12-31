@@ -22,6 +22,8 @@ package org.neo4j.kernel.impl.api.state;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.neo4j.helpers.collection.Iterables;
 
@@ -87,7 +89,7 @@ abstract class StateDefaults<KEY, RO, RW extends RO>
         Map<KEY, RW> map = getMap( state );
         if ( map == null )
         {
-            setMap( state, map = new HashMap<>() );
+            setMap( state, map = new TreeMap<>() );
         }
         RW value = map.get( key );
         if ( value == null )

@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.impl.core;
 
+import static java.lang.String.format;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +38,7 @@ import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
 import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
 import org.neo4j.kernel.api.exceptions.PropertyKeyIdNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
+import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
 import org.neo4j.kernel.api.exceptions.schema.IllegalTokenNameException;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
@@ -44,6 +47,57 @@ import org.neo4j.kernel.impl.api.operations.KeyReadOperations;
 
 public class RelationshipProxy implements Relationship, RelationshipVisitor<RuntimeException>
 {
+    
+    @Override
+    public void setProperty( String key, int time, byte[] value )
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().relationshipSetProperty( getId(), Property.property( propertyKeyId, time, value ) );
+                
+                //FIXME
+                statement.dataWriteOperations().relationshipSetProperty( getId(), Property.property( propertyKeyId, propertyKeyId ) );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException e )
+        {
+            throw new IllegalStateException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            // TODO: Maybe throw more context-specific error than just IllegalArgument
+            throw new IllegalArgumentException( e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+    
+    
+    @Override
+    public byte[] getProperty( String key, int time )
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public byte[] getProperty( String key, int startTime, int endTime )
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
+    
     public interface RelationshipActions
     {
         Statement statement();

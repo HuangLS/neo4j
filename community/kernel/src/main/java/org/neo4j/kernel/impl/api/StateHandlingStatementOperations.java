@@ -25,6 +25,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import org.act.dynproperty.impl.RangeQueryCallBack;
+import org.act.dynproperty.util.Slice;
 import org.neo4j.collection.primitive.PrimitiveIntCollections;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
@@ -54,6 +56,7 @@ import org.neo4j.kernel.api.exceptions.schema.TooManyLabelsException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.api.properties.PropertyKeyIdIterator;
 import org.neo4j.kernel.api.txstate.ReadableTxState;
@@ -68,6 +71,7 @@ import org.neo4j.kernel.impl.api.operations.SchemaReadOperations;
 import org.neo4j.kernel.impl.api.operations.SchemaWriteOperations;
 import org.neo4j.kernel.impl.api.state.AugmentWithLocalStateExpandCursor;
 import org.neo4j.kernel.impl.api.state.ConstraintIndexCreator;
+import org.neo4j.kernel.impl.api.store.DynamicPropertyRead;
 import org.neo4j.kernel.impl.api.store.StoreReadLayer;
 import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.index.IndexEntityType;
@@ -95,6 +99,251 @@ public class StateHandlingStatementOperations implements
         LegacyIndexReadOperations,
         LegacyIndexWriteOperations
 {
+    
+    
+    
+    @Override
+    public DynamicProperty nodeGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException
+    {
+        DynamicProperty toret = null;
+        if( statment.txState().hasChanges() )
+        {
+            Iterator<DynamicProperty> iterator = statment.txState().appendedNodePropertyInThisTxByProId( nodeId, propertyKeyId );
+            toret = iterator.next();
+            if( toret.time() <= time )
+            {
+                while( iterator.hasNext() )
+                {
+                    DynamicProperty temp = iterator.next();
+                    if( temp.time() > time )
+                        return toret;
+                    else
+                        toret = temp;
+                }
+                return toret;
+            }
+            byte[] value = this.dynamicPropertyRead.getNodeProperty( nodeId, propertyKeyId, time );
+            return new DynamicProperty( propertyKeyId, time, value );
+        }
+        else
+        {
+            byte[] value = this.dynamicPropertyRead.getNodeProperty( nodeId, propertyKeyId, time );
+            return new DynamicProperty( propertyKeyId, time, value );
+        }
+    }
+
+    @Override
+    public DynamicProperty nodeGetProperty(KernelStatement statment, long relId, int propertyKeyId, int startTime, int endTime,
+            RangeQueryCallBack callback ) throws EntityNotFoundException
+    {
+        if( statment.hasTxStateWithChanges() )
+        {
+            Iterator<DynamicProperty> iterator = statment.txState().appendedRelationshipPropertyInThisTxByProId( relId, propertyKeyId );
+            DynamicProperty temp = iterator.next();
+            if( startTime >= temp.time() )
+            {
+                callback.onCall( new Slice(temp.value()) );
+                while( iterator.hasNext() )
+                {
+                    temp = iterator.next();
+                    callback.onCall( new Slice( temp.value() ) );
+                }
+                return new DynamicProperty( propertyKeyId, startTime, callback.onReturn().copyBytes() );
+            }
+            else if( endTime <= temp.time() )
+            {
+                byte[] value = this.dynamicPropertyRead.getRelationshipProperty( relId, propertyKeyId, startTime, endTime, callback );
+                return new DynamicProperty( propertyKeyId, startTime, value );
+            }
+            else
+            {
+                callback.onCall( new Slice(temp.value()) );
+                while( iterator.hasNext() )
+                {
+                    temp = iterator.next();
+                    callback.onCall( new Slice( temp.value() ) );
+                }
+                this.dynamicPropertyRead.getRelationshipProperty( relId, propertyKeyId, startTime, -1, callback );
+                byte[] value = callback.onReturn().getBytes();
+                return new DynamicProperty( propertyKeyId, startTime, value );
+            }
+        }
+        byte[] value = this.dynamicPropertyRead.getRelationshipProperty( relId, propertyKeyId, startTime, endTime, callback );
+        return new DynamicProperty( propertyKeyId, startTime, value ); 
+    }
+
+    @Override
+    public DynamicProperty relationshipGetProperty(KernelStatement statment, long relId, int propertyKeyId, int time )
+            throws EntityNotFoundException
+    {
+        DynamicProperty toret = null;
+        if( statment.txState().hasChanges() )
+        {
+            Iterator<DynamicProperty> iterator = statment.txState().appendedRelationshipPropertyInThisTxByProId( relId, propertyKeyId );
+            toret = iterator.next();
+            if( toret.time() <= time )
+            {
+                while( iterator.hasNext() )
+                {
+                    DynamicProperty temp = iterator.next();
+                    if( temp.time() > time )
+                        return toret;
+                    else
+                        toret = temp;
+                }
+                return toret;
+            }
+            byte[] value = this.dynamicPropertyRead.getRelationshipProperty( relId, propertyKeyId, time );
+            return new DynamicProperty( propertyKeyId, time, value );
+        }
+        else
+        {
+            byte[] value = this.dynamicPropertyRead.getRelationshipProperty( relId, propertyKeyId, time );
+            return new DynamicProperty( propertyKeyId, time, value );
+        }
+    }
+
+    @Override
+    public DynamicProperty relationshipGetProperty(KernelStatement statment, long nodeId, int propertyKeyId, int startTime, int endTime,
+            RangeQueryCallBack callback ) throws EntityNotFoundException
+    {
+        if( statment.hasTxStateWithChanges() )
+        {
+            Iterator<DynamicProperty> iterator = statment.txState().appendedRelationshipPropertyInThisTxByProId( nodeId, propertyKeyId );
+            DynamicProperty temp = iterator.next();
+            if( startTime >= temp.time() )
+            {
+                callback.onCall( new Slice(temp.value()) );
+                while( iterator.hasNext() )
+                {
+                    temp = iterator.next();
+                    callback.onCall( new Slice( temp.value() ) );
+                }
+                return new DynamicProperty( propertyKeyId, startTime, callback.onReturn().copyBytes() );
+            }
+            else if( endTime <= temp.time() )
+            {
+                byte[] value = this.dynamicPropertyRead.getNodeProperty( nodeId, propertyKeyId, startTime, endTime, callback );
+                return new DynamicProperty( propertyKeyId, startTime, value );
+            }
+            else
+            {
+                callback.onCall( new Slice(temp.value()) );
+                while( iterator.hasNext() )
+                {
+                    temp = iterator.next();
+                    callback.onCall( new Slice( temp.value() ) );
+                }
+                this.dynamicPropertyRead.getNodeProperty( nodeId, propertyKeyId, startTime, -1, callback );
+                byte[] value = callback.onReturn().getBytes();
+                return new DynamicProperty( propertyKeyId, startTime, value );
+            }
+        }
+        byte[] value = this.dynamicPropertyRead.getNodeProperty( nodeId, propertyKeyId, startTime, endTime, callback );
+        return new DynamicProperty( propertyKeyId, startTime, value ); 
+    }
+    
+    
+    
+    @Override
+    public Property relationshipSetProperty( KernelStatement state, long relationshipId, DefinedProperty property )
+            throws EntityNotFoundException
+    {
+        if( !(property instanceof DynamicProperty) )
+        {
+            Property existingProperty = relationshipGetProperty( state, relationshipId, property.propertyKeyId() );
+            if ( !existingProperty.isDefined() )
+            {
+                legacyPropertyTrackers.relationshipAddStoreProperty( relationshipId, property );
+            }
+            else
+            {
+                legacyPropertyTrackers.relationshipChangeStoreProperty( relationshipId, (DefinedProperty)
+                        existingProperty, property );
+            }
+            state.txState().relationshipDoReplaceProperty( relationshipId, existingProperty, property );
+            return existingProperty;
+        }
+        else
+        {
+            DynamicProperty existingProperty = relationshipGetDynamicProperty( state, relationshipId, property.propertyKeyId() );
+            if( null != existingProperty &&  existingProperty.time() >= ((DynamicProperty)property).time() )
+            {
+                //FIXME
+                throw new RuntimeException( "" );
+            }
+            state.txState().relationshipDoAppendDynamicProperty( relationshipId, (DynamicProperty)property );
+            return existingProperty;
+        }
+    }
+    
+    private DynamicProperty relationshipGetDynamicProperty( KernelStatement state, long relId, int propertyKeyId )
+            throws EntityNotFoundException
+    {
+        if ( state.hasTxStateWithChanges() )
+        {
+            DynamicProperty toret = state.txState().relationshipDynamicPropertyGetLatest( relId, propertyKeyId );
+            if( toret != null )
+                return toret;
+        }
+        byte[] value = this.dynamicPropertyRead.getRelationshipProperty( relId, propertyKeyId, -1 );
+        int time = this.dynamicPropertyRead.getRelationshipPropertyLatestTime( relId, propertyKeyId );
+        return new DynamicProperty( propertyKeyId, time, value );
+    }
+    
+    @Override
+    public Property nodeSetProperty( KernelStatement state, long nodeId, DefinedProperty property )
+            throws EntityNotFoundException
+    {
+        if( !(property instanceof DynamicProperty ) )
+        {
+            Property existingProperty = nodeGetProperty( state, nodeId, property.propertyKeyId() );
+            if ( !existingProperty.isDefined() )
+            {
+                legacyPropertyTrackers.nodeAddStoreProperty( nodeId, property );
+            }
+            else
+            {
+                legacyPropertyTrackers.nodeChangeStoreProperty( nodeId, (DefinedProperty) existingProperty, property );
+            }
+            state.txState().nodeDoReplaceProperty( nodeId, existingProperty, property );
+            indexesUpdateProperty( state, nodeId, property.propertyKeyId(),
+                                   existingProperty instanceof DefinedProperty ? (DefinedProperty) existingProperty : null,
+                                   property );
+            return existingProperty;
+        }
+        else
+        {
+            DynamicProperty existingProperty = nodeGetDynamicProperty( state, nodeId, property.propertyKeyId() );
+            if( null != existingProperty && existingProperty.time() >= ((DynamicProperty)property).time() )
+            {
+                //FIXME
+                throw new RuntimeException( "" );
+            }
+            state.txState().nodeDoAppendDynamicProperty( nodeId, (DynamicProperty)property );
+            return existingProperty;
+        }
+    }
+    
+    private DynamicProperty nodeGetDynamicProperty( KernelStatement state, long nodeId, int propertyKeyId )
+            throws EntityNotFoundException
+    {
+        if ( state.hasTxStateWithChanges() )
+        {
+            DynamicProperty toret = state.txState().nodeDynamicPropertyGetLatest( nodeId, propertyKeyId );
+            if( toret != null )
+                return toret;
+        }
+
+        byte[] value = this.dynamicPropertyRead.getNodeProperty( nodeId, propertyKeyId, -1 );
+        int time = this.dynamicPropertyRead.getNodePropertyLatestTime( nodeId, propertyKeyId );
+        return new DynamicProperty( propertyKeyId, time, value );
+    }
+    
+    private final DynamicPropertyRead dynamicPropertyRead;
+    
+    
+    
     private final StoreReadLayer storeLayer;
     private final LegacyPropertyTrackers legacyPropertyTrackers;
     private final ConstraintIndexCreator constraintIndexCreator;
@@ -103,12 +352,13 @@ public class StateHandlingStatementOperations implements
     public StateHandlingStatementOperations(
             StoreReadLayer storeLayer, LegacyPropertyTrackers propertyTrackers,
             ConstraintIndexCreator constraintIndexCreator,
-            LegacyIndexStore legacyIndexStore )
+            LegacyIndexStore legacyIndexStore, DynamicPropertyRead dynamicPropertyRead )
     {
         this.storeLayer = storeLayer;
         this.legacyPropertyTrackers = propertyTrackers;
         this.constraintIndexCreator = constraintIndexCreator;
         this.legacyIndexStore = legacyIndexStore;
+        this.dynamicPropertyRead = dynamicPropertyRead;
     }
 
     @Override
@@ -612,44 +862,6 @@ public class StateHandlingStatementOperations implements
             return nodes.augmentWithRemovals( labelPropertyChanges.augment( nodeIds ) );
         }
         return nodeIds;
-    }
-
-    @Override
-    public Property nodeSetProperty( KernelStatement state, long nodeId, DefinedProperty property )
-            throws EntityNotFoundException
-    {
-        Property existingProperty = nodeGetProperty( state, nodeId, property.propertyKeyId() );
-        if ( !existingProperty.isDefined() )
-        {
-            legacyPropertyTrackers.nodeAddStoreProperty( nodeId, property );
-        }
-        else
-        {
-            legacyPropertyTrackers.nodeChangeStoreProperty( nodeId, (DefinedProperty) existingProperty, property );
-        }
-        state.txState().nodeDoReplaceProperty( nodeId, existingProperty, property );
-        indexesUpdateProperty( state, nodeId, property.propertyKeyId(),
-                               existingProperty instanceof DefinedProperty ? (DefinedProperty) existingProperty : null,
-                               property );
-        return existingProperty;
-    }
-
-    @Override
-    public Property relationshipSetProperty( KernelStatement state, long relationshipId, DefinedProperty property )
-            throws EntityNotFoundException
-    {
-        Property existingProperty = relationshipGetProperty( state, relationshipId, property.propertyKeyId() );
-        if ( !existingProperty.isDefined() )
-        {
-            legacyPropertyTrackers.relationshipAddStoreProperty( relationshipId, property );
-        }
-        else
-        {
-            legacyPropertyTrackers.relationshipChangeStoreProperty( relationshipId, (DefinedProperty)
-                    existingProperty, property );
-        }
-        state.txState().relationshipDoReplaceProperty( relationshipId, existingProperty, property );
-        return existingProperty;
     }
 
     @Override

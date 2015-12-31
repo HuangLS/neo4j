@@ -19,12 +19,15 @@
  */
 package org.neo4j.kernel.api.txstate;
 
+import java.util.Iterator;
 import java.util.Map;
 
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.properties.Property;
+import org.neo4j.kernel.impl.api.DyanmicProperty;
 
 /**
  * Kernel transaction state, please see {@link org.neo4j.kernel.impl.api.state.TxState} for implementation details.
@@ -38,6 +41,10 @@ public interface TransactionState extends ReadableTxState
 {
     // ENTITY RELATED
 
+    void nodeDoAppendDynamicProperty( long id, DynamicProperty property );
+    
+    void relationshipDoAppendDynamicProperty( long id, DynamicProperty property );
+    
     void relationshipDoCreate( long id, int relationshipTypeId, long startNodeId, long endNodeId );
 
     void nodeDoCreate( long id );
@@ -98,4 +105,5 @@ public interface TransactionState extends ReadableTxState
     // </Legacy index>
 
     void indexDoUpdateProperty( IndexDescriptor descriptor, long nodeId, DefinedProperty before, DefinedProperty after );
+
 }

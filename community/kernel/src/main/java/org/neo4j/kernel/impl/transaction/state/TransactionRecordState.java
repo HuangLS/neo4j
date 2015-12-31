@@ -23,11 +23,19 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
+import org.act.dynproperty.impl.InternalKey;
+import org.act.dynproperty.impl.ValueType;
+import org.act.dynproperty.util.Slice;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.store.NeoStore;
 import org.neo4j.kernel.impl.store.NodeStore;
@@ -74,6 +82,59 @@ import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsField;
  */
 public class TransactionRecordState implements RecordState
 {
+    
+    private class DynProKeyValue
+    {
+        private InternalKey key;
+        private byte[] value;
+        
+        DynProKeyValue( InternalKey key, byte[] value )
+        {
+            this.key = key;
+            this.value = value;
+        }
+        
+        InternalKey getKey()
+        {
+            return key;
+        }
+        
+        byte[] getValue()
+        {
+            return value;
+        }
+    }
+    
+    public void nodeAppendDynamicProperty( long id, Iterator<DynamicProperty> appended )
+    {
+        for( DynamicProperty p = appended.next(); appended.hasNext(); p = appended.next() )
+        {
+            Slice idSlice = new Slice( 12 );
+            idSlice.setLong( 0, id );
+            idSlice.setInt( 8, p.propertyKeyId() );
+            InternalKey key = new InternalKey( idSlice, p.time(), ValueType.VALUE );
+            DynProKeyValue keyValue = new DynProKeyValue( key, p.value() );
+            nodeAppendedDynProperty.add( keyValue );
+        }
+    }
+    
+    public void relationshipAppendDynamicProperty( long id, Iterator<DynamicProperty> appended )
+    {
+        for( DynamicProperty p = appended.next(); appended.hasNext(); p = appended.next() )
+        {
+            Slice idSlice = new Slice( 12 );
+            idSlice.setLong( 0, id );
+            idSlice.setInt( 8, p.propertyKeyId() );
+            InternalKey key = new InternalKey( idSlice, p.time(), ValueType.VALUE );
+            DynProKeyValue keyValue = new DynProKeyValue( key, p.value() );
+            relationshipAppendDynProperty.add( keyValue );
+        }
+    }
+    
+    
+    private final List<DynProKeyValue> nodeAppendedDynProperty = new LinkedList<TransactionRecordState.DynProKeyValue>();
+    private final List<DynProKeyValue> relationshipAppendDynProperty = new LinkedList<TransactionRecordState.DynProKeyValue>();
+    
     private final NeoStore neoStore;
     private final IntegrityValidator integrityValidator;
     private final NeoStoreTransactionContext context;
@@ -107,6 +168,8 @@ public class TransactionRecordState implements RecordState
         this.lastCommittedTxWhenTransactionStarted = lastCommittedTxWhenTransactionStarted;
         context.initialize();
         prepared = false;
+        this.nodeAppendedDynProperty.clear();
+        this.relationshipAppendDynProperty.clear();
     }
 
     @Override
@@ -131,7 +194,21 @@ public class TransactionRecordState implements RecordState
                            context.getLabelTokenRecords().changeSize() +
                            context.getRelationshipTypeTokenRecords().changeSize() +
                            context.getRelGroupRecords().changeSize() +
-                           (neoStoreRecord != null ? neoStoreRecord.changeSize() : 0);
+                           (neoStoreRecord != null ? neoStoreRecord.changeSize() : 0) + 
+                           nodeAppendedDynProperty.size() + 
+                           relationshipAppendDynProperty.size();
+        
+        for( DynProKeyValue p : nodeAppendedDynProperty )
+        {
+            Command.NodeDynProCommand command = new Command.NodeDynProCommand(p.key,p.value);
+            commands.add( command );
+        }
+        
+        for( DynProKeyValue p : relationshipAppendDynProperty )
+        {
+            Command.RelationshipDynProCommand command = new Command.RelationshipDynProCommand(p.key,p.value);
+            commands.add( command );
+        }
 
         for ( RecordProxy<Integer, LabelTokenRecord, Void> record : context.getLabelTokenRecords().changes() )
         {

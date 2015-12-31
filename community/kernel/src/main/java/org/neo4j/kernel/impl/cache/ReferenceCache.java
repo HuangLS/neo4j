@@ -49,7 +49,7 @@ public class ReferenceCache<E extends EntityWithSizeObject> extends Cache.Adapte
     public E put( E value, boolean force )
     {
         Long key = value.getId();
-        ReferenceWithKey<Long, E> ref = referenceFactory.<Long, E>newReference( key, value, (ReferenceQueue) refQueue );
+		ReferenceWithKey<Long, E> ref = referenceFactory.<Long, E>newReference( key, value, (ReferenceQueue) refQueue );
 
         try
         {

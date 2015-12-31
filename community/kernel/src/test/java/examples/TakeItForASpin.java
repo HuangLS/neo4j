@@ -20,24 +20,36 @@
 package examples;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.test.TargetDirectory;
 
 public class TakeItForASpin
 {
+    
+    private static final int NODE_NUM = 10;
+    private static List<String> PRO_NAMES = new ArrayList<String>( 10 );
+    private static final int TIME_NUM = 100;
+    private static final int TX_NUM = 5;
+    static
+    {
+        for( int i = 0; i<10; i++ )
+        {
+            PRO_NAMES.add( String.valueOf(i) );
+        }
+    }
+    
+    
     public static void main( String[] args )
     {
         File dir = TargetDirectory.forTest( TakeItForASpin.class ).makeGraphDbDir();
         GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase( dir.getAbsolutePath() );
-        try ( Transaction tx = db.beginTx() )
-        {
-            db.createNode();
-            tx.success();
-        }
-        finally
+        
         {
             db.shutdown();
         }

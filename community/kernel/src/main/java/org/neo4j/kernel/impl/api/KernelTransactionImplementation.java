@@ -42,6 +42,7 @@ import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.txstate.LegacyIndexTransactionState;
 import org.neo4j.kernel.api.txstate.TransactionState;
 import org.neo4j.kernel.api.txstate.TxStateHolder;
@@ -402,6 +403,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
         {
             if ( failure || !success )
             {
+                //FIXME not change yet
                 rollback();
                 if ( success )
                 {
@@ -602,6 +604,20 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
 
     private class TransactionToRecordStateVisitor extends TxStateVisitor.Adapter
     {
+        
+        @Override
+        public void visitNodeAppendDynamicProperty( long id, Iterator<DynamicProperty> appended )
+        {
+            recordState.nodeAppendDynamicProperty( id, appended );
+        }
+        
+        @Override
+        public void visitRelationshipAppendDynamicProperty( long id, Iterator<DynamicProperty> appended )
+        {
+            recordState.relationshipAppendDynamicProperty( id, appended );
+        }
+        
+        
         private final RelationshipDataExtractor edge = new RelationshipDataExtractor();
         private boolean clearState;
 

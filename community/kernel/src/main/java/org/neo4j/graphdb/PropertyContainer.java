@@ -19,6 +19,8 @@
  */
 package org.neo4j.graphdb;
 
+import org.act.dynproperty.impl.RangeQueryCallBack;
+
 /**
  * Defines a common API for handling properties on both {@link Node nodes} and
  * {@link Relationship relationships}.
@@ -35,6 +37,21 @@ package org.neo4j.graphdb;
  */
 public interface PropertyContainer
 {
+    /**
+     * Set a dynamic property or append a new value if the property exists already.
+     * The property value must be one of the valid property types below:
+     * <ul>
+     * <li><code>byte[]</code></li>
+     * </ul>
+     * <p>
+     * This means that <code>null</code> is not an accepted property value.
+     */
+    void setProperty( String key, int time, byte[] value );
+    
+    byte[] getProperty( String key, int time );
+    
+    byte[] getProperty( String key, int startTime, int endTime, RangeQueryCallBack callback );
+    
     /**
      * Get the {@link GraphDatabaseService} that this {@link Node} or
      * {@link Relationship} belongs to.

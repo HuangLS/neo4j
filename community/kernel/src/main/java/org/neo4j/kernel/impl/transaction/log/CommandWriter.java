@@ -65,6 +65,31 @@ public class CommandWriter implements NeoCommandHandler
     {
         return value > Integer.MAX_VALUE ? (byte) 1 : (byte) 0;
     }
+    
+    @Override
+    public boolean visitNodeDynProCommand(Command.NodeDynProCommand command) throws IOException 
+    {
+        //FIXME LOG FORMAT
+        channel.put( NeoCommandType.NODE_DYN_PROPERTY_COMMAND );
+        channel.putLong( command.getProContainerKey() );
+        channel.putInt( command.getProId() );
+        channel.putInt( command.getTime() );
+        byte[] value = command.getValue();
+        channel.put( value, value.length );
+        return false;
+    }
+    
+    public boolean visitRelationshipDynProCommand(Command.RelationshipDynProCommand command) throws IOException 
+    {
+      //FIXME LOG FORMAT
+        channel.put( NeoCommandType.REL_DYN_PROPERTY_COMAND );
+        channel.putLong( command.getProContainerKey() );
+        channel.putInt( command.getProId() );
+        channel.putInt( command.getTime() );
+        byte[] value = command.getValue();
+        channel.put( value, value.length );
+        return false;
+    }
 
     @Override
     public boolean visitNodeCommand( Command.NodeCommand command ) throws IOException

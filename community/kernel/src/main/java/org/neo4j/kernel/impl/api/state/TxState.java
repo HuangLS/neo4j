@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
 
 import org.neo4j.collection.primitive.Primitive;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
@@ -36,6 +37,7 @@ import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.api.txstate.ReadableTxState;
 import org.neo4j.kernel.api.txstate.RelationshipChangeVisitorAdapter;
@@ -63,6 +65,87 @@ import static org.neo4j.kernel.api.properties.Property.property;
  */
 public final class TxState implements TransactionState
 {
+    
+    @Override
+    public Iterator<DynamicProperty> appendedNodePropertyInThisTxByProId( long nodeId, int proId )
+    {
+        NodeState state = this.nodeStatesMap.get( nodeId );
+        if( null == state )
+            return null;
+        return state.appendDynamicPropertyById( proId );
+    }
+
+    @Override
+    public Iterator<DynamicProperty> appendedRelationshipPropertyInThisTxByProId( long relId, int proId )
+    {
+        RelationshipState state = this.relationshipStatesMap.get( relId );
+        if( null == state )
+            return null;
+        return state.appendDynamicPropertyById( proId );
+    }
+    
+    public void relationshipDoAppendDynamicProperty( long relId, DynamicProperty property )
+    {
+        RelationshipState.Mutable relState = getOrCreateRelationshipState( relId );
+        relState.appendDynamicProperty( property );
+    }
+    
+    public DynamicProperty relationshipDynamicPropertyGetLatest( long relId, int dynamicPropertyId )
+    {
+        RelationshipState.Mutable relState = getOrCreateRelationshipState( relId );
+        if( null == relState )
+            return null;
+        Iterator<DynamicProperty> iterator = relState.appendedDynamicProperties();
+        if( null == iterator )
+            return null;
+        DynamicProperty toret = null;
+        DynamicProperty temp = null;
+        while( iterator.hasNext() )
+        {
+            temp = iterator.next();
+            if( temp.propertyKeyId() == dynamicPropertyId )
+            {
+                if( null == toret || temp.time() > toret.time() )
+                {
+                    toret = temp;
+                }
+            }
+        }
+        return toret;
+    }
+    
+    public DynamicProperty nodeDynamicPropertyGetLatest( long nodeId, int dynamicPropertyId )
+    {
+        NodeState.Mutable nodeState = getOrCreateNodeState( nodeId );
+        if( null == nodeState )
+            return null;
+        Iterator<DynamicProperty> iterator = nodeState.appendedDynamicProperties();
+        if( null == iterator )
+            return null;
+        DynamicProperty toret = null;
+        DynamicProperty temp = null;
+        while( iterator.hasNext() )
+        {
+            temp = iterator.next();
+            if( temp.propertyKeyId() == dynamicPropertyId )
+            {
+                if( null == toret || temp.time() > toret.time() )
+                {
+                    toret = temp;
+                }
+            }
+        }
+        return toret;
+    }
+    
+    @Override
+    public void nodeDoAppendDynamicProperty( long nodeId, DynamicProperty property )
+    {
+        NodeState.Mutable nodeState = getOrCreateNodeState( nodeId );
+        nodeState.appendDynamicProperty( property );
+    }
+    
+    
     private Map<Integer/*Label ID*/, LabelState.Mutable> labelStatesMap;
     private static final LabelState.Defaults LABEL_STATE = new LabelState.Defaults()
     {
@@ -325,6 +408,12 @@ public final class TxState implements TransactionState
         return new NodeState.Visitor()
         {
             @Override
+            public void visiteAppendedDynamicProperty( long entityId, Iterator<DynamicProperty> appended )
+            {
+                visitor.visitNodeAppendDynamicProperty( entityId, appended );
+            }
+            
+            @Override
             public void visitLabelChanges( long nodeId, Set<Integer> added, Set<Integer> removed )
             {
                 visitor.visitNodeLabelChanges( nodeId, added, removed );
@@ -343,6 +432,7 @@ public final class TxState implements TransactionState
             {
                 visitor.visitNodeRelationshipChanges( nodeId, added, removed );
             }
+
         };
     }
 
@@ -350,6 +440,13 @@ public final class TxState implements TransactionState
     {
         return new PropertyContainerState.Visitor()
         {
+            
+            @Override
+            public void visiteAppendedDynamicProperty( long entityId, Iterator<DynamicProperty> appended )
+            {
+                visitor.visitRelationshipAppendDynamicProperty( entityId, appended );
+            }
+            
             @Override
             public void visitPropertyChanges( long entityId, Iterator<DefinedProperty> added,
                                               Iterator<DefinedProperty> changed, Iterator<Integer> removed)
@@ -363,6 +460,13 @@ public final class TxState implements TransactionState
     {
         return new PropertyContainerState.Visitor()
         {
+            
+            @Override
+            public void visiteAppendedDynamicProperty( long entityId, Iterator<DynamicProperty> appended )
+            {
+                // FIXME Nothing for now  visitor.visitNodeAppendDynamicProperty( entityId, appended );
+            }
+            
             @Override
             public void visitPropertyChanges( long entityId, Iterator<DefinedProperty> added,
                                               Iterator<DefinedProperty> changed, Iterator<Integer> removed)

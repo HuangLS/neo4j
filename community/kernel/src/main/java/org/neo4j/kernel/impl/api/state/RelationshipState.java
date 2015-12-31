@@ -23,6 +23,7 @@ import java.util.Iterator;
 
 import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.DynamicProperty;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
 
 /**
@@ -85,6 +86,13 @@ public interface RelationshipState extends PropertyContainerState
 
         private static final RelationshipState DEFAULT = new RelationshipState()
         {
+            
+            @Override
+            public Iterator<DynamicProperty> appendedDynamicProperties()
+            {
+                return IteratorUtil.emptyIterator();
+            }
+            
             private UnsupportedOperationException notDefined( String field )
             {
                 return new UnsupportedOperationException( field + " not defined" );
