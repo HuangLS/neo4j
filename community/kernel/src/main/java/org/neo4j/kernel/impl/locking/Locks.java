@@ -72,7 +72,21 @@ public interface Locks extends Lifecycle
     }
 
     public interface Client extends AutoCloseable
-    {
+    {   
+
+        void acquireDynPropertyExclusive( ResourceType nodeProperaty, long Id, int propertyKeyId, int time )throws AcquireLockTimeoutException;
+        
+        void acquireDynPropertyShared( ResourceType nodeProperaty, long Id, int propertyKeyId, int start, int end )throws AcquireLockTimeoutException;
+        
+        boolean tryDynPropertyExclusive( ResourceType nodeProperaty, long Id, int propertyKeyId, int time );
+        
+        boolean tryDynPropertyShared( ResourceType nodeProperaty, long Id, int propertyKeyId, int start, int end );
+        
+        void releaseDynPropertyExclusive( ResourceType nodeProperaty, long Id, int propertyKeyId, int time );
+        
+        void releaseDynPropertyShared( ResourceType nodeProperaty, long Id, int propertyKeyId, int start, int end );
+        
+        
         /**
          * Can be grabbed when there are no locks or only share locks on a resource. If the lock cannot be acquired,
          * behavior is specified by the {@link WaitStrategy} for the given {@link ResourceType}.
@@ -113,6 +127,7 @@ public interface Locks extends Lifecycle
 
         /** For slave transactions, this tracks an identifier for the lock session running on the master */
         int getLockSessionId();
+
     }
 
     /**

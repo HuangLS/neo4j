@@ -600,4 +600,36 @@ class RWLock implements Visitor<LineLogger, RuntimeException>
     {
         return txLockElementMap.size();
     }
+
+    void releaseReadLock( LockTransaction lockTransaction, int start, int end )
+    {
+        // do nothing
+    }
+
+    void releaseWriteLock( LockTransaction lockTransaction, int time )
+    {
+        // do nothing
+    }
+
+    boolean tryAcquireReadLock( LockTransaction lockTransaction, int start, int end )
+    {
+        // do nothing
+        return false;
+    }
+
+    boolean tryAcquireWriteLock( LockTransaction lockTransaction, int time )
+    {
+        // do nothing
+        return false;
+    }
+
+    void acquireWriteLock( LockTransaction lockTransaction, int time )
+    {
+        // do nothing
+    }
+
+    void acquireReadLock( LockTransaction lockTransaction, int start, int end )
+    {
+        // do nothing
+    }
 }

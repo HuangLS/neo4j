@@ -24,6 +24,15 @@ import org.neo4j.kernel.impl.locking.Locks;
 
 public interface LockOperations
 {
+    
+    void acquireDynPropertyExclusive( KernelStatement state, Locks.ResourceType resourceType, long Id, int proId, int time );
+    
+    void acquireDynPropertyShared( KernelStatement state, Locks.ResourceType resourceType, long Id, int proId, int start, int end );
+    
+    void releaseDynPropertyExclusive( KernelStatement state, Locks.ResourceType resourceType, long Id, int proId, int time );
+    
+    void releaseDynPropertyShared( KernelStatement state, Locks.ResourceType resourceType, long Id, int proId, int start, int end );
+    
     void acquireExclusive( KernelStatement state, Locks.ResourceType resourceType, long[] resourceId );
     void acquireShared( KernelStatement state, Locks.ResourceType resourceType, long[] resourceId );
 

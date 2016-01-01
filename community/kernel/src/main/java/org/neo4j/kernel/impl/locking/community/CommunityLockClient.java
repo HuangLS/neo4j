@@ -19,22 +19,136 @@
  */
 package org.neo4j.kernel.impl.locking.community;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+
 import org.neo4j.collection.primitive.Primitive;
 import org.neo4j.collection.primitive.PrimitiveIntObjectMap;
 import org.neo4j.collection.primitive.PrimitiveIntObjectVisitor;
 import org.neo4j.collection.primitive.PrimitiveLongObjectMap;
 import org.neo4j.collection.primitive.PrimitiveLongObjectVisitor;
+import org.neo4j.kernel.impl.locking.AcquireLockTimeoutException;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.locking.Locks.ResourceType;
+import org.neo4j.kernel.impl.locking.ResourceTypes;
 
 import static java.lang.String.format;
 
 public class CommunityLockClient implements Locks.Client
 {
+    
+    @Override
+    public void acquireDynPropertyExclusive( ResourceType nodeProperaty, long Id, int propertyKeyId, int time )
+    {
+        Map<LockResouceId,LockResource> localLocks = localExclusive( nodeProperaty );
+        DynProResourceId id =  new DynProResourceId( Id, propertyKeyId );
+        LockResource resource = localLocks.get( id );
+        if( resource != null )
+        {
+            resource.acquireReference();
+        }
+
+        resource = new LockResource( nodeProperaty, id );
+        manager.getWriteLock( resource, lockTransaction, time );
+        localLocks.put(id, resource);
+    }
+    
+    @Override
+    public void acquireDynPropertyShared( ResourceType nodeProperaty, long Id, int propertyKeyId, int start,
+            int end ) throws AcquireLockTimeoutException
+    {
+        Map<LockResouceId,LockResource> localLocks = localShared( nodeProperaty );
+        DynProResourceId id =  new DynProResourceId( Id, propertyKeyId );
+        LockResource resource = localLocks.get( id );
+        if( resource != null )
+        {
+            resource.acquireReference();
+        }
+
+        resource = new LockResource( nodeProperaty, id );
+        manager.getReadLock( resource, lockTransaction, start, end );
+        localLocks.put(id, resource);
+    }
+
+    @Override
+    public boolean tryDynPropertyExclusive( ResourceType nodeProperaty, long Id, int propertyKeyId, int time )
+    {
+        Map<LockResouceId,LockResource> localLocks = localExclusive( nodeProperaty );
+        DynProResourceId id =  new DynProResourceId( Id, propertyKeyId );
+        LockResource resource = localLocks.get( id );
+        if( resource != null )
+        {
+            resource.acquireReference();
+        }
+
+        resource = new LockResource( nodeProperaty, id );
+        if(manager.trygetWriteLock( resource, lockTransaction, time ))
+        {
+            localLocks.put(id, resource);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean tryDynPropertyShared( ResourceType nodeProperaty, long Id, int propertyKeyId, int start, int end )
+    {
+        Map<LockResouceId,LockResource> localLocks = localShared( nodeProperaty );
+        DynProResourceId id =  new DynProResourceId( Id, propertyKeyId );
+        LockResource resource = localLocks.get( id );
+        if( resource != null )
+        {
+            resource.acquireReference();
+        }
+
+        resource = new LockResource( nodeProperaty, id );
+        if(manager.trygetReadLock( resource, lockTransaction, start, end ))
+        {
+            localLocks.put(id, resource);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void releaseDynPropertyExclusive( ResourceType nodeProperaty, long Id, int propertyKeyId, int time )
+    {
+        Map<LockResouceId,LockResource> localLocks = localExclusive( nodeProperaty );
+        DynProResourceId id =  new DynProResourceId( Id, propertyKeyId );
+        LockResource resource = localLocks.get( id );
+        if( resource != null )
+        {
+            resource.acquireReference();
+        }
+
+        resource = new LockResource( nodeProperaty, id );
+        manager.releaseWriteLock( resource, lockTransaction, time );
+        localLocks.put(id, resource);
+    }
+
+    @Override
+    public void releaseDynPropertyShared( ResourceType nodeProperaty, long Id, int propertyKeyId, int start,
+            int end )
+    {
+        Map<LockResouceId,LockResource> localLocks = localShared( nodeProperaty );
+        DynProResourceId id =  new DynProResourceId( Id, propertyKeyId );
+        LockResource resource = localLocks.get( id );
+        if( resource != null )
+        {
+            resource.acquireReference();
+        }
+
+        resource = new LockResource( nodeProperaty, id );
+        manager.releaseReadLock( resource, lockTransaction, start, end );
+        localLocks.put(id, resource);
+    }
+    
     private final LockManagerImpl manager;
     private final LockTransaction lockTransaction = new LockTransaction();
 
-    private final PrimitiveIntObjectMap<PrimitiveLongObjectMap<LockResource>> sharedLocks = Primitive.intObjectMap();
-    private final PrimitiveIntObjectMap<PrimitiveLongObjectMap<LockResource>> exclusiveLocks = Primitive.intObjectMap();
+    private final PrimitiveIntObjectMap<Map<LockResouceId,LockResource>> sharedLocks = Primitive.intObjectMap();
+    private final PrimitiveIntObjectMap<Map<LockResouceId,LockResource>> exclusiveLocks = Primitive.intObjectMap();
 
     public CommunityLockClient( LockManagerImpl manager )
     {
@@ -44,58 +158,61 @@ public class CommunityLockClient implements Locks.Client
     @Override
     public void acquireShared( Locks.ResourceType resourceType, long... resourceIds )
     {
-        PrimitiveLongObjectMap<LockResource> localLocks = localShared( resourceType );
+        Map<LockResouceId,LockResource> localLocks = localShared( resourceType );
         for ( long resourceId : resourceIds )
         {
-            LockResource resource = localLocks.get( resourceId );
+            NRLockResouceId id = new NRLockResouceId( resourceId );
+            LockResource resource = localLocks.get( id );
             if( resource != null )
             {
                 resource.acquireReference();
                 continue;
             }
 
-            resource = new LockResource( resourceType, resourceId );
+            resource = new LockResource( resourceType, id );
             manager.getReadLock( resource, lockTransaction );
-            localLocks.put(resourceId, resource);
+            localLocks.put(id, resource);
         }
     }
 
     @Override
     public void acquireExclusive( Locks.ResourceType resourceType, long... resourceIds )
     {
-        PrimitiveLongObjectMap<LockResource> localLocks = localExclusive( resourceType );
+        Map<LockResouceId,LockResource> localLocks = localExclusive( resourceType );
         for ( long resourceId : resourceIds )
         {
-            LockResource resource = localLocks.get( resourceId );
+            NRLockResouceId id =  new NRLockResouceId( resourceId );
+            LockResource resource = localLocks.get( id );
             if( resource != null )
             {
                 resource.acquireReference();
                 continue;
             }
 
-            resource = new LockResource( resourceType, resourceId );
+            resource = new LockResource( resourceType, id );
             manager.getWriteLock( resource, lockTransaction );
-            localLocks.put(resourceId, resource);
+            localLocks.put(id, resource);
         }
     }
 
     @Override
     public boolean tryExclusiveLock( Locks.ResourceType resourceType, long... resourceIds )
     {
-        PrimitiveLongObjectMap<LockResource> localLocks = localExclusive( resourceType );
+        Map<LockResouceId,LockResource> localLocks = localExclusive( resourceType );
         for ( long resourceId : resourceIds )
         {
-            LockResource resource = localLocks.get( resourceId );
+            NRLockResouceId id = new NRLockResouceId( resourceId );
+            LockResource resource = localLocks.get( id );
             if( resource != null )
             {
                 resource.acquireReference();
                 continue;
             }
 
-            resource = new LockResource( resourceType, resourceId );
+            resource = new LockResource( resourceType, id );
             if(manager.tryWriteLock( resource, lockTransaction ))
             {
-                localLocks.put(resourceId, resource);
+                localLocks.put(id, resource);
             }
             else
             {
@@ -108,20 +225,21 @@ public class CommunityLockClient implements Locks.Client
     @Override
     public boolean trySharedLock( Locks.ResourceType resourceType, long... resourceIds )
     {
-        PrimitiveLongObjectMap<LockResource> localLocks = localShared( resourceType );
+        Map<LockResouceId,LockResource> localLocks = localShared( resourceType );
         for ( long resourceId : resourceIds )
         {
-            LockResource resource = localLocks.get( resourceId );
+            NRLockResouceId id = new NRLockResouceId( resourceId );
+            LockResource resource = localLocks.get( id );
             if( resource != null )
             {
                 resource.acquireReference();
                 continue;
             }
 
-            resource = new LockResource( resourceType, resourceId );
+            resource = new LockResource( resourceType, id );
             if(manager.tryReadLock( resource, lockTransaction ))
             {
-                localLocks.put(resourceId, resource);
+                localLocks.put(id, resource);
             }
             else
             {
@@ -134,26 +252,28 @@ public class CommunityLockClient implements Locks.Client
     @Override
     public void releaseShared( Locks.ResourceType resourceType, long... resourceIds )
     {
-        PrimitiveLongObjectMap<LockResource> localLocks = localShared( resourceType );
+        Map<LockResouceId,LockResource> localLocks = localShared( resourceType );
         for ( long resourceId : resourceIds )
         {
-            LockResource resource = localLocks.get( resourceId );
+            NRLockResouceId id = new NRLockResouceId( resourceId );
+            LockResource resource = localLocks.get( id );
             if( resource.releaseReference() != 0)
             {
                 continue;
             }
             localLocks.remove( resourceId );
 
-            manager.releaseReadLock( new LockResource( resourceType, resourceId ), lockTransaction );
+            manager.releaseReadLock( new LockResource( resourceType, id ), lockTransaction );
         }
     }
 
     @Override
     public void releaseExclusive( Locks.ResourceType resourceType, long... resourceIds )
     {
-        PrimitiveLongObjectMap<LockResource> localLocks = localExclusive( resourceType );
+        Map<LockResouceId,LockResource> localLocks = localExclusive( resourceType );
         for ( long resourceId : resourceIds )
         {
+            NRLockResouceId id = new NRLockResouceId( resourceId );
             LockResource resource = localLocks.get( resourceId );
             if( resource.releaseReference() != 0)
             {
@@ -161,7 +281,7 @@ public class CommunityLockClient implements Locks.Client
             }
             localLocks.remove( resourceId );
 
-            manager.releaseWriteLock( new LockResource( resourceType, resourceId ), lockTransaction );
+            manager.releaseWriteLock( new LockResource( resourceType, id ), lockTransaction );
         }
     }
 
@@ -198,46 +318,52 @@ public class CommunityLockClient implements Locks.Client
         return lockTransaction.getId();
     }
 
-    private PrimitiveLongObjectMap<LockResource> localShared( Locks.ResourceType resourceType )
+    private Map<LockResouceId,LockResource> localShared( Locks.ResourceType resourceType )
     {
-        PrimitiveLongObjectMap<LockResource> map = sharedLocks.get( resourceType.typeId() );
+        Map<LockResouceId,LockResource> map = sharedLocks.get( resourceType.typeId() );
         if(map == null)
         {
-            map = Primitive.longObjectMap();
+            map = new HashMap<LockResouceId,LockResource>();
             sharedLocks.put( resourceType.typeId(), map );
         }
         return map;
     }
 
-    private PrimitiveLongObjectMap<LockResource> localExclusive( Locks.ResourceType resourceType )
+    private Map<LockResouceId,LockResource> localExclusive( Locks.ResourceType resourceType )
     {
-        PrimitiveLongObjectMap<LockResource> map = exclusiveLocks.get( resourceType.typeId() );
+        Map<LockResouceId,LockResource> map = exclusiveLocks.get( resourceType.typeId() );
         if(map == null)
         {
-            map = Primitive.longObjectMap();
+            map = new HashMap<LockResouceId,LockResource>();
             exclusiveLocks.put( resourceType.typeId(), map );
         }
         return map;
     }
 
-    private final PrimitiveIntObjectVisitor<PrimitiveLongObjectMap<LockResource>, RuntimeException> typeReadReleaser = new
-            PrimitiveIntObjectVisitor<PrimitiveLongObjectMap<LockResource>, RuntimeException>()
+    private final PrimitiveIntObjectVisitor<Map<LockResouceId,LockResource>, RuntimeException> typeReadReleaser = new
+            PrimitiveIntObjectVisitor<Map<LockResouceId,LockResource>, RuntimeException>()
     {
         @Override
-        public boolean visited( int key, PrimitiveLongObjectMap<LockResource> value ) throws RuntimeException
+        public boolean visited( int key, Map<LockResouceId,LockResource> value ) throws RuntimeException
         {
-            value.visitEntries( readReleaser );
+            for(Entry<LockResouceId,LockResource> entry : value.entrySet() )
+            {
+                manager.releaseReadLock( entry.getValue(), lockTransaction );
+            }
             return false;
         }
     };
 
-    private final PrimitiveIntObjectVisitor<PrimitiveLongObjectMap<LockResource>, RuntimeException> typeWriteReleaser = new
-            PrimitiveIntObjectVisitor<PrimitiveLongObjectMap<LockResource>, RuntimeException>()
+    private final PrimitiveIntObjectVisitor<Map<LockResouceId,LockResource>, RuntimeException> typeWriteReleaser = new
+            PrimitiveIntObjectVisitor<Map<LockResouceId,LockResource>, RuntimeException>()
     {
         @Override
-        public boolean visited( int key, PrimitiveLongObjectMap<LockResource> value ) throws RuntimeException
+        public boolean visited( int key, Map<LockResouceId,LockResource> value ) throws RuntimeException
         {
-            value.visitEntries( writeReleaser );
+            for(Entry<LockResouceId,LockResource> entry : value.entrySet() )
+            {
+                manager.releaseWriteLock( entry.getValue(), lockTransaction );
+            }
             return false;
         }
     };
@@ -267,4 +393,5 @@ public class CommunityLockClient implements Locks.Client
     {
         return format( "%s[%d]", getClass().getSimpleName(), getLockSessionId() );
     }
+
 }

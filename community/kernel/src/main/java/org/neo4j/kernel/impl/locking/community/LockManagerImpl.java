@@ -25,12 +25,44 @@ import java.util.Map;
 import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.kernel.DeadlockDetectedException;
 import org.neo4j.kernel.impl.locking.LockManager;
+import org.neo4j.kernel.impl.locking.ResourceTypes;
 import org.neo4j.kernel.impl.transaction.IllegalResourceException;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.logging.Logging;
 
 public class LockManagerImpl implements LockManager
 {
+    
+    public void releaseReadLock( LockResource resource, LockTransaction lockTransaction, int start, int end )
+    {
+        getRWLockForReleasing( resource, lockTransaction, 1, 0 ).releaseReadLock( lockTransaction, start, end );
+    }
+
+    public void releaseWriteLock( LockResource resource, LockTransaction lockTransaction, int time )
+    {
+        getRWLockForReleasing( resource, lockTransaction, 0, 1 ).releaseWriteLock( lockTransaction, time );
+    }
+
+    public boolean trygetReadLock( LockResource resource, LockTransaction lockTransaction, int start, int end )
+    {
+        return getRWLockForAcquiring( lockTransaction, lockTransaction ).tryAcquireReadLock( lockTransaction, start, end );
+    }
+
+    public boolean trygetWriteLock( LockResource resource, LockTransaction lockTransaction, int time )
+    {
+        return getRWLockForAcquiring( resource, lockTransaction ).tryAcquireWriteLock( lockTransaction, time );
+    }
+
+    public void getWriteLock( LockResource resource, LockTransaction lockTransaction, int time )
+    {
+        getRWLockForAcquiring( resource, lockTransaction ).acquireWriteLock( lockTransaction, time );
+    }
+    
+    public void getReadLock( LockResource resource, LockTransaction lockTransaction, int start, int end )
+    {
+        getRWLockForAcquiring( resource, lockTransaction ).acquireReadLock( lockTransaction, start, end );
+    }
+    
     private final Map<Object,RWLock> resourceLockMap = new HashMap<>();
     private final RagManager ragManager;
 
@@ -46,7 +78,7 @@ public class LockManagerImpl implements LockManager
     }
 
     @Override
-    public void getReadLock( Object resource, Object tx )
+    public void getReadLock( Object resource, Object tx  )
         throws DeadlockDetectedException, IllegalResourceException
     {
         getRWLockForAcquiring( resource, tx ).acquireReadLock( tx );
@@ -141,7 +173,11 @@ public class LockManagerImpl implements LockManager
             RWLock lock = resourceLockMap.get( resource );
             if ( lock == null )
             {
-                lock = new RWLock( resource, ragManager );
+                LockResource re = (LockResource)resource;
+                if( re.type().equals( ResourceTypes.NODE_PROPERATY ) || re.type().equals( ResourceTypes.REL_PROPERTY ) )
+                    lock = new DynRWLock( resource, ragManager );
+                else
+                    lock = new RWLock( resource, ragManager );
                 resourceLockMap.put( resource, lock );
             }
             lock.mark();

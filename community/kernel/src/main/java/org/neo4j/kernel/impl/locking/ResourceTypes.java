@@ -37,7 +37,10 @@ public enum ResourceTypes implements Locks.ResourceType
     SCHEMA      (3, LockWaitStrategies.INCREMENTAL_BACKOFF),
     INDEX_ENTRY (4, LockWaitStrategies.INCREMENTAL_BACKOFF),
 
-    LEGACY_INDEX(5, LockWaitStrategies.INCREMENTAL_BACKOFF)
+    LEGACY_INDEX(5, LockWaitStrategies.INCREMENTAL_BACKOFF),
+    
+    NODE_PROPERATY(6, LockWaitStrategies.INCREMENTAL_BACKOFF),
+    REL_PROPERTY(7, LockWaitStrategies.INCREMENTAL_BACKOFF)
     ;
 
     private final static Map<Integer, Locks.ResourceType> idToType = new HashMap<>();

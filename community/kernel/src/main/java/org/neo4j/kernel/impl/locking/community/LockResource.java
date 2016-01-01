@@ -24,12 +24,12 @@ import org.neo4j.kernel.impl.locking.Locks;
 public class LockResource
 {
     private final Locks.ResourceType resourceType;
-    private final long resourceId;
+    private final LockResouceId resourceId;
 
     /** Local reference count, used for each client to count references to a lock. */
     private int refCount = 1;
 
-    public LockResource( Locks.ResourceType resourceType, long resourceId )
+    public LockResource( Locks.ResourceType resourceType, LockResouceId resourceId )
     {
         this.resourceType = resourceType;
         this.resourceId = resourceId;
@@ -49,7 +49,7 @@ public class LockResource
 
         LockResource that = (LockResource) o;
 
-        if ( resourceId != that.resourceId )
+        if ( !resourceId.equals( that.resourceId ) )
         {
             return false;
         }
@@ -65,7 +65,7 @@ public class LockResource
     public int hashCode()
     {
         int result = resourceType.hashCode();
-        result = 31 * result + (int) (resourceId ^ (resourceId >>> 32));
+        result = 31 * result + resourceId.hashCode();
         return result;
     }
 
@@ -85,7 +85,7 @@ public class LockResource
         return --refCount;
     }
 
-    public long resourceId()
+    public LockResouceId resourceId()
     {
         return resourceId;
     }

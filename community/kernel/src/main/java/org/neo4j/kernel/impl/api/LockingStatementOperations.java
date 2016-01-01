@@ -46,11 +46,13 @@ import org.neo4j.kernel.impl.api.operations.SchemaReadOperations;
 import org.neo4j.kernel.impl.api.operations.SchemaStateOperations;
 import org.neo4j.kernel.impl.api.operations.SchemaWriteOperations;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.locking.Locks.ResourceType;
 import org.neo4j.kernel.impl.locking.ResourceTypes;
 import org.neo4j.kernel.impl.store.SchemaStorage;
 
 import static org.neo4j.kernel.impl.locking.ResourceTypes.schemaResource;
 
+@SuppressWarnings( "deprecation" )
 public class LockingStatementOperations implements
     EntityWriteOperations,
     SchemaReadOperations,
@@ -58,6 +60,53 @@ public class LockingStatementOperations implements
     SchemaStateOperations,
     LockOperations
 {
+    
+    
+    @Override
+    public void acquireDynPropertyExclusive( KernelStatement state, ResourceType resourceType, long Id, int proId,
+            int time )
+    {
+        if(resourceType.equals( ResourceTypes.NODE_PROPERATY ) )
+            state.locks().acquireShared( ResourceTypes.NODE, Id );
+        else
+            state.locks().acquireShared( ResourceTypes.RELATIONSHIP, Id );
+        state.locks().acquireDynPropertyExclusive( resourceType, Id, proId, time );
+    }
+
+    @Override
+    public void acquireDynPropertyShared( KernelStatement state, ResourceType resourceType, long Id, int proId,
+            int start, int end )
+    {
+        if(resourceType.equals( ResourceTypes.NODE_PROPERATY ) )
+            state.locks().acquireShared( ResourceTypes.NODE, Id );
+        else
+            state.locks().acquireShared( ResourceTypes.RELATIONSHIP, Id );
+        state.locks().acquireDynPropertyShared( resourceType, Id, proId, start, end );
+    }
+
+    @Override
+    public void releaseDynPropertyExclusive( KernelStatement state, ResourceType resourceType, long Id, int proId,
+            int time )
+    {
+        state.locks().releaseDynPropertyExclusive( resourceType, Id, proId, time );
+        if(resourceType.equals( ResourceTypes.NODE_PROPERATY ) )
+            state.locks().releaseShared( ResourceTypes.NODE, Id );
+        else
+            state.locks().releaseShared( ResourceTypes.RELATIONSHIP, Id );
+    }
+
+    @Override
+    public void releaseDynPropertyShared( KernelStatement state, ResourceType resourceType, long Id, int proId,
+            int start, int end )
+    {
+        state.locks().releaseDynPropertyShared( resourceType, Id, proId, start, end );
+        if(resourceType.equals( ResourceTypes.NODE_PROPERATY ) )
+            state.locks().releaseShared( ResourceTypes.NODE, Id );
+        else
+            state.locks().releaseShared( ResourceTypes.RELATIONSHIP, Id );
+    }
+    
+    
     private final EntityReadOperations entityReadDelegate;
     private final EntityWriteOperations entityWriteDelegate;
     private final SchemaReadOperations schemaReadDelegate;
@@ -326,7 +375,8 @@ public class LockingStatementOperations implements
         }
         else
         {
-            //FIXME
+            state.locks().acquireShared( ResourceTypes.NODE, nodeId );
+            state.locks().acquireDynPropertyExclusive( ResourceTypes.NODE_PROPERATY, nodeId, property.propertyKeyId(), ((DynamicProperty)property).time() );
         }
         return entityWriteDelegate.nodeSetProperty( state, nodeId, property );
     }
@@ -349,7 +399,8 @@ public class LockingStatementOperations implements
         }
         else
         {
-            
+            state.locks().acquireShared( ResourceTypes.RELATIONSHIP, relationshipId );
+            state.locks().acquireDynPropertyExclusive( ResourceTypes.REL_PROPERTY, relationshipId, property.propertyKeyId(), ((DynamicProperty)property).time() );
         }
         return entityWriteDelegate.relationshipSetProperty( state, relationshipId, property );
     }
@@ -407,4 +458,5 @@ public class LockingStatementOperations implements
     {
         return schemaReadDelegate.indexGetFailure( state, descriptor );
     }
+
 }
