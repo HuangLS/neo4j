@@ -24,6 +24,10 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.io.IOException;
 
+import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Relationship;
+import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.io.fs.DefaultFileSystemAbstraction;
@@ -167,6 +171,18 @@ public class EmbeddedDatabaseRule extends DatabaseRule
         {
             throw new RuntimeException( e );
         }
+    }
+
+    @Override
+    public ResourceIterator<Node> findNodesByTemporalProperty(String key, int time, Object value) {
+        //FIXME TGraph: Not Implement.
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value) {
+        //FIXME TGraph: Not Implement.
+        throw new TGraphNoImplementationException();
     }
 
     private interface TempDirectory

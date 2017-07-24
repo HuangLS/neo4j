@@ -24,6 +24,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.neo4j.kernel.impl.locking.community.LockResourceId;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -536,14 +537,14 @@ public class StopCompatibility extends LockingCompatibilityTestSuite.Compatibili
     private void assertLocksHeld( final Long... expectedResourceIds )
     {
         final List<Long> expectedLockedIds = Arrays.asList( expectedResourceIds );
-        final List<Long> seenLockedIds = new ArrayList<>();
+        final List<LockResourceId> seenLockedIds = new ArrayList<>();
 
         locks.accept( new Locks.Visitor()
         {
             @Override
-            public void visit( Locks.ResourceType resourceType, long resourceId, String description,
-                    long estimatedWaitTime,
-                    long lockIdentityHashCode )
+            public void visit(Locks.ResourceType resourceType, LockResourceId resourceId, String description,
+                              long estimatedWaitTime,
+                              long lockIdentityHashCode )
             {
                 seenLockedIds.add( resourceId );
             }
@@ -559,7 +560,7 @@ public class StopCompatibility extends LockingCompatibilityTestSuite.Compatibili
         locks.accept( new Locks.Visitor()
         {
             @Override
-            public void visit( Locks.ResourceType resourceType, long resourceId, String description,
+            public void visit( Locks.ResourceType resourceType, LockResourceId resourceId, String description,
                     long estimatedWaitTime,
                     long lockIdentityHashCode )
             {

@@ -64,6 +64,7 @@ import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.store.MetaDataStore;
 import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.StoreFactory;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.command.Command;
@@ -254,7 +255,7 @@ public class TransactionRepresentationCommitProcessIT
     {
         return new TransactionRepresentationStoreApplier( mock( IndexingService.class ),
                 mock( Provider.class ), neoStores, mock( CacheAccessBackDoor.class ), mock( LockService.class ),
-                legacyIndexApplierLookup, indexStore, kernelHealth, legacyIndexTransactionOrdering );
+                legacyIndexApplierLookup, indexStore, kernelHealth, legacyIndexTransactionOrdering, null );
     }
 
     private CheckPointerImpl createCheckPointer( MetaDataStore metaDataStore, KernelHealth kernelHealth,
@@ -263,7 +264,7 @@ public class TransactionRepresentationCommitProcessIT
         CountCommittedTransactionThreshold committedTransactionThreshold =
                 new CountCommittedTransactionThreshold( 1 );
         final StoreFlusher storeFlusher = new StoreFlusher( neoStores, mock( IndexingService.class ),
-                mock( LabelScanStore.class ), Iterables.<IndexImplementation>empty() );
+                mock( LabelScanStore.class ), Iterables.<IndexImplementation>empty(), mock(TemporalPropertyStoreAdapter.class) );
         LogProvider logProvider = mock( LogProvider.class );
         when( logProvider.getLog( any( Class.class ) ) ).thenReturn( mock( Log.class ) );
         return new CheckPointerImpl( metaDataStore, committedTransactionThreshold, storeFlusher,

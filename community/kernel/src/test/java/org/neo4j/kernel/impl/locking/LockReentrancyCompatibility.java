@@ -21,6 +21,7 @@ package org.neo4j.kernel.impl.locking;
 
 import org.junit.Ignore;
 import org.junit.Test;
+import org.neo4j.kernel.impl.locking.community.LockResourceId;
 
 import java.util.concurrent.Future;
 
@@ -237,19 +238,19 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
     private static class LockIdentityExplorer implements Locks.Visitor
     {
         private Locks.ResourceType resourceType;
-        private long resourceId;
+        private LockResourceId resourceId;
         private long lockIdentityHashCode;
 
         public LockIdentityExplorer( Locks.ResourceType resourceType, long resourceId )
         {
             this.resourceType = resourceType;
-            this.resourceId = resourceId;
+            this.resourceId = new LockResourceId.Normal(resourceId);
         }
 
         @Override
-        public void visit( Locks.ResourceType resourceType, long resourceId, String description,
-                long estimatedWaitTime,
-                long lockIdentityHashCode )
+        public void visit(Locks.ResourceType resourceType, LockResourceId resourceId, String description,
+                          long estimatedWaitTime,
+                          long lockIdentityHashCode )
         {
             if ( this.resourceType.equals( resourceType ) && this.resourceId == resourceId )
             {

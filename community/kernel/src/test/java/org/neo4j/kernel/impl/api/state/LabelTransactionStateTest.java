@@ -40,6 +40,7 @@ import org.neo4j.kernel.impl.api.StatementOperationsTestHelper;
 import org.neo4j.kernel.impl.api.store.StoreReadLayer;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
 import org.neo4j.kernel.impl.index.LegacyIndexStore;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -68,7 +69,7 @@ public class LabelTransactionStateTest
         txState = new TxState();
         state = StatementOperationsTestHelper.mockedState( txState );
         txContext = new StateHandlingStatementOperations( store, mock( LegacyPropertyTrackers.class ),
-                mock( ConstraintIndexCreator.class ), mock( LegacyIndexStore.class ) );
+                mock( ConstraintIndexCreator.class ), mock( LegacyIndexStore.class ), mock(TemporalPropertyStoreAdapter.class ) );
 
         storeStatement = mock( StoreStatement.class );
         when( state.getStoreStatement() ).thenReturn( storeStatement );

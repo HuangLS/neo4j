@@ -44,6 +44,7 @@ import org.neo4j.kernel.impl.api.StateHandlingStatementOperations;
 import org.neo4j.kernel.impl.api.store.StoreReadLayer;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
 import org.neo4j.kernel.impl.index.LegacyIndexStore;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.util.Cursors;
 import org.neo4j.kernel.impl.util.diffsets.DiffSets;
 
@@ -388,6 +389,6 @@ public class StateHandlingStatementOperationsTest
     {
         return new StateHandlingStatementOperations( delegate,
                 mock( LegacyPropertyTrackers.class ), mock( ConstraintIndexCreator.class ),
-                mock( LegacyIndexStore.class ) );
+                mock( LegacyIndexStore.class ), mock(TemporalPropertyStoreAdapter.class ) );
     }
 }

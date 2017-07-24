@@ -36,6 +36,7 @@ import org.neo4j.kernel.impl.api.RecoveryLegacyIndexApplierLookup;
 import org.neo4j.kernel.impl.api.TransactionRepresentationStoreApplier;
 import org.neo4j.kernel.impl.api.index.RecoveryIndexingUpdatesValidator;
 import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.transaction.CommittedTransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.DeadSimpleLogVersionRepository;
 import org.neo4j.kernel.impl.transaction.DeadSimpleTransactionIdStore;
@@ -159,7 +160,7 @@ public class RecoveryTest
             TransactionRepresentationStoreApplier storeApplier = mock( TransactionRepresentationStoreApplier.class );
 
             life.add( new Recovery( new DefaultRecoverySPI( provider, lookup, flusher, mock( NeoStores.class ),
-                    logFiles, fs, logVersionRepository, finder, validator, transactionIdStore, txStore, storeApplier )
+                    logFiles, fs, logVersionRepository, finder, validator, transactionIdStore, txStore, storeApplier, mock(TemporalPropertyStoreAdapter.class) )
             {
                 private int nr = 0;
 
@@ -254,7 +255,7 @@ public class RecoveryTest
             TransactionRepresentationStoreApplier storeApplier = mock( TransactionRepresentationStoreApplier.class );
 
             life.add( new Recovery( new DefaultRecoverySPI( provider, lookup, flusher, mock( NeoStores.class ),
-                    logFiles, fs, logVersionRepository, finder, validator, transactionIdStore, txStore, storeApplier )
+                    logFiles, fs, logVersionRepository, finder, validator, transactionIdStore, txStore, storeApplier, mock(TemporalPropertyStoreAdapter.class) )
             {
                 @Override
                 public Visitor<CommittedTransactionRepresentation,Exception> startRecovery()
@@ -378,7 +379,7 @@ public class RecoveryTest
             TransactionRepresentationStoreApplier storeApplier = mock( TransactionRepresentationStoreApplier.class );
 
             life.add( new Recovery( new DefaultRecoverySPI( provider, lookup, flusher, mock( NeoStores.class ),
-                    logFiles, fs, logVersionRepository, finder, validator, transactionIdStore, txStore, storeApplier )
+                    logFiles, fs, logVersionRepository, finder, validator, transactionIdStore, txStore, storeApplier, mock(TemporalPropertyStoreAdapter.class) )
             {
                 @Override
                 public Visitor<CommittedTransactionRepresentation,Exception> startRecovery()

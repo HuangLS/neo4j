@@ -43,6 +43,7 @@ import org.neo4j.kernel.impl.api.store.StoreReadLayer;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
 import org.neo4j.kernel.impl.constraints.StandardConstraintSemantics;
 import org.neo4j.kernel.impl.index.LegacyIndexStore;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.util.Cursors;
 import org.neo4j.kernel.impl.util.PrimitiveLongResourceIterator;
 
@@ -99,7 +100,8 @@ public class IndexQueryTransactionStateTest
                 store,
                 mock( LegacyPropertyTrackers.class ),
                 mock( ConstraintIndexCreator.class ),
-                mock( LegacyIndexStore.class ) );
+                mock( LegacyIndexStore.class ),
+                mock( TemporalPropertyStoreAdapter.class ));
         txContext = new ConstraintEnforcingEntityOperations(
                 new StandardConstraintSemantics(), stateHandlingOperations, stateHandlingOperations, stateHandlingOperations, stateHandlingOperations );
     }

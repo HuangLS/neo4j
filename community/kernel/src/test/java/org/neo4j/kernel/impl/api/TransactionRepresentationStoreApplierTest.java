@@ -40,6 +40,7 @@ import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.locking.ReentrantLockService;
 import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeStore;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.store.counts.CountsTracker;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
@@ -88,7 +89,7 @@ public class TransactionRepresentationStoreApplierTest
     {
         TransactionRepresentationStoreApplier applier =
                 new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStores, cacheAccess,
-                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue );
+                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue, null );
 
         TransactionRepresentation transaction = mock( TransactionRepresentation.class );
 
@@ -108,7 +109,7 @@ public class TransactionRepresentationStoreApplierTest
         when( neoStores.getNodeStore() ).thenReturn( nodeStore );
         TransactionRepresentationStoreApplier applier =
                 new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStores, cacheAccess,
-                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue );
+                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue, null );
         long nodeId = 5L;
         TransactionRepresentation transaction = createNodeTransaction( nodeId );
 
@@ -128,7 +129,7 @@ public class TransactionRepresentationStoreApplierTest
         IdOrderingQueue queue = mock( IdOrderingQueue.class );
         TransactionRepresentationStoreApplier applier =
                 new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStores, cacheAccess,
-                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue );
+                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue, null );
         TransactionRepresentation transaction = new PhysicalTransactionRepresentation( indexTransaction() );
 
         // WHEN
@@ -148,7 +149,7 @@ public class TransactionRepresentationStoreApplierTest
         IdOrderingQueue queue = mock( IdOrderingQueue.class );
         TransactionRepresentationStoreApplier applier =
                 new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStores, cacheAccess,
-                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue );
+                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue, null );
         TransactionRepresentation transaction = mock( TransactionRepresentation.class );
         IOException ioex = new IOException();
         //noinspection unchecked

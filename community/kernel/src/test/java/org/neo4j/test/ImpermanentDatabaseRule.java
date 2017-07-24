@@ -19,6 +19,10 @@
  */
 package org.neo4j.test;
 
+import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Relationship;
+import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.logging.LogProvider;
@@ -68,5 +72,17 @@ public class ImpermanentDatabaseRule extends DatabaseRule
     private TestGraphDatabaseFactory maybeSetInternalLogProvider( TestGraphDatabaseFactory factory )
     {
         return ( internalLogProvider == null ) ? factory : factory.setInternalLogProvider( internalLogProvider );
+    }
+
+    @Override
+    public ResourceIterator<Node> findNodesByTemporalProperty(String key, int time, Object value) {
+        //FIXME TGraph: Not Implement.
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value) {
+        //FIXME TGraph: Not Implement.
+        throw new TGraphNoImplementationException();
     }
 }
