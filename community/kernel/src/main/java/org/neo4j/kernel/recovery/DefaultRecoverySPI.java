@@ -30,6 +30,7 @@ import org.neo4j.kernel.impl.api.index.RecoveryIndexingUpdatesValidator;
 import org.neo4j.kernel.impl.api.index.ValidatedIndexUpdates;
 import org.neo4j.kernel.impl.locking.LockGroup;
 import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.store.UnderlyingStorageException;
 import org.neo4j.kernel.impl.transaction.CommittedTransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
@@ -57,16 +58,18 @@ public class DefaultRecoverySPI implements Recovery.SPI
     private final TransactionIdStore transactionIdStore;
     private final LogicalTransactionStore logicalTransactionStore;
     private final Visitor<CommittedTransactionRepresentation,Exception> recoveryVisitor;
+    private final TemporalPropertyStoreAdapter temporalPropStore;
 
-    public DefaultRecoverySPI( RecoveryLabelScanWriterProvider labelScanWriters,
-            RecoveryLegacyIndexApplierLookup legacyIndexApplierLookup,
-            StoreFlusher storeFlusher, NeoStores neoStores,
-            PhysicalLogFiles logFiles, FileSystemAbstraction fs,
-            LogVersionRepository logVersionRepository, LatestCheckPointFinder checkPointFinder,
-            RecoveryIndexingUpdatesValidator indexUpdatesValidator,
-            TransactionIdStore transactionIdStore,
-            LogicalTransactionStore logicalTransactionStore,
-            TransactionRepresentationStoreApplier storeApplier )
+    public DefaultRecoverySPI(RecoveryLabelScanWriterProvider labelScanWriters,
+                              RecoveryLegacyIndexApplierLookup legacyIndexApplierLookup,
+                              StoreFlusher storeFlusher, NeoStores neoStores,
+                              PhysicalLogFiles logFiles, FileSystemAbstraction fs,
+                              LogVersionRepository logVersionRepository, LatestCheckPointFinder checkPointFinder,
+                              RecoveryIndexingUpdatesValidator indexUpdatesValidator,
+                              TransactionIdStore transactionIdStore,
+                              LogicalTransactionStore logicalTransactionStore,
+                              TransactionRepresentationStoreApplier storeApplier,
+                              TemporalPropertyStoreAdapter temporalPropertyStoreAdapter)
     {
         this.labelScanWriters = labelScanWriters;
         this.legacyIndexApplierLookup = legacyIndexApplierLookup;
@@ -80,6 +83,7 @@ public class DefaultRecoverySPI implements Recovery.SPI
         this.logicalTransactionStore = logicalTransactionStore;
         this.positionToRecoverFrom = new PositionToRecoverFrom( checkPointFinder );
         this.recoveryVisitor = new RecoveryVisitor( storeApplier, indexUpdatesValidator );
+        this.temporalPropStore = temporalPropertyStoreAdapter;
     }
 
     @Override

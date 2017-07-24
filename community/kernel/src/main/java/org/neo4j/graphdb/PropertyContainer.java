@@ -19,6 +19,9 @@
  */
 package org.neo4j.graphdb;
 
+import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
+
 import java.util.Map;
 
 /**
@@ -145,4 +148,20 @@ public interface PropertyContainer
      * @return all properties on this property container
      */
     Map<String, Object> getAllProperties();
+
+
+    Object getTemporalProperty(String key, int time);
+
+    Object getTemporalProperties(String key, int startTime, int endTime, RangeQueryCallBack callBack);
+
+    void setTemporalProperty(String key, int time, Object value);
+
+    void setTemporalPropertyInvalid(String key, int time);
+
+    void deleteTemporalProperty(String key);
+
+    void deleteTemporalPropertyPoint(String key, int time);
+
+    void createTemporalProperty(String key, int time, int maxValueLength, Object value);
+
 }

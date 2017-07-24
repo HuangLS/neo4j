@@ -24,10 +24,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.graphdb.ConstraintViolationException;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.NotFoundException;
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.helpers.ThisShouldNotHappenError;
 import org.neo4j.kernel.api.EntityType;
 import org.neo4j.kernel.api.ReadOperations;
@@ -238,6 +240,44 @@ public class GraphPropertiesProxy implements GraphProperties
             throw new ThisShouldNotHappenError( "Rickard",
                     "Property key retrieved through kernel API should exist.", e );
         }
+    }
+
+    @Override
+    public Object getTemporalProperty(String key, int time) {
+        //TODO TGraph: can graph have temporal property? current not implement
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public Object getTemporalProperties(String key, int startTime, int endTime, RangeQueryCallBack callBack) {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public void setTemporalProperty(String key, int time, Object value) {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public void setTemporalPropertyInvalid(String key, int time) {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public void deleteTemporalProperty(String key) {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public void deleteTemporalPropertyPoint(String key, int time) {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public void createTemporalProperty(String key, int time, int maxValueLength, Object value)
+    {
+        //FIXME TGraph: Not Implement.
+        throw new TGraphNoImplementationException();
     }
 
     @Override

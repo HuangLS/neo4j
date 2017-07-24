@@ -39,6 +39,7 @@ import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
 import org.neo4j.kernel.api.procedures.ProcedureSignature.ProcedureName;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.TemporalProperty;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.api.state.NodeState;
 import org.neo4j.kernel.impl.api.state.PropertyContainerState;
@@ -56,6 +57,12 @@ import org.neo4j.kernel.impl.util.diffsets.ReadableRelationshipDiffSets;
  */
 public interface ReadableTxState
 {
+
+    TemporalProperty getNodeTemporalProperty(long nodeId, int propertyKeyId, int time );
+
+    TemporalProperty getRelationshipTemporalProperty(long relId, int propertyKeyId, int time );
+
+
     void accept( TxStateVisitor visitor ) throws ConstraintValidationKernelException, CreateConstraintFailureException;
 
     boolean hasChanges();

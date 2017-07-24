@@ -144,6 +144,16 @@ class RWLock
         }
     }
 
+    public void releaseTemporalReadLock(Object tx){}
+    public void releaseTemporalWriteLock( Object tx ){}
+    public void releaseTemporalReadLock(Object tx, int start, int end){}
+    public void releaseTemporalWriteLock(Object tx, int time){}
+    public boolean tryAcquireTemporalReadLock(Object tx, int start, int end){return false;}
+    public boolean tryAcquireTemporalWriteLock(Object tx, int time){return false;}
+    public boolean acquireTemporalWriteLock(Object tx, int time){return false;}
+    public boolean acquireTemporalReadLock(Object tx, int start, int end){return false;}
+
+
     public Object resource()
     {
         return resource;

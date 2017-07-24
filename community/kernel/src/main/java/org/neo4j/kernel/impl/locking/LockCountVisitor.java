@@ -19,13 +19,15 @@
  */
 package org.neo4j.kernel.impl.locking;
 
+import org.neo4j.kernel.impl.locking.community.LockResourceId;
+
 public class LockCountVisitor implements  Locks.Visitor
 {
     private int lockCount = 0;
 
     @Override
-    public void visit( Locks.ResourceType resourceType, long resourceId, String description, long estimatedWaitTime,
-            long lockIdentityHashCode )
+    public void visit(Locks.ResourceType resourceType, LockResourceId resourceId, String description, long estimatedWaitTime,
+                      long lockIdentityHashCode )
     {
         lockCount++;
     }

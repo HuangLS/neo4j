@@ -19,12 +19,14 @@
  */
 package org.neo4j.kernel.impl.api.operations;
 
+import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.cursor.RelationshipItem;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.IndexBrokenKernelException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
@@ -35,6 +37,14 @@ import org.neo4j.kernel.impl.api.store.StoreStatement;
 
 public interface EntityReadOperations
 {
+
+    Object nodeGetTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId, int time ) throws PropertyNotFoundException, EntityNotFoundException;
+    Object nodeGetTemporalProperties(KernelStatement statement, long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback )
+            throws EntityNotFoundException, PropertyNotFoundException;
+    Object relationshipGetTemporalProperty( KernelStatement statement, long relId, int propertyKeyId, int time ) throws PropertyNotFoundException, EntityNotFoundException;
+    Object relationshipGetTemporalProperties(KernelStatement statement, long relId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback )
+            throws EntityNotFoundException, PropertyNotFoundException;
+
     /**
      * @param labelId the label id of the label that returned nodes are guaranteed to have
      * @return ids of all nodes that have the given label

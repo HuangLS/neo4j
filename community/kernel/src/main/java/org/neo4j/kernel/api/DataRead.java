@@ -19,10 +19,12 @@
  */
 package org.neo4j.kernel.api;
 
+import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.IndexBrokenKernelException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
@@ -152,4 +154,15 @@ interface DataRead
 
     <EXCEPTION extends Exception> void relationshipVisit( long relId, RelationshipVisitor<EXCEPTION> visitor )
             throws EntityNotFoundException, EXCEPTION;
+
+    /**
+     * TGraph operations
+     */
+    Object nodeGetTemporalPropertyPoint(long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException;
+
+    Object nodeGetTemporalPropertyRange(long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callBack) throws EntityNotFoundException, PropertyNotFoundException;
+
+    Object relationshipGetTemporalPropertyPoint(long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException;
+
+    Object relationshipGetTemporalPropertyRange(long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callBack) throws EntityNotFoundException, PropertyNotFoundException;
 }

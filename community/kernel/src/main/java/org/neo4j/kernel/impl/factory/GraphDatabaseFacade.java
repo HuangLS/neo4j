@@ -28,20 +28,7 @@ import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.function.LongFunction;
 import org.neo4j.function.Supplier;
-import org.neo4j.graphdb.ConstraintViolationException;
-import org.neo4j.graphdb.DependencyResolver;
-import org.neo4j.graphdb.Label;
-import org.neo4j.graphdb.MultipleFoundException;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.NotFoundException;
-import org.neo4j.graphdb.QueryExecutionException;
-import org.neo4j.graphdb.Relationship;
-import org.neo4j.graphdb.RelationshipType;
-import org.neo4j.graphdb.ResourceIterable;
-import org.neo4j.graphdb.ResourceIterator;
-import org.neo4j.graphdb.Result;
-import org.neo4j.graphdb.Transaction;
-import org.neo4j.graphdb.TransactionFailureException;
+import org.neo4j.graphdb.*;
 import org.neo4j.graphdb.event.KernelEventHandler;
 import org.neo4j.graphdb.event.TransactionEventHandler;
 import org.neo4j.graphdb.index.IndexManager;
@@ -538,6 +525,20 @@ public class GraphDatabaseFacade
     public BidirectionalTraversalDescription bidirectionalTraversalDescription()
     {
         return new BidirectionalTraversalDescriptionImpl( threadToTransactionBridge );
+    }
+
+    @Override
+    public ResourceIterator<Node> findNodesByTemporalProperty(String key, int time, Object value) {
+        //FIXME TGraph: Not Implement.
+        throw new TGraphNoImplementationException();
+        //return null;
+    }
+
+    @Override
+    public ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value) {
+        //FIXME TGraph: Not Implement.
+        throw new TGraphNoImplementationException();
+        //return null;
     }
 
     // GraphDatabaseAPI

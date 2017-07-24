@@ -31,6 +31,7 @@ import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
 import org.neo4j.kernel.api.procedures.ProcedureSignature;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
+import org.neo4j.kernel.api.properties.TemporalProperty;
 
 /**
  * Kernel transaction state, please see {@link org.neo4j.kernel.impl.api.state.TxState} for implementation details.
@@ -42,6 +43,27 @@ import org.neo4j.kernel.api.properties.Property;
  */
 public interface TransactionState extends ReadableTxState
 {
+    // write/mutate temporal property
+
+    void nodeDoCreateTemporalPropertyRecord( long nodeId, TemporalProperty temporalProperty );
+
+    void nodeDoCreateTemporalPropertyInvalidRecord( long nodeId, TemporalProperty temporalProperty );
+
+    void nodeDoDeleteTemporalPropertyRecord( long nodeId, TemporalProperty temporalProperty );
+
+    void nodeDoDeleteTemporalProperty( long nodeId, int propertyKeyId );
+
+
+    void relationshipDoCreateTemporalProperty( long relationshipId, TemporalProperty temporalProperty );
+
+    void relationshipDoCreateTemporalPropertyInvalidRecord( long relationshipId, TemporalProperty temporalProperty );
+
+    void relationshipDoDeleteTemporalPropertyRecord( long relationshipId, TemporalProperty temporalProperty);
+
+    void relationshipDoDeleteTemporalProperty( long relationshipId, int propertyKeyId );
+
+
+
     // ENTITY RELATED
 
     void relationshipDoCreate( long id, int relationshipTypeId, long startNodeId, long endNodeId );

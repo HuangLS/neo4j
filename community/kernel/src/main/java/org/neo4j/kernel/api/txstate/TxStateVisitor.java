@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
@@ -31,6 +32,7 @@ import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.TemporalProperty;
 import org.neo4j.kernel.impl.api.state.RelationshipChangesForNode;
 
 /**
@@ -93,6 +95,14 @@ public interface TxStateVisitor
     void visitCreatedProcedure( ProcedureDescriptor procedureDescriptor );
 
     void visitDroppedProcedure( ProcedureDescriptor procedureDescriptor );
+
+    void visitNodeTemporalPropertyChanges( long nodeId,
+                                           Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid,
+                                           Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp );
+
+    void visitRelationshipTemporalPropertyChanges(long relationshipId,
+                                                  Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid,
+                                                  Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp );
 
     class Adapter implements TxStateVisitor
     {
@@ -334,5 +344,23 @@ public interface TxStateVisitor
                 next.visitDroppedProcedure( procedureDescriptor );
             }
         }
+
+        @Override
+        public void visitNodeTemporalPropertyChanges(long nodeId, Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid, Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp) {
+            if( next != null )
+            {
+                next.visitNodeTemporalPropertyChanges( nodeId, addOrUpdate, addInvalid, delPoint, delProp );
+            }
+        }
+
+        @Override
+        public void visitRelationshipTemporalPropertyChanges(long relationshipId, Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid, Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp) {
+            if( next != null )
+            {
+                next.visitRelationshipTemporalPropertyChanges( relationshipId, addOrUpdate, addInvalid, delPoint, delProp );
+            }
+        }
+
+
     }
 }

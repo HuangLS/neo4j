@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddRelationshipCommand;
@@ -64,6 +65,30 @@ public class HighIdTransactionApplier implements CommandHandler
     {
         this.delegate = delegate;
         this.neoStores = neoStores;
+    }
+
+    @Override
+    public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+        //FIXME TGraph: Not Implement.
+        return false;
+    }
+
+    @Override
+    public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+        //FIXME TGraph: Not Implement.
+        return false;
+    }
+
+    @Override
+    public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
+        //FIXME TGraph: Not Implement.
+        return false;
+    }
+
+    @Override
+    public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
+        //FIXME TGraph: Not Implement.
+        return false;
     }
 
     @Override

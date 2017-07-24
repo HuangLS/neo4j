@@ -210,4 +210,9 @@ public abstract class Property
     {
         return new ShortArrayProperty( propertyKeyId, value );
     }
+
+    public static TemporalProperty temporalProperty( int propertyKeyId, int time, int len, byte[] value )
+    {
+        return new TemporalProperty(propertyKeyId, time, len, value);
+    }
 }

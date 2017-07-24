@@ -19,7 +19,10 @@
  */
 package org.neo4j.kernel.impl.locking;
 
+
+
 import org.neo4j.helpers.Service;
+import org.neo4j.kernel.impl.locking.community.LockResourceId;
 import org.neo4j.kernel.impl.util.concurrent.WaitStrategy;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 
@@ -58,8 +61,8 @@ public interface Locks extends Lifecycle
     interface Visitor
     {
         /** Visit the description of a lock held by at least one client. */
-        void visit( ResourceType resourceType, long resourceId, String description, long estimatedWaitTime,
-                long lockIdentityHashCode );
+        void visit(ResourceType resourceType, LockResourceId resourceId, String description, long estimatedWaitTime,
+                   long lockIdentityHashCode );
     }
 
     /** Locks are split by resource types. It is up to the implementation to define the contract for these. */
@@ -74,6 +77,14 @@ public interface Locks extends Lifecycle
 
     interface Client extends AutoCloseable
     {
+        void acquireTemporalPropShared( ResourceType resourceType, long entityId, int propertyKeyId, int start, int end ) throws AcquireLockTimeoutException;
+
+        void acquireTemporalPropExclusive( ResourceType resourceType, long entityId, int propertyKeyId, int time ) throws AcquireLockTimeoutException;
+
+        void releaseTemporalPropShared( ResourceType resourceType, long entityId, int propertyKeyId, int start, int end ) throws AcquireLockTimeoutException;
+
+        void releaseTemporalPropExclusive( ResourceType resourceType, long entityId, int propertyKeyId, int time ) throws AcquireLockTimeoutException;
+
         /**
          * Can be grabbed when there are no locks or only share locks on a resource. If the lock cannot be acquired,
          * behavior is specified by the {@link WaitStrategy} for the given {@link ResourceType}.

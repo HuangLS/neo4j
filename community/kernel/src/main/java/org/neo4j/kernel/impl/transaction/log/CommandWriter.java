@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.impl.index.IndexCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddRelationshipCommand;
@@ -64,6 +65,42 @@ public class CommandWriter implements CommandHandler
     protected static byte needsLong( long value )
     {
         return value > Integer.MAX_VALUE ? (byte) 1 : (byte) 0;
+    }
+
+    @Override
+    public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+        channel.put( NeoCommandType.NODE_TEMPORAL_PRO_DELETE );
+        channel.put( command.getId().getBytes(), command.getId().length() );
+        return false;
+    }
+
+    @Override
+    public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+        channel.put( NeoCommandType.REL_TEMPORAL_PRO_DELETE );
+        channel.put( command.getId().getBytes(), command.getId().length() );
+        return false;
+    }
+
+    @Override
+    public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
+        channel.put( NeoCommandType.NODE_TEMPORAL_PROPERTY_COMMAND );
+        byte[] key = command.getInternalKey().encode().copyBytes();
+        channel.putInt( key.length );
+        channel.put( key, key.length );
+        channel.putInt( command.getValue().length );
+        channel.put( command.getValue(), command.getValue().length );
+        return false;
+    }
+
+    @Override
+    public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
+        channel.put( NeoCommandType.REL_TEMPORAL_PROPERTY_COMMAND );
+        byte[] key = command.getInternalKey().encode().copyBytes();
+        channel.putInt( key.length );
+        channel.put( key, key.length );
+        channel.putInt( command.getValue().length );
+        channel.put( command.getValue(), command.getValue().length );
+        return false;
     }
 
     @Override

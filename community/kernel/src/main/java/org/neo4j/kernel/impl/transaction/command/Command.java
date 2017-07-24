@@ -20,8 +20,12 @@
 package org.neo4j.kernel.impl.transaction.command;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
 
+import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.util.Slice;
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.LabelTokenRecord;
@@ -311,6 +315,161 @@ public abstract class Command
         }
     }
 
+    public static class NodeTemporalPropertyCommand extends Command
+    {
+
+        private InternalKey key;
+        private byte[] value;
+
+        public NodeTemporalPropertyCommand(InternalKey key, byte[] value )
+        {
+            this.key = key;
+            this.value = value;
+        }
+
+        public NodeTemporalPropertyCommand() {}
+
+        public InternalKey getInternalKey()
+        {
+            return key;
+        }
+
+        public int getTime()
+        {
+            return key.getStartTime();
+        }
+
+        public byte[] getValue()
+        {
+            return value;
+        }
+
+        @Override
+        public String toString() {
+            return key.toString()+ Arrays.toString(value);
+        }
+
+        @Override
+        public boolean handle(CommandHandler handler) throws IOException {
+            return handler.visitNodeTemporalPropertyCommand(this);
+        }
+
+        public void init(InternalKey internalKey, byte[] value) {
+            this.key = internalKey;
+            this.value = value;
+        }
+    }
+
+    public static class RelationshipTemporalPropertyCommand extends Command
+    {
+        private InternalKey key;
+        private byte[] value;
+
+        public RelationshipTemporalPropertyCommand(InternalKey key, byte[] value )
+        {
+            this.key = key;
+            this.value = value;
+        }
+
+        public RelationshipTemporalPropertyCommand() {}
+
+        public InternalKey getInternalKey()
+        {
+            return key;
+        }
+
+        public int getTime()
+        {
+            return key.getStartTime();
+        }
+
+        public byte[] getValue()
+        {
+            return value;
+        }
+
+        @Override
+        public String toString() {
+            return key.toString()+ Arrays.toString(value);
+        }
+
+        @Override
+        public boolean handle(CommandHandler handler) throws IOException {
+            return handler.visitRelationshipTemporalPropertyCommand(this);
+        }
+
+        public void init(InternalKey internalKey, byte[] value) {
+            this.key = internalKey;
+            this.value = value;
+        }
+    }
+
+    public static class RelationshipTemporalPropertyDeleteCommand extends Command
+    {
+        private Slice id;
+
+        public RelationshipTemporalPropertyDeleteCommand(Slice id )
+        {
+            this.id = id;
+        }
+
+        public RelationshipTemporalPropertyDeleteCommand() {}
+
+        public Slice getId()
+        {
+            return this.id;
+        }
+
+        @Override
+        public String toString()
+        {
+            return this.id.toString();
+        }
+
+        @Override
+        public boolean handle( CommandHandler handler ) throws IOException
+        {
+            return false;
+        }
+
+        public void init(Slice slice) {
+            this.id = slice;
+        }
+    }
+
+    public static class NodeTemporalPropertyDeleteCommand extends Command
+    {
+        private Slice id;
+
+        public NodeTemporalPropertyDeleteCommand(Slice id )
+        {
+            this.id = id;
+        }
+
+        public NodeTemporalPropertyDeleteCommand() {}
+
+        public Slice getId()
+        {
+            return this.id;
+        }
+
+        @Override
+        public String toString()
+        {
+            return this.id.toString();
+        }
+
+        @Override
+        public boolean handle( CommandHandler handler ) throws IOException
+        {
+            return false;
+        }
+
+        public void init(Slice slice) {
+            this.id = slice;
+        }
+    }
+
     public static abstract class TokenCommand<RECORD extends TokenRecord> extends Command
     {
         protected RECORD record;
@@ -492,4 +651,6 @@ public abstract class Command
             return delta;
         }
     }
+
+
 }

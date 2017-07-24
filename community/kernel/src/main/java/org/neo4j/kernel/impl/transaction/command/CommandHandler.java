@@ -21,6 +21,7 @@ package org.neo4j.kernel.impl.transaction.command;
 
 import java.io.IOException;
 
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddRelationshipCommand;
@@ -59,6 +60,16 @@ import org.neo4j.kernel.impl.transaction.command.Command.SchemaRuleCommand;
 public interface CommandHandler extends AutoCloseable
 {
     CommandHandler EMPTY = new CommandHandler.Adapter();
+
+    // Temporal commands
+    boolean visitNodeTemporalPropertyDeleteCommand( Command.NodeTemporalPropertyDeleteCommand command ) throws IOException;
+
+    boolean visitRelationshipTemporalPropertyDeleteCommand( Command.RelationshipTemporalPropertyDeleteCommand command ) throws IOException;
+
+    boolean visitNodeTemporalPropertyCommand( Command.NodeTemporalPropertyCommand command ) throws IOException;
+
+    boolean visitRelationshipTemporalPropertyCommand( Command.RelationshipTemporalPropertyCommand command ) throws IOException;
+
 
     // Store commands
     boolean visitNodeCommand( Command.NodeCommand command ) throws IOException;
@@ -125,6 +136,26 @@ public interface CommandHandler extends AutoCloseable
         @Override
         public boolean visitPropertyCommand( PropertyCommand command ) throws IOException
         {
+            return false;
+        }
+
+        @Override
+        public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+            return false;
+        }
+
+        @Override
+        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+            return false;
+        }
+
+        @Override
+        public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
+            return false;
+        }
+
+        @Override
+        public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
             return false;
         }
 
@@ -249,6 +280,26 @@ public interface CommandHandler extends AutoCloseable
         public boolean visitPropertyCommand( PropertyCommand command ) throws IOException
         {
             return delegate.visitPropertyCommand( command );
+        }
+
+        @Override
+        public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+            return delegate.visitNodeTemporalPropertyDeleteCommand(command);
+        }
+
+        @Override
+        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+            return delegate.visitRelationshipTemporalPropertyDeleteCommand(command);
+        }
+
+        @Override
+        public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
+            return delegate.visitNodeTemporalPropertyCommand( command );
+        }
+
+        @Override
+        public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
+            return delegate.visitRelationshipTemporalPropertyCommand( command );
         }
 
         @Override

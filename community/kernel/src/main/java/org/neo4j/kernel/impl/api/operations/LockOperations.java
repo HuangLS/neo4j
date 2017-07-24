@@ -29,4 +29,10 @@ public interface LockOperations
 
     void releaseExclusive( KernelStatement statement, Locks.ResourceType type, long id );
     void releaseShared( KernelStatement statement, Locks.ResourceType type, long id );
+
+    void acquireTemporalExclusive( KernelStatement state, Locks.ResourceType resourceType, long resourceId, int propertyKeyId, int time );
+    void acquireTemporalShared( KernelStatement state, Locks.ResourceType resourceType, long resourceId, int propertyKeyId, int start, int end );
+
+    void releaseTemporalExclusive( KernelStatement statement, Locks.ResourceType type, long id, int propertyKeyId, int time );
+    void releaseTemporalShared( KernelStatement statement, Locks.ResourceType type, long id, int propertyKeyId, int start, int end );
 }

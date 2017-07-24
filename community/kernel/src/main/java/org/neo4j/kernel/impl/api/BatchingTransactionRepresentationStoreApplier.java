@@ -29,6 +29,7 @@ import org.neo4j.kernel.impl.core.CacheAccessBackDoor;
 import org.neo4j.kernel.impl.index.IndexConfigStore;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.util.IdOrderingQueue;
 
 /**
@@ -40,17 +41,20 @@ public class BatchingTransactionRepresentationStoreApplier extends TransactionRe
 {
     private final RecoveryLabelScanWriterProvider labelScanWriterProvider;
     private final RecoveryLegacyIndexApplierLookup legacyIndexApplierLookup;
+    private final TemporalPropertyStoreAdapter temporalPropStore;
     private KernelHealth health;
 
     public BatchingTransactionRepresentationStoreApplier( IndexingService indexingService,
             LabelScanStore labelScanStore, NeoStores neoStore, CacheAccessBackDoor cacheAccess,
             LockService lockService, LegacyIndexApplierLookup legacyIndexProviderLookup,
-            IndexConfigStore indexConfigStore, KernelHealth kernelHealth, IdOrderingQueue legacyIndexTransactionOrdering )
+            IndexConfigStore indexConfigStore, KernelHealth kernelHealth, IdOrderingQueue legacyIndexTransactionOrdering,
+            TemporalPropertyStoreAdapter temporalPropertyStore)
     {
         this( indexingService, new RecoveryLabelScanWriterProvider( labelScanStore, 1000 ),
                 neoStore, cacheAccess, lockService,
                 new RecoveryLegacyIndexApplierLookup( legacyIndexProviderLookup, 1000 ),
-                indexConfigStore, kernelHealth, legacyIndexTransactionOrdering );
+                indexConfigStore, kernelHealth, legacyIndexTransactionOrdering,
+                temporalPropertyStore);
         this.health = kernelHealth;
     }
 
@@ -63,12 +67,14 @@ public class BatchingTransactionRepresentationStoreApplier extends TransactionRe
             RecoveryLegacyIndexApplierLookup legacyIndexApplierLookup,
             IndexConfigStore indexConfigStore,
             KernelHealth kernelHealth,
-            IdOrderingQueue legacyIndexTransactionOrdering )
+            IdOrderingQueue legacyIndexTransactionOrdering,
+            TemporalPropertyStoreAdapter temporalPropertyStore)
     {
         super( indexingService, labelScanWriterProvider, neoStore, cacheAccess, lockService, legacyIndexApplierLookup,
-                indexConfigStore, kernelHealth, legacyIndexTransactionOrdering );
+                indexConfigStore, kernelHealth, legacyIndexTransactionOrdering, temporalPropertyStore );
         this.labelScanWriterProvider = labelScanWriterProvider;
         this.legacyIndexApplierLookup = legacyIndexApplierLookup;
+        this.temporalPropStore = temporalPropertyStore;
     }
 
     public void closeBatch() throws IOException
@@ -78,6 +84,7 @@ public class BatchingTransactionRepresentationStoreApplier extends TransactionRe
             labelScanWriterProvider.close();
             legacyIndexApplierLookup.close();
             indexingService.flushAll();
+//Fixme TGraph            temporalPropStore.();
         }
         catch ( Throwable ex )
         {

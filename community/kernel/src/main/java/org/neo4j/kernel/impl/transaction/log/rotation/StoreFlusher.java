@@ -23,6 +23,7 @@ import org.neo4j.graphdb.index.IndexImplementation;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 
 public class StoreFlusher
 {
@@ -30,15 +31,18 @@ public class StoreFlusher
     private final IndexingService indexingService;
     private final LabelScanStore labelScanStore;
     private final Iterable<IndexImplementation> indexProviders;
+    private final TemporalPropertyStoreAdapter temporalPropStore;
 
-    public StoreFlusher( NeoStores neoStores, IndexingService indexingService,
-            LabelScanStore labelScanStore,
-            Iterable<IndexImplementation> indexProviders )
+    public StoreFlusher(NeoStores neoStores, IndexingService indexingService,
+                        LabelScanStore labelScanStore,
+                        Iterable<IndexImplementation> indexProviders,
+                        TemporalPropertyStoreAdapter temporalPropertyStoreAdapter)
     {
         this.neoStores = neoStores;
         this.indexingService = indexingService;
         this.labelScanStore = labelScanStore;
         this.indexProviders = indexProviders;
+        this.temporalPropStore = temporalPropertyStoreAdapter;
     }
 
     public void forceEverything()
@@ -50,5 +54,6 @@ public class StoreFlusher
             index.force();
         }
         neoStores.flush();
+        temporalPropStore.flushAll();
     }
 }

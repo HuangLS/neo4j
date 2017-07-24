@@ -19,18 +19,18 @@
  */
 package org.neo4j.kernel.impl.locking.community;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import org.neo4j.collection.primitive.Primitive;
 import org.neo4j.collection.primitive.PrimitiveIntObjectMap;
 import org.neo4j.collection.primitive.PrimitiveIntObjectVisitor;
-import org.neo4j.collection.primitive.PrimitiveLongObjectMap;
+
 import org.neo4j.collection.primitive.PrimitiveLongObjectVisitor;
 import org.neo4j.helpers.collection.Visitor;
-import org.neo4j.kernel.impl.locking.LockClientStateHolder;
-import org.neo4j.kernel.impl.locking.LockClientStoppedException;
-import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.locking.*;
 
 import static java.lang.String.format;
 
@@ -43,8 +43,8 @@ public class CommunityLockClient implements Locks.Client
     private final LockManagerImpl manager;
     private final LockTransaction lockTransaction = new LockTransaction();
 
-    private final PrimitiveIntObjectMap<PrimitiveLongObjectMap<LockResource>> sharedLocks = Primitive.intObjectMap();
-    private final PrimitiveIntObjectMap<PrimitiveLongObjectMap<LockResource>> exclusiveLocks = Primitive.intObjectMap();
+    private final PrimitiveIntObjectMap<Map<LockResourceId, LockResource>> sharedLocks = Primitive.intObjectMap();
+    private final PrimitiveIntObjectMap<Map<LockResourceId, LockResource>> exclusiveLocks = Primitive.intObjectMap();
 
     // To be able to close Locks.Client instance properly we should be able to do couple of things:
     //  - have a possibility to prevent new clients to come
@@ -60,25 +60,131 @@ public class CommunityLockClient implements Locks.Client
     }
 
     @Override
+    public void acquireTemporalPropShared(Locks.ResourceType resourceType, long entityId, int propertyKeyId, int start, int end) throws AcquireLockTimeoutException {
+        stateHolder.incrementActiveClients( this );
+        try
+        {
+            LockResourceId id =  new LockResourceId.TemporalProp( entityId, propertyKeyId );
+            Map<LockResourceId, LockResource> localLocks = localShared( resourceType );
+            LockResource resource = localLocks.get( id );
+            if( resource != null )
+            {
+                resource.acquireReference();
+            }else
+            {
+                resource = new LockResource(resourceType, id);
+                if ( manager.getTemporalPropReadLock(resource, lockTransaction, start, end) )
+                {
+                    localLocks.put(id, resource);
+                }
+                else
+                {
+                    throw new LockClientStoppedException( this );
+                }
+            }
+        }
+        finally
+        {
+            stateHolder.decrementActiveClients();
+        }
+    }
+
+    @Override
+    public void acquireTemporalPropExclusive(Locks.ResourceType resourceType, long entityId, int propertyKeyId, int time) throws AcquireLockTimeoutException {
+        stateHolder.incrementActiveClients( this );
+        try
+        {
+            LockResourceId id =  new LockResourceId.TemporalProp( entityId, propertyKeyId );
+            Map<LockResourceId, LockResource> localLocks = localShared( resourceType );
+            LockResource resource = localLocks.get( id );
+            if( resource != null )
+            {
+                resource.acquireReference();
+            }else
+            {
+                resource = new LockResource(resourceType, id);
+                if ( manager.getTemporalPropWriteLock(resource, lockTransaction, time) )
+                {
+                    localLocks.put(id, resource);
+                }
+                else
+                {
+                    throw new LockClientStoppedException( this );
+                }
+            }
+        }
+        finally
+        {
+            stateHolder.decrementActiveClients();
+        }
+    }
+
+    @Override
+    public void releaseTemporalPropShared(Locks.ResourceType resourceType, long entityId, int propertyKeyId, int start, int end) throws AcquireLockTimeoutException {
+        stateHolder.incrementActiveClients( this );
+        try
+        {
+            LockResourceId.TemporalProp resId = new LockResourceId.TemporalProp(entityId, propertyKeyId);
+            Map<LockResourceId, LockResource> localLocks = localShared( resourceType );
+            LockResource resource = localLocks.get( resId );
+            if ( resource.releaseReference() != 0 )
+            {
+                return;
+            }
+
+            localLocks.remove( resId );
+
+            manager.releaseTemporalPropReadLock( new LockResource( resourceType, resId ), lockTransaction, start, end );
+        }
+        finally
+        {
+            stateHolder.decrementActiveClients();
+        }
+    }
+
+    @Override
+    public void releaseTemporalPropExclusive(Locks.ResourceType resourceType, long entityId, int propertyKeyId, int time) throws AcquireLockTimeoutException {
+        stateHolder.incrementActiveClients( this );
+        try
+        {
+            LockResourceId.TemporalProp resId = new LockResourceId.TemporalProp(entityId,propertyKeyId);
+            Map<LockResourceId, LockResource> localLocks = localExclusive( resourceType );
+            LockResource resource = localLocks.get( resId );
+            if ( resource.releaseReference() != 0 )
+            {
+                return;
+            }
+            localLocks.remove( resId );
+
+            manager.releaseTemporalPropWriteLock( new LockResource( resourceType, resId ), lockTransaction, time);
+        }
+        finally
+        {
+            stateHolder.decrementActiveClients();
+        }
+    }
+
+    @Override
     public void acquireShared( Locks.ResourceType resourceType, long... resourceIds )
     {
         stateHolder.incrementActiveClients( this );
         try
         {
-            PrimitiveLongObjectMap<LockResource> localLocks = localShared( resourceType );
+            Map<LockResourceId, LockResource> localLocks = localShared( resourceType );
             for ( long resourceId : resourceIds )
             {
-                LockResource resource = localLocks.get( resourceId );
+                LockResourceId.Normal resId = new LockResourceId.Normal(resourceId);
+                LockResource resource = localLocks.get( resId );
                 if ( resource != null )
                 {
                     resource.acquireReference();
                 }
                 else
                 {
-                    resource = new LockResource( resourceType, resourceId );
+                    resource = new LockResource( resourceType, resId );
                     if ( manager.getReadLock( resource, lockTransaction ) )
                     {
-                        localLocks.put( resourceId, resource );
+                        localLocks.put( resId, resource );
                     }
                     else
                     {
@@ -101,20 +207,21 @@ public class CommunityLockClient implements Locks.Client
         stateHolder.incrementActiveClients( this );
         try
         {
-            PrimitiveLongObjectMap<LockResource> localLocks = localExclusive( resourceType );
+            Map<LockResourceId, LockResource> localLocks = localExclusive( resourceType );
             for ( long resourceId : resourceIds )
             {
-                LockResource resource = localLocks.get( resourceId );
+                LockResourceId.Normal resId = new LockResourceId.Normal(resourceId);
+                LockResource resource = localLocks.get( resId );
                 if ( resource != null )
                 {
                     resource.acquireReference();
                 }
                 else
                 {
-                    resource = new LockResource( resourceType, resourceId );
+                    resource = new LockResource( resourceType, resId );
                     if ( manager.getWriteLock( resource, lockTransaction ) )
                     {
-                        localLocks.put( resourceId, resource );
+                        localLocks.put( resId, resource );
                     }
                     else
                     {
@@ -135,8 +242,9 @@ public class CommunityLockClient implements Locks.Client
         stateHolder.incrementActiveClients( this );
         try
         {
-            PrimitiveLongObjectMap<LockResource> localLocks = localExclusive( resourceType );
-            LockResource resource = localLocks.get( resourceId );
+            LockResourceId.Normal resId = new LockResourceId.Normal(resourceId);
+            Map<LockResourceId, LockResource> localLocks = localExclusive( resourceType );
+            LockResource resource = localLocks.get( resId );
             if ( resource != null )
             {
                 resource.acquireReference();
@@ -144,10 +252,10 @@ public class CommunityLockClient implements Locks.Client
             }
             else
             {
-                resource = new LockResource( resourceType, resourceId );
+                resource = new LockResource( resourceType, resId );
                 if ( manager.tryWriteLock( resource, lockTransaction ) )
                 {
-                    localLocks.put( resourceId, resource );
+                    localLocks.put( resId, resource );
                     return true;
                 }
                 else
@@ -168,8 +276,9 @@ public class CommunityLockClient implements Locks.Client
         stateHolder.incrementActiveClients( this );
         try
         {
-            PrimitiveLongObjectMap<LockResource> localLocks = localShared( resourceType );
-            LockResource resource = localLocks.get( resourceId );
+            LockResourceId.Normal resId = new LockResourceId.Normal(resourceId);
+            Map<LockResourceId, LockResource> localLocks = localShared( resourceType );
+            LockResource resource = localLocks.get( resId );
             if ( resource != null )
             {
                 resource.acquireReference();
@@ -177,10 +286,10 @@ public class CommunityLockClient implements Locks.Client
             }
             else
             {
-                resource = new LockResource( resourceType, resourceId );
+                resource = new LockResource( resourceType, resId );
                 if ( manager.tryReadLock( resource, lockTransaction ) )
                 {
-                    localLocks.put( resourceId, resource );
+                    localLocks.put( resId, resource );
                     return true;
                 }
                 else
@@ -201,16 +310,17 @@ public class CommunityLockClient implements Locks.Client
         stateHolder.incrementActiveClients( this );
         try
         {
-            PrimitiveLongObjectMap<LockResource> localLocks = localShared( resourceType );
-            LockResource resource = localLocks.get( resourceId );
+            LockResourceId.Normal resId = new LockResourceId.Normal(resourceId);
+            Map<LockResourceId, LockResource> localLocks = localShared( resourceType );
+            LockResource resource = localLocks.get( resId );
             if ( resource.releaseReference() != 0 )
             {
                 return;
             }
 
-            localLocks.remove( resourceId );
+            localLocks.remove( resId );
 
-            manager.releaseReadLock( new LockResource( resourceType, resourceId ), lockTransaction );
+            manager.releaseReadLock( new LockResource( resourceType, resId ), lockTransaction );
         }
         finally
         {
@@ -224,15 +334,16 @@ public class CommunityLockClient implements Locks.Client
         stateHolder.incrementActiveClients( this );
         try
         {
-            PrimitiveLongObjectMap<LockResource> localLocks = localExclusive( resourceType );
-            LockResource resource = localLocks.get( resourceId );
+            LockResourceId.Normal resId = new LockResourceId.Normal(resourceId);
+            Map<LockResourceId, LockResource> localLocks = localExclusive( resourceType );
+            LockResource resource = localLocks.get( resId );
             if ( resource.releaseReference() != 0 )
             {
                 return;
             }
-            localLocks.remove( resourceId );
+            localLocks.remove( resId );
 
-            manager.releaseWriteLock( new LockResource( resourceType, resourceId ), lockTransaction );
+            manager.releaseWriteLock( new LockResource( resourceType, resId ), lockTransaction );
         }
         finally
         {
@@ -292,47 +403,77 @@ public class CommunityLockClient implements Locks.Client
         return lockTransaction.getId();
     }
 
-    private PrimitiveLongObjectMap<LockResource> localShared( Locks.ResourceType resourceType )
+    private Map<LockResourceId, LockResource> localShared( Locks.ResourceType resourceType )
     {
-        PrimitiveLongObjectMap<LockResource> map = sharedLocks.get( resourceType.typeId() );
+        Map<LockResourceId, LockResource> map = sharedLocks.get( resourceType.typeId() );
         if(map == null)
         {
-            map = Primitive.longObjectMap();
+            map = new HashMap<>();
             sharedLocks.put( resourceType.typeId(), map );
         }
         return map;
     }
 
-    private PrimitiveLongObjectMap<LockResource> localExclusive( Locks.ResourceType resourceType )
+    private Map<LockResourceId, LockResource> localExclusive( Locks.ResourceType resourceType )
     {
-        PrimitiveLongObjectMap<LockResource> map = exclusiveLocks.get( resourceType.typeId() );
+        Map<LockResourceId, LockResource> map = exclusiveLocks.get( resourceType.typeId() );
         if(map == null)
         {
-            map = Primitive.longObjectMap();
+            map = new HashMap<>();
             exclusiveLocks.put( resourceType.typeId(), map );
         }
         return map;
     }
 
-    private final PrimitiveIntObjectVisitor<PrimitiveLongObjectMap<LockResource>, RuntimeException> typeReadReleaser = new
-            PrimitiveIntObjectVisitor<PrimitiveLongObjectMap<LockResource>, RuntimeException>()
+    private final PrimitiveIntObjectVisitor<Map<LockResourceId, LockResource>, RuntimeException> typeReadReleaser = new
+            PrimitiveIntObjectVisitor<Map<LockResourceId, LockResource>, RuntimeException>()
     {
         @Override
-        public boolean visited( int key, PrimitiveLongObjectMap<LockResource> value ) throws RuntimeException
+        public boolean visited( int key, Map<LockResourceId, LockResource> value ) throws RuntimeException
         {
-            value.visitEntries( readReleaser );
-            return false;
+            if( key == ResourceTypes.NODE_TEMPORAL_PROP.typeId() ||
+                    key == ResourceTypes.REL_TEMPORAL_PROP.typeId())
+            {
+                for(Map.Entry<LockResourceId,LockResource> entry : value.entrySet() )
+                {
+                    manager.releaseAllTemporalPropReadLock( entry.getValue(), lockTransaction );
+                }
+                return false;
+            }
+            else
+            {
+                for(Map.Entry<LockResourceId,LockResource> entry : value.entrySet() )
+                {
+                    manager.releaseReadLock( entry.getValue(), lockTransaction );
+                }
+                return false;
+            }
         }
     };
 
-    private final PrimitiveIntObjectVisitor<PrimitiveLongObjectMap<LockResource>, RuntimeException> typeWriteReleaser = new
-            PrimitiveIntObjectVisitor<PrimitiveLongObjectMap<LockResource>, RuntimeException>()
+    private final PrimitiveIntObjectVisitor<Map<LockResourceId, LockResource>, RuntimeException> typeWriteReleaser = new
+            PrimitiveIntObjectVisitor<Map<LockResourceId, LockResource>, RuntimeException>()
     {
         @Override
-        public boolean visited( int key, PrimitiveLongObjectMap<LockResource> value ) throws RuntimeException
+        public boolean visited( int key, Map<LockResourceId, LockResource> value ) throws RuntimeException
         {
-            value.visitEntries( writeReleaser );
-            return false;
+            if( key == ResourceTypes.NODE_TEMPORAL_PROP.typeId() ||
+                    key == ResourceTypes.REL_TEMPORAL_PROP.typeId())
+            {
+                for(Map.Entry<LockResourceId,LockResource> entry : value.entrySet() )
+                {
+                    manager.releaseAllTemporalPropWriteLock( entry.getValue(), lockTransaction );
+                }
+                return false;
+            }
+            else
+            {
+                for(Map.Entry<LockResourceId,LockResource> entry : value.entrySet() )
+                {
+                    manager.releaseWriteLock( entry.getValue(), lockTransaction );
+                }
+                return false;
+            }
         }
     };
 

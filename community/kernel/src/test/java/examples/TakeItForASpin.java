@@ -20,10 +20,13 @@
 package examples;
 
 import java.io.File;
+import java.io.IOException;
 
 import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 
 import static java.lang.System.getProperty;
 
@@ -33,14 +36,58 @@ public class TakeItForASpin
     {
         File dir = new File( getProperty( "java.io.tmpdir" ), "graph-db");
         GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase( dir );
+        long i;
         try ( Transaction tx = db.beginTx() )
         {
-            db.createNode();
+            Node node = db.createNode();
+            i = node.getId();
+            System.out.println(i);
+            tx.success();
+        }
+//        try
+//        {
+//            Thread.sleep(40000);
+//        } catch (InterruptedException e)
+//        {
+//            e.printStackTrace();
+//        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            Node node = db.getNodeById(i);
+            node.setProperty("hehe", "haha");
+            node.getProperty("hehe");
+            tx.success();
+        }
+
+        try ( Transaction tx = db.beginTx() )
+        {
+            Node node = db.getNodeById(i);
+            Object s = node.getProperty("hehe");
+            System.out.println(s);
+
+            int t = time();
+            node.createTemporalProperty("haha", t, 4, "hehe");
+            node.setTemporalProperty("haha", t, "hehe");
+            Object v = node.getTemporalProperty("haha", t);
+            if(v instanceof String){
+                System.out.println(v);
+            }
             tx.success();
         }
         finally
         {
             db.shutdown();
         }
+//        try
+//        {
+//            System.in.read();
+//        } catch (IOException e)
+//        {
+//            e.printStackTrace();
+//        }
+    }
+
+    private static int time(){
+        return (int) (System.currentTimeMillis()/1000);
     }
 }

@@ -19,12 +19,10 @@
  */
 package org.neo4j.kernel.impl.transaction.state;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
+import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.util.Slice;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.api.properties.DefinedProperty;
@@ -75,6 +73,95 @@ import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsField;
  */
 public class TransactionRecordState implements RecordState
 {
+    public static class TemporalProKeyValue
+    {
+        private InternalKey key;
+        private byte[] value;
+
+        public TemporalProKeyValue(InternalKey key, byte[] value )
+        {
+            this.key = key;
+            this.value = value;
+        }
+
+        InternalKey getKey()
+        {
+            return key;
+        }
+
+        byte[] getValue()
+        {
+            return value;
+        }
+    }
+
+    public void nodeAppendTemporalProperty(long id, Iterator<TemporalProKeyValue> appended )
+    {
+        while( appended.hasNext() )
+        {
+            TemporalProKeyValue keyvalue = appended.next();
+            this.nodeAppendTemporalPropertyPoint.add( keyvalue );
+        }
+    }
+
+    public void nodeDeleteTemporalPropertyPoint(long id, Iterator<TemporalProKeyValue> deleted )
+    {
+        while( deleted.hasNext() )
+        {
+            TemporalProKeyValue kv = deleted.next();
+            this.nodeDeleteTemporalPropertyPoint.add( kv );
+        }
+    }
+
+    public void nodeDeleteTemporalProperty(long id, Iterator<Integer> propertyIds )
+    {
+        while( propertyIds.hasNext() )
+        {
+            int pid = propertyIds.next();
+            //FIXME TGraph MUST!
+//            this.nodeDeleteTemporalProperties.add( pid );
+        }
+    }
+
+    public void relationshipAppendTemporalProperty(long id, Iterator<TemporalProKeyValue> appended )
+    {
+        while( appended.hasNext() )
+        {
+            TemporalProKeyValue keyvalue = appended.next();
+            this.relationshipAppendTemporalPropertyPoint.add( keyvalue );
+        }
+    }
+
+    public void relationshipDeleteTemporalPropertyPoint(long id, Iterator<TemporalProKeyValue> deleted )
+    {
+        while( deleted.hasNext() )
+        {
+            TemporalProKeyValue kv = deleted.next();
+            this.relationshipDeleteTemporalPropertyPoint.add( kv );
+        }
+    }
+
+    public void relationshipDeleteTemporalProperty( long id, Iterator<Integer> propertyIds )
+    {
+        while( propertyIds.hasNext() )
+        {
+            int pid = propertyIds.next();
+            //FIXME TGraph MUST!
+//            this.relationshipDeleteTemporalProperties.add( pid );
+        }
+    }
+
+
+    private final List<TemporalProKeyValue> nodeAppendTemporalPropertyPoint = new LinkedList<>();
+    private final List<TemporalProKeyValue> nodeDeleteTemporalPropertyPoint = new LinkedList<>();
+    private final List<Slice> nodeDeleteTemporalProperties = new LinkedList<>();
+
+    private final List<TemporalProKeyValue> relationshipAppendTemporalPropertyPoint = new LinkedList<TemporalProKeyValue>();
+    private final List<TemporalProKeyValue> relationshipDeleteTemporalPropertyPoint = new LinkedList<TemporalProKeyValue>();
+    private final List<Slice> relationshipDeleteTemporalProperties = new LinkedList<Slice>();
+
+
+
     private final IntegrityValidator integrityValidator;
     private final NeoStoreTransactionContext context;
     private final NodeStore nodeStore;
@@ -148,7 +235,48 @@ public class TransactionRecordState implements RecordState
                            context.getLabelTokenRecords().changeSize() +
                            context.getRelationshipTypeTokenRecords().changeSize() +
                            context.getRelGroupRecords().changeSize() +
-                           (neoStoreRecord != null ? neoStoreRecord.changeSize() : 0);
+                           (neoStoreRecord != null ? neoStoreRecord.changeSize() : 0) +
+                this.nodeAppendTemporalPropertyPoint.size() +
+                this.nodeDeleteTemporalPropertyPoint.size() +
+                this.nodeDeleteTemporalProperties.size() +
+                this.relationshipAppendTemporalPropertyPoint.size()+
+                this.relationshipDeleteTemporalPropertyPoint.size()+
+                this.relationshipDeleteTemporalProperties.size();
+
+        for( TemporalProKeyValue p : nodeAppendTemporalPropertyPoint )
+        {
+            Command.NodeTemporalPropertyCommand command = new Command.NodeTemporalPropertyCommand(p.key,p.value );
+            commands.add( command );
+        }
+        for( Slice id : nodeDeleteTemporalProperties )
+        {
+            Command.NodeTemporalPropertyDeleteCommand command = new Command.NodeTemporalPropertyDeleteCommand( id );
+            commands.add( command );
+        }
+        for( TemporalProKeyValue p : nodeDeleteTemporalPropertyPoint )
+        {
+            Command.NodeTemporalPropertyCommand command = new Command.NodeTemporalPropertyCommand(p.key,p.value );
+            commands.add( command );
+        }
+
+        for( TemporalProKeyValue p : relationshipAppendTemporalPropertyPoint )
+        {
+            Command.RelationshipTemporalPropertyCommand command = new Command.RelationshipTemporalPropertyCommand(p.key,p.value );
+            commands.add( command );
+        }
+
+        for( TemporalProKeyValue p : relationshipDeleteTemporalPropertyPoint )
+        {
+            Command.RelationshipTemporalPropertyCommand command = new Command.RelationshipTemporalPropertyCommand(p.key,p.value );
+            commands.add( command );
+        }
+        for( Slice id : relationshipDeleteTemporalProperties )
+        {
+            Command.RelationshipTemporalPropertyDeleteCommand command = new Command.RelationshipTemporalPropertyDeleteCommand( id );
+            commands.add( command );
+        }
+
+
 
         for ( RecordProxy<Integer, LabelTokenRecord, Void> record : context.getLabelTokenRecords().changes() )
         {

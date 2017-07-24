@@ -19,9 +19,27 @@
  */
 package org.neo4j.kernel.impl.locking;
 
+import org.neo4j.graphdb.TGraphNoImplementationException;
+
 public class NoOpClient implements Locks.Client
 {
     public static final Locks.Client NO_LOCKS = new NoOpClient();
+
+    @Override
+    public void acquireTemporalPropShared(Locks.ResourceType resourceType, long entityId, int propertyKeyId, int start, int end) throws AcquireLockTimeoutException {
+    }
+
+    @Override
+    public void acquireTemporalPropExclusive(Locks.ResourceType resourceType, long entityId, int propertyKeyId, int time) throws AcquireLockTimeoutException {
+    }
+
+    @Override
+    public void releaseTemporalPropShared(Locks.ResourceType resourceType, long entityId, int propertyKeyId, int start, int end) throws AcquireLockTimeoutException {
+    }
+
+    @Override
+    public void releaseTemporalPropExclusive(Locks.ResourceType resourceType, long entityId, int propertyKeyId, int time) throws AcquireLockTimeoutException {
+    }
 
     @Override
     public void acquireShared( Locks.ResourceType resourceType, long... resourceIds ) throws AcquireLockTimeoutException

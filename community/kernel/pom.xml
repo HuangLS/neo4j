@@ -315,5 +315,10 @@ the relevant Commercial Agreement.
       <artifactId>geronimo-spec-j2ee</artifactId>
       <scope>test</scope>
     </dependency>
+      <dependency>
+          <groupId>org.act</groupId>
+          <artifactId>temporal-property</artifactId>
+          <version>2.3.11-SNAPSHOT</version>
+      </dependency>
   </dependencies>
 </project>

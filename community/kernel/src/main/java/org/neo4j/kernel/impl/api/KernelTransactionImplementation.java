@@ -19,13 +19,13 @@
  */
 package org.neo4j.kernel.impl.api;
 
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.ValueType;
+import org.act.temporalProperty.util.Slice;
 import org.neo4j.collection.pool.Pool;
 import org.neo4j.collection.primitive.PrimitiveIntCollections;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
@@ -56,6 +56,7 @@ import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.TemporalProperty;
 import org.neo4j.kernel.api.txstate.LegacyIndexTransactionState;
 import org.neo4j.kernel.api.txstate.TransactionState;
 import org.neo4j.kernel.api.txstate.TxStateHolder;
@@ -83,6 +84,7 @@ import org.neo4j.kernel.impl.transaction.command.Command;
 import org.neo4j.kernel.impl.transaction.log.PhysicalTransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.state.NeoStoreTransactionContext;
 import org.neo4j.kernel.impl.transaction.state.TransactionRecordState;
+import org.neo4j.kernel.impl.transaction.state.TransactionRecordState.TemporalProKeyValue;
 import org.neo4j.kernel.impl.transaction.tracing.CommitEvent;
 import org.neo4j.kernel.impl.transaction.tracing.TransactionEvent;
 import org.neo4j.kernel.impl.transaction.tracing.TransactionTracer;
@@ -968,6 +970,89 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
                 DefinedProperty prop = added.next();
                 recordState.graphAddProperty( prop.propertyKeyId(), prop.value() );
             }
+        }
+
+        @Override
+        public void visitNodeTemporalPropertyChanges( long nodeId,
+                Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid,
+                Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp) {
+            List<TemporalProKeyValue> appendList = new LinkedList<TemporalProKeyValue>();
+            while( addOrUpdate.hasNext() )
+            {
+                TemporalProperty pro = addOrUpdate.next();
+                Slice idSlice = new Slice(12);
+                idSlice.setLong( 0, nodeId );
+                idSlice.setInt( 8, pro.propertyKeyId() );
+                InternalKey key = new InternalKey( idSlice, pro.time(), pro.valueLength(), ValueType.VALUE );
+                TemporalProKeyValue kv = new TemporalProKeyValue( key, pro.value() );
+                appendList.add( kv );
+            }
+            while( addInvalid.hasNext() )
+            {
+                TemporalProperty pro = addInvalid.next();
+                Slice idSlice = new Slice(12);
+                idSlice.setLong( 0, nodeId );
+                idSlice.setInt( 8, pro.propertyKeyId() );
+                InternalKey key = new InternalKey( idSlice, pro.time(), 0, ValueType.INVALID );
+                TemporalProKeyValue kv = new TemporalProKeyValue( key, pro.value() );
+                appendList.add( kv );
+            }
+
+            List<TemporalProKeyValue> deletePoints = new LinkedList<TemporalProKeyValue>();
+            while( delPoint.hasNext() )
+            {
+                TemporalProperty pro = delPoint.next();
+                Slice idSlice = new Slice(12);
+                idSlice.setLong( 0, nodeId );
+                idSlice.setInt( 8, pro.propertyKeyId() );
+                InternalKey key = new InternalKey( idSlice, pro.time(), pro.valueLength(), ValueType.DELETION );
+                TemporalProKeyValue keyvalue = new TemporalProKeyValue( key, pro.value() );
+                deletePoints.add( keyvalue );
+            }
+            recordState.nodeAppendTemporalProperty( nodeId, appendList.iterator() );
+            recordState.nodeDeleteTemporalPropertyPoint( nodeId, deletePoints.iterator() );
+            recordState.nodeDeleteTemporalProperty( nodeId, delProp );
+        }
+
+        @Override
+        public void visitRelationshipTemporalPropertyChanges(
+                long relationshipId, Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid,
+                Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp) {
+            List<TemporalProKeyValue> appendedlist = new LinkedList<TransactionRecordState.TemporalProKeyValue>();
+            while( addOrUpdate.hasNext() )
+            {
+                TemporalProperty pro = addOrUpdate.next();
+                Slice idSlice = new Slice(12);
+                idSlice.setLong( 0, relationshipId );
+                idSlice.setInt( 8, pro.propertyKeyId() );
+                InternalKey key = new InternalKey( idSlice, pro.time(), pro.valueLength(), ValueType.VALUE );
+                TemporalProKeyValue keyvalue = new TemporalProKeyValue( key, pro.value() );
+                appendedlist.add( keyvalue );
+            }
+            while( addInvalid.hasNext() )
+            {
+                TemporalProperty pro = addInvalid.next();
+                Slice idSlice = new Slice(12);
+                idSlice.setLong( 0, relationshipId );
+                idSlice.setInt( 8, pro.propertyKeyId() );
+                InternalKey key = new InternalKey( idSlice, pro.time(), 0, ValueType.INVALID );
+                TemporalProKeyValue keyvalue = new TemporalProKeyValue( key, pro.value() );
+                appendedlist.add( keyvalue );
+            }
+            List<TemporalProKeyValue> deletedlist = new LinkedList<TransactionRecordState.TemporalProKeyValue>();
+            while( delPoint.hasNext() )
+            {
+                TemporalProperty pro = delPoint.next();
+                Slice idSlice = new Slice(12);
+                idSlice.setLong( 0, relationshipId );
+                idSlice.setInt( 8, pro.propertyKeyId() );
+                InternalKey key = new InternalKey( idSlice, pro.time(), pro.valueLength(), ValueType.DELETION );
+                TemporalProKeyValue keyvalue = new TemporalProKeyValue( key, pro.value() );
+                deletedlist.add( keyvalue );
+            }
+            recordState.relationshipAppendTemporalProperty( relationshipId, appendedlist.iterator() );
+            recordState.relationshipDeleteTemporalPropertyPoint( relationshipId, deletedlist.iterator() );
+            recordState.relationshipDeleteTemporalProperty( relationshipId, delProp );
         }
 
         @Override

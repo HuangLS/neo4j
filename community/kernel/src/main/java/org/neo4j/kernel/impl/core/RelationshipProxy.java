@@ -25,14 +25,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.cursor.Cursor;
-import org.neo4j.graphdb.ConstraintViolationException;
-import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.NotFoundException;
-import org.neo4j.graphdb.Relationship;
-import org.neo4j.graphdb.RelationshipType;
+import org.neo4j.graphdb.*;
 import org.neo4j.helpers.ThisShouldNotHappenError;
 import org.neo4j.kernel.api.EntityType;
 import org.neo4j.kernel.api.Statement;
@@ -43,6 +39,7 @@ import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
 import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
 import org.neo4j.kernel.api.exceptions.PropertyKeyIdNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
+import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
 import org.neo4j.kernel.api.exceptions.schema.IllegalTokenNameException;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
@@ -52,6 +49,7 @@ public class RelationshipProxy
         extends PropertyContainerProxy
         implements Relationship, RelationshipVisitor<RuntimeException>
 {
+
     public interface RelationshipActions
     {
         Statement statement();
@@ -309,6 +307,205 @@ public class RelationshipProxy
                     "Property key retrieved through kernel API should exist.", e );
         }
     }
+
+    @Override
+    public void createTemporalProperty(String key, int time, int maxValueLength, Object value) {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                //statement.dataWriteOperations().nodeSetProperty( nodeId, Property.property( propertyKeyId, time, value ) );
+                statement.dataWriteOperations().relationshipCreateTemporalProperty( this.getId(), maxValueLength, propertyKeyId, time, value );
+            }
+            catch ( ConstraintValidationKernelException e )
+            {
+                throw new ConstraintViolationException(
+                        e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( String.format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+
+    }
+
+    @Override
+    public Object getTemporalProperty(String key, int time) {
+        if ( null == key )
+        {
+            throw new IllegalArgumentException( "(null) property key is not allowed" );
+        }
+
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
+            return statement.readOperations().relationshipGetTemporalPropertyPoint( this.getId(), propertyKeyId, time );
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+    }
+
+    @Override
+    public Object getTemporalProperties(String key, int startTime, int endTime, RangeQueryCallBack callBack) {
+        if ( null == key )
+        {
+            throw new IllegalArgumentException( "(null) property key is not allowed" );
+        }
+
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
+            return statement.readOperations().relationshipGetTemporalPropertyRange( this.getId(), propertyKeyId, startTime, endTime, callBack );
+            //return statement.readOperations().nodeGetProperty( nodeId, propertyKeyId, startTime, endTime, callback ).value();
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+    }
+
+    @Override
+    public void setTemporalProperty(String key, int time, Object value)
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().relationshipSetTemporalProperty( this.getId(), propertyKeyId, time, value );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( String.format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
+    @Override
+    public void setTemporalPropertyInvalid(String key, int time)
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().relationshipSetTemporalPropertyInvalid( this.getId(), propertyKeyId, time );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( String.format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
+    @Override
+    public void deleteTemporalProperty(String key)
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().relationshipRemoveTemporalProperty( this.getId(), propertyKeyId );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( String.format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
+    @Override
+    public void deleteTemporalPropertyPoint(String key, int time)
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().relationshipRemoveTemporalPropertyPoint( this.getId(), propertyKeyId, time );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( String.format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
 
     @Override
     public Object getProperty( String key )

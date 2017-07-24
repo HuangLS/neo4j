@@ -21,6 +21,7 @@ package org.neo4j.kernel.impl.api;
 
 import java.io.IOException;
 
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddRelationshipCommand;
@@ -81,6 +82,58 @@ public class CommandApplierFacade implements CommandHandler, Visitor<Command,IOE
     {
         element.handle( this );
         return false;
+    }
+
+    @Override
+    public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+        boolean result = false;
+        for ( CommandHandler handler : handlers )
+        {
+            if ( handler.visitNodeTemporalPropertyDeleteCommand( command ) )
+            {
+                result = true;
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+        boolean result = false;
+        for ( CommandHandler handler : handlers )
+        {
+            if ( handler.visitRelationshipTemporalPropertyDeleteCommand( command ) )
+            {
+                result = true;
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
+        boolean result = false;
+        for ( CommandHandler handler : handlers )
+        {
+            if ( handler.visitNodeTemporalPropertyCommand( command ) )
+            {
+                result = true;
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
+        boolean result = false;
+        for ( CommandHandler handler : handlers )
+        {
+            if ( handler.visitRelationshipTemporalPropertyCommand( command ) )
+            {
+                result = true;
+            }
+        }
+        return result;
     }
 
     @Override

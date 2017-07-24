@@ -22,6 +22,7 @@ package org.neo4j.kernel.impl.api;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntCollection;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
@@ -29,6 +30,7 @@ import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.function.Function;
 import org.neo4j.graphdb.Direction;
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.api.DataWriteOperations;
 import org.neo4j.kernel.api.LegacyIndexHits;
 import org.neo4j.kernel.api.ReadOperations;
@@ -42,11 +44,7 @@ import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.cursor.RelationshipItem;
-import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
-import org.neo4j.kernel.api.exceptions.LabelNotFoundKernelException;
-import org.neo4j.kernel.api.exceptions.ProcedureException;
-import org.neo4j.kernel.api.exceptions.PropertyKeyIdNotFoundKernelException;
-import org.neo4j.kernel.api.exceptions.RelationshipTypeIdNotFoundKernelException;
+import org.neo4j.kernel.api.exceptions.*;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.legacyindex.LegacyIndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException;
@@ -473,6 +471,50 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
     {
         statement.assertOpen();
         dataRead().relationshipVisit( statement, relId, visitor );
+    }
+
+    @Override
+    public Object nodeGetTemporalPropertyPoint(long nodeId, int propertyKeyId, int time) throws PropertyNotFoundException, EntityNotFoundException
+    {
+        statement.assertOpen();
+        if ( propertyKeyId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        return dataRead().nodeGetTemporalProperty(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public Object nodeGetTemporalPropertyRange(long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callBack) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        statement.assertOpen();
+        if ( propertyKeyId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        return dataRead().nodeGetTemporalProperties(statement, nodeId, propertyKeyId, startTime, endTime, callBack);
+    }
+
+    @Override
+    public Object relationshipGetTemporalPropertyPoint(long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        statement.assertOpen();
+        if ( propertyKeyId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        return dataRead().relationshipGetTemporalProperty(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public Object relationshipGetTemporalPropertyRange(long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callBack) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        statement.assertOpen();
+        if ( propertyKeyId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        return dataRead().relationshipGetTemporalProperties(statement, nodeId, propertyKeyId, startTime, endTime, callBack);
     }
 
     // </DataRead>
@@ -957,6 +999,68 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
         statement.assertOpen();
         return dataWrite().graphRemoveProperty( statement, propertyKeyId );
     }
+
+    @Override
+    public void nodeCreateTemporalProperty(long nodeId, int maxValueLength, int propertyKeyId, int time, Object value) throws EntityNotFoundException, ConstraintValidationKernelException {
+        statement.assertOpen();
+        dataWrite().nodeCreateTemporalProperty( statement, nodeId, propertyKeyId, time, maxValueLength, value);
+    }
+
+    @Override
+    public void nodeSetTemporalProperty(long nodeId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException {
+        statement.assertOpen();
+        dataWrite().nodeSetTemporalProperty(statement, nodeId, propertyKeyId, time, value);
+    }
+
+    @Override
+    public void nodeSetTemporalPropertyInvalid(long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException {
+        statement.assertOpen();
+        dataWrite().nodeInvalidTemporalProperty(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public void nodeRemoveTemporalPropertyPoint(long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException {
+        statement.assertOpen();
+        dataWrite().nodeDeleteTemporalPropertyPoint(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public void nodeRemoveTemporalProperty(long nodeId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException {
+        statement.assertOpen();
+        dataWrite().nodeDeleteTemporalProperty(statement, nodeId, propertyKeyId);
+    }
+
+    @Override
+    public void relationshipCreateTemporalProperty(long nodeId, int maxValueLength, int propertyKeyId, int time, Object value) throws EntityNotFoundException, ConstraintValidationKernelException {
+        statement.assertOpen();
+        dataWrite().relationshipCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
+    }
+
+    @Override
+    public void relationshipSetTemporalProperty(long relationshipId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException {
+        statement.assertOpen();
+        dataWrite().relationshipSetTemporalProperty(statement, relationshipId, propertyKeyId, time, value);
+    }
+
+    @Override
+    public void relationshipSetTemporalPropertyInvalid(long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException {
+        statement.assertOpen();
+        dataWrite().relationshipInvalidTemporalProperty(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public void relationshipRemoveTemporalPropertyPoint(long relationshipId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException {
+        statement.assertOpen();
+        dataWrite().relationshipDeleteTemporalPropertyRecord(statement, relationshipId, propertyKeyId, time);
+    }
+
+    @Override
+    public void relationshipRemoveTemporalProperty(long relationshipId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException {
+        statement.assertOpen();
+        dataWrite().relationshipDeleteTemporalProperty(statement, relationshipId, propertyKeyId);
+    }
+
+
     // </DataWrite>
 
     // <SchemaWrite>

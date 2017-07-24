@@ -332,4 +332,11 @@ public interface GraphDatabaseService
      * @return a new {@link BidirectionalTraversalDescription}
      */
     BidirectionalTraversalDescription bidirectionalTraversalDescription();
+
+
+    ResourceIterator<Node> findNodesByTemporalProperty(String key, int time, Object value);
+
+    ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value);
+
+
 }

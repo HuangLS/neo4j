@@ -25,6 +25,7 @@ import java.util.Iterator;
 
 import org.neo4j.function.Consumer;
 import org.neo4j.function.Function;
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.constraints.NodePropertyConstraint;
 import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
@@ -34,6 +35,7 @@ import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
 import org.neo4j.kernel.api.exceptions.ProcedureException;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException;
 import org.neo4j.kernel.api.exceptions.schema.AlreadyIndexedException;
@@ -62,9 +64,7 @@ import org.neo4j.kernel.impl.store.SchemaStorage;
 
 import static java.lang.Math.max;
 import static java.lang.Math.min;
-import static org.neo4j.kernel.impl.locking.ResourceTypes.PROCEDURE;
-import static org.neo4j.kernel.impl.locking.ResourceTypes.procedureResourceId;
-import static org.neo4j.kernel.impl.locking.ResourceTypes.schemaResource;
+import static org.neo4j.kernel.impl.locking.ResourceTypes.*;
 
 public class LockingStatementOperations implements
         EntityWriteOperations,
@@ -297,6 +297,78 @@ public class LockingStatementOperations implements
     public long nodeCreate( KernelStatement statement )
     {
         return entityWriteDelegate.nodeCreate( statement );
+    }
+
+    @Override
+    public void nodeCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
+        entityWriteDelegate.nodeCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
+    }
+
+    @Override
+    public void nodeSetTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        acquireShared(statement, NODE, nodeId);
+        statement.locks().optimistic().acquireTemporalPropExclusive(NODE_TEMPORAL_PROP, nodeId, propertyKeyId, time);
+        entityWriteDelegate.nodeSetTemporalProperty(statement, nodeId, propertyKeyId, time, value);
+    }
+
+    @Override
+    public void nodeInvalidTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        acquireShared(statement, NODE, nodeId);
+        statement.locks().optimistic().acquireTemporalPropExclusive(NODE_TEMPORAL_PROP, nodeId, propertyKeyId, time);
+        entityWriteDelegate.nodeInvalidTemporalProperty(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public void nodeDeleteTemporalPropertyPoint(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        acquireShared(statement, NODE, nodeId);
+        statement.locks().optimistic().acquireTemporalPropExclusive(NODE_TEMPORAL_PROP, nodeId, propertyKeyId, time);
+        entityWriteDelegate.nodeDeleteTemporalPropertyPoint(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public void nodeDeleteTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        acquireExclusiveNodeLock(statement, nodeId);
+        entityWriteDelegate.nodeDeleteTemporalProperty(statement, nodeId, propertyKeyId);
+    }
+
+    @Override
+    public void relationshipCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
+        entityWriteDelegate.relationshipCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
+    }
+
+    @Override
+    public void relationshipSetTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        acquireShared(statement, RELATIONSHIP, relId);
+        statement.locks().optimistic().acquireTemporalPropExclusive(REL_TEMPORAL_PROP, relId, propertyKeyId, time);
+        entityWriteDelegate.relationshipSetTemporalProperty(statement, relId, propertyKeyId, time, value);
+    }
+
+    @Override
+    public void relationshipInvalidTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        acquireShared(statement, RELATIONSHIP, relId);
+        statement.locks().optimistic().acquireTemporalPropExclusive(REL_TEMPORAL_PROP, relId, propertyKeyId, time);
+        entityWriteDelegate.relationshipInvalidTemporalProperty(statement, relId, propertyKeyId, time);
+    }
+
+    @Override
+    public void relationshipDeleteTemporalProperty(KernelStatement statement, long relId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        acquireExclusiveRelationshipLock(statement, relId);
+        entityWriteDelegate.relationshipDeleteTemporalProperty(statement, relId, propertyKeyId);
+    }
+
+    @Override
+    public void relationshipDeleteTemporalPropertyRecord(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        acquireShared( statement, RELATIONSHIP, relId );
+        statement.locks().optimistic().acquireTemporalPropExclusive(REL_TEMPORAL_PROP, relId, propertyKeyId, time );
+        entityWriteDelegate.relationshipDeleteTemporalPropertyRecord( statement, relId, propertyKeyId, time );
     }
 
     @Override
@@ -550,6 +622,53 @@ public class LockingStatementOperations implements
     {
         state.locks().pessimistic().releaseShared( type, resourceId );
         state.assertOpen();
+    }
+
+    @Override
+    public void acquireTemporalExclusive(KernelStatement state, Locks.ResourceType resourceType, long resourceId, int propertyKeyId, int time)
+    {
+        if(resourceType.equals( ResourceTypes.NODE ) )
+        {
+            state.locks().optimistic().acquireShared(ResourceTypes.NODE, resourceId);
+        }else
+        {
+            state.locks().optimistic().acquireShared(ResourceTypes.RELATIONSHIP, resourceId);
+        }
+        state.locks().optimistic().acquireTemporalPropExclusive( resourceType, resourceId, propertyKeyId, time );
+
+    }
+
+    @Override
+    public void acquireTemporalShared(KernelStatement state, Locks.ResourceType resourceType, long resourceId, int propertyKeyId, int start, int end)
+    {
+        if(resourceType.equals( ResourceTypes.NODE ) )
+        {
+            state.locks().optimistic().acquireShared(ResourceTypes.NODE, resourceId);
+        }else
+        {
+            state.locks().optimistic().acquireShared(ResourceTypes.RELATIONSHIP, resourceId);
+        }
+        state.locks().optimistic().acquireTemporalPropShared( resourceType, resourceId, propertyKeyId, start, end );
+    }
+
+    @Override
+    public void releaseTemporalExclusive(KernelStatement statement, Locks.ResourceType type, long id, int propertyKeyId, int time)
+    {
+        statement.locks().pessimistic().releaseTemporalPropExclusive( type, id, propertyKeyId, time );
+        if(type.equals( ResourceTypes.NODE_TEMPORAL_PROP ) )
+            statement.locks().pessimistic().releaseShared( ResourceTypes.NODE, id );
+        else
+            statement.locks().pessimistic().releaseShared( ResourceTypes.RELATIONSHIP, id );
+    }
+
+    @Override
+    public void releaseTemporalShared(KernelStatement statement, Locks.ResourceType type, long id, int propertyKeyId, int start, int end)
+    {
+        statement.locks().pessimistic().releaseTemporalPropShared( type, id, propertyKeyId, start, end );
+        if(type.equals( ResourceTypes.NODE_TEMPORAL_PROP ) )
+            statement.locks().pessimistic().releaseShared( ResourceTypes.NODE, id );
+        else
+            statement.locks().pessimistic().releaseShared( ResourceTypes.RELATIONSHIP, id );
     }
 
     // === TODO Below is unnecessary delegate methods

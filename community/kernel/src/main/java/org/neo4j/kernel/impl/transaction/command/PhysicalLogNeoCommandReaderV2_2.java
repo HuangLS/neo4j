@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
 import org.neo4j.kernel.impl.index.IndexCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
@@ -211,6 +212,30 @@ public class PhysicalLogNeoCommandReaderV2_2 implements CommandReader
 
     private class PhysicalNeoCommandReader implements CommandHandler
     {
+        @Override
+        public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+            //FIXME TGraph: Not Implement.
+            return false;
+        }
+
+        @Override
+        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+            //FIXME TGraph: Not Implement.
+            return false;
+        }
+
+        @Override
+        public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
+            //FIXME TGraph: Not Implement.
+            return false;
+        }
+
+        @Override
+        public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
+            //FIXME TGraph: Not Implement.
+            return false;
+        }
+
         @Override
         public boolean visitNodeCommand( Command.NodeCommand command ) throws IOException
         {

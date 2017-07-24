@@ -31,6 +31,7 @@ import org.neo4j.kernel.impl.index.IndexConfigStore;
 import org.neo4j.kernel.impl.locking.LockGroup;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.command.CacheInvalidationTransactionApplier;
 import org.neo4j.kernel.impl.transaction.command.CommandHandler;
@@ -58,13 +59,16 @@ public class TransactionRepresentationStoreApplier
     private final KernelHealth health;
     private final IdOrderingQueue legacyIndexTransactionOrdering;
 
+    private final TemporalPropertyStoreAdapter temporalPropStore;
+
     private final WorkSync<Provider<LabelScanWriter>,IndexTransactionApplier.LabelUpdateWork> labelScanStoreSync;
 
     public TransactionRepresentationStoreApplier(
             IndexingService indexingService, Provider<LabelScanWriter> labelScanWriters, NeoStores neoStores,
             CacheAccessBackDoor cacheAccess, LockService lockService, LegacyIndexApplierLookup
             legacyIndexProviderLookup,
-            IndexConfigStore indexConfigStore, KernelHealth health, IdOrderingQueue legacyIndexTransactionOrdering )
+            IndexConfigStore indexConfigStore, KernelHealth health, IdOrderingQueue legacyIndexTransactionOrdering,
+            TemporalPropertyStoreAdapter temporalPropertyStore)
     {
         this.indexingService = indexingService;
         this.labelScanWriters = labelScanWriters;
@@ -76,6 +80,7 @@ public class TransactionRepresentationStoreApplier
         this.health = health;
         this.legacyIndexTransactionOrdering = legacyIndexTransactionOrdering;
         labelScanStoreSync = new WorkSync<>( labelScanWriters );
+        this.temporalPropStore = temporalPropertyStore;
     }
 
     public void apply( TransactionRepresentation representation, ValidatedIndexUpdates indexUpdates, LockGroup locks,
@@ -104,9 +109,13 @@ public class TransactionRepresentationStoreApplier
         // Counts store application
         CommandHandler countsStoreApplier = getCountsStoreApplier( transactionId, mode );
 
+        // Dynamic Property store application
+        TemporalPropertyStoreHandler temporalProHandler = new TemporalPropertyStoreHandler( this.temporalPropStore );
+
+
         // Perform the application
         try ( CommandApplierFacade applier = new CommandApplierFacade(
-                storeApplier, indexApplier, legacyIndexApplier, countsStoreApplier ) )
+                storeApplier, indexApplier, legacyIndexApplier, countsStoreApplier, temporalProHandler ) )
         {
             representation.accept( applier );
         }
@@ -132,6 +141,6 @@ public class TransactionRepresentationStoreApplier
             IdOrderingQueue legacyIndexTransactionOrdering )
     {
         return new TransactionRepresentationStoreApplier( indexingService, labelScanWriters, neoStores, cacheAccess,
-                lockService, legacyIndexProviderLookup, indexConfigStore, health, legacyIndexTransactionOrdering );
+                lockService, legacyIndexProviderLookup, indexConfigStore, health, legacyIndexTransactionOrdering, temporalPropStore );
     }
 }

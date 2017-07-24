@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.function.IntFunction;
@@ -448,6 +449,204 @@ public class NodeProxy
         {
             throw new ThisShouldNotHappenError( "Rickard",
                     "Property key retrieved through kernel API should exist.", e );
+        }
+    }
+
+    @Override
+    public Object getTemporalProperty(String key, int time) {
+        if ( null == key )
+        {
+            throw new IllegalArgumentException( "(null) property key is not allowed" );
+        }
+
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
+            return statement.readOperations().nodeGetTemporalPropertyPoint( nodeId, propertyKeyId, time );
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+    }
+
+    @Override
+    public Object getTemporalProperties(String key, int startTime, int endTime, RangeQueryCallBack callBack) {
+        if ( null == key )
+        {
+            throw new IllegalArgumentException( "(null) property key is not allowed" );
+        }
+
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
+            return statement.readOperations().nodeGetTemporalPropertyRange( this.getId(), propertyKeyId, startTime, endTime, callBack );
+            //return statement.readOperations().nodeGetProperty( nodeId, propertyKeyId, startTime, endTime, callback ).value();
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+    }
+
+    @Override
+    public void createTemporalProperty( String key, int time, int maxValueLength, Object value )
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                //statement.dataWriteOperations().nodeSetProperty( nodeId, Property.property( propertyKeyId, time, value ) );
+                statement.dataWriteOperations().nodeCreateTemporalProperty( nodeId, maxValueLength, propertyKeyId, time, value );
+            }
+            catch ( ConstraintValidationKernelException e )
+            {
+                throw new ConstraintViolationException(
+                        e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
+    @Override
+    public void setTemporalProperty(String key, int time, Object value)
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().nodeSetTemporalProperty( nodeId, propertyKeyId, time, value );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
+    @Override
+    public void setTemporalPropertyInvalid(String key, int time)
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().nodeSetTemporalPropertyInvalid( nodeId, propertyKeyId, time );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
+    @Override
+    public void deleteTemporalProperty(String key)
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().nodeRemoveTemporalProperty( nodeId, propertyKeyId );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
+    @Override
+    public void deleteTemporalPropertyPoint(String key, int time)
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                statement.dataWriteOperations().nodeRemoveTemporalPropertyPoint( nodeId, propertyKeyId, time );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
+            }
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
         }
     }
 

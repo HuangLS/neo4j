@@ -19,12 +19,14 @@
  */
 package org.neo4j.kernel.impl.api;
 
+import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.cursor.RelationshipItem;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
 import org.neo4j.kernel.api.exceptions.schema.IndexBrokenKernelException;
@@ -54,6 +56,74 @@ public class GuardingStatementOperations implements
         this.entityWriteDelegate = entityWriteDelegate;
         this.entityReadDelegate = entityReadDelegate;
         this.guard = guard;
+    }
+
+    @Override
+    public void nodeCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
+        guard.check();
+        entityWriteDelegate.nodeCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
+    }
+
+    @Override
+    public void nodeSetTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        entityWriteDelegate.nodeSetTemporalProperty(statement, nodeId, propertyKeyId, time, value);
+    }
+
+    @Override
+    public void nodeInvalidTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        entityWriteDelegate.nodeInvalidTemporalProperty(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public void nodeDeleteTemporalPropertyPoint(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        entityWriteDelegate.nodeDeleteTemporalPropertyPoint(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public void nodeDeleteTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        entityWriteDelegate.nodeDeleteTemporalProperty(statement, nodeId, propertyKeyId);
+    }
+
+    @Override
+    public void relationshipCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
+        guard.check();
+        entityWriteDelegate.relationshipCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
+    }
+
+    @Override
+    public void relationshipSetTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        entityWriteDelegate.relationshipSetTemporalProperty(statement, relId, propertyKeyId, time, value);
+    }
+
+    @Override
+    public void relationshipInvalidTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        entityWriteDelegate.relationshipInvalidTemporalProperty(statement, relId, propertyKeyId, time);
+    }
+
+    @Override
+    public void relationshipDeleteTemporalProperty(KernelStatement statement, long relId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        entityWriteDelegate.relationshipDeleteTemporalProperty(statement, relId, propertyKeyId);
+    }
+
+    @Override
+    public void relationshipDeleteTemporalPropertyRecord(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        entityWriteDelegate.relationshipDeleteTemporalPropertyRecord(statement, relId, propertyKeyId, time);
     }
 
     @Override
@@ -156,6 +226,34 @@ public class GuardingStatementOperations implements
     {
         guard.check();
         return entityWriteDelegate.graphRemoveProperty( state, propertyKeyId );
+    }
+
+    @Override
+    public Object nodeGetTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        return entityReadDelegate.nodeGetTemporalProperty(statement, nodeId, propertyKeyId, time);
+    }
+
+    @Override
+    public Object nodeGetTemporalProperties(KernelStatement statement, long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        return entityReadDelegate.nodeGetTemporalProperties(statement, nodeId, propertyKeyId, startTime, endTime, callback);
+    }
+
+    @Override
+    public Object relationshipGetTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        return entityReadDelegate.relationshipGetTemporalProperty(statement, relId, propertyKeyId, time);
+    }
+
+    @Override
+    public Object relationshipGetTemporalProperties(KernelStatement statement, long relId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        return entityReadDelegate.relationshipGetTemporalProperties(statement, relId, propertyKeyId, startTime, endTime, callback);
     }
 
     @Override

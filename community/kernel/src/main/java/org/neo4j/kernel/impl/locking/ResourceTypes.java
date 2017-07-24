@@ -45,7 +45,11 @@ public enum ResourceTypes implements Locks.ResourceType
      * Dropping procedures is done with the protection of an exclusive schema lock, meaning procedure creation
      * is expected to be done holding both this lock and a shared schema lock.
      */
-    PROCEDURE   (6, LockWaitStrategies.INCREMENTAL_BACKOFF)
+    PROCEDURE   (6, LockWaitStrategies.INCREMENTAL_BACKOFF),
+
+
+    NODE_TEMPORAL_PROP(7, LockWaitStrategies.INCREMENTAL_BACKOFF),
+    REL_TEMPORAL_PROP(8, LockWaitStrategies.INCREMENTAL_BACKOFF)
     ;
 
     private final static Map<Integer, Locks.ResourceType> idToType = new HashMap<>();
