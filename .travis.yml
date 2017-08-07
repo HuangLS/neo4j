@@ -1,0 +1,42 @@
+dist: trusty
+sudo: false
+language: java
+matrix:
+  include:
+    - os: linux
+      jdk: oraclejdk8
+
+git:
+  depth: 1
+
+addons:
+  apt:
+    packages:
+    - debhelper
+    - devscripts
+    - dos2unix
+    - dpkg
+    - make
+    - xmlstarlet
+    - graphviz
+    - nodejs-legacy
+    - npm
+    - rpm
+    - unzip
+
+cache:
+  directories:
+    - $HOME/.m2
+
+install:
+  - cd $HOME  &&  git clone -b recoveryFromLog --depth=1 --single-branch https://github.com/TGraphDB/temporal-storage.git
+  - cd $HOME  &&  git clone -b master          --depth=1 --single-branch https://github.com/TGraphDB/temporal-index.git
+  - cd $HOME/temporal-storage  &&  mvn -B install -Dmaven.test.skip=true   # --settings $HOME/settings.xml 
+  - cd $HOME/temporal-index    &&  mvn -B install -Dmaven.test.skip=true
+  - cd $TRAVIS_BUILD_DIR
+  - mvn -B  install  -DskipTests=true  -Dlicense.skip=true  -Dlicensing.skip=true  -Dmaven.javadoc.skip=true
+    #  - mvn -B  install  -pl org.neo4j:neo4j-cypher  -am  -DskipTests=true  -Dlicense.skip=true  -Dlicensing.skip=true
+
+script:
+  - echo $PWD
+  - echo "skip tests"  # mvn test -B
