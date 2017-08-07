@@ -100,23 +100,20 @@ public class TemporalPropertyStoreAdapter extends LifecycleAdapter
         this.relStore.setProperty( id, value );
     }
 
-    public byte[] getNodeProperty( long nodeId, int propertyKeyId, int time )
+    public Slice getNodeProperty( long nodeId, int propertyKeyId, int time )
     {
-        Slice toret = this.nodeStore.getPointValue(nodeId, propertyKeyId, time);
-        return toret == null ? null:toret.copyBytes();
+        return this.nodeStore.getPointValue(nodeId, propertyKeyId, time);
     }
 
-    public byte[] getRelationshipProperty( long relId, int propertyKeyId, int time )
+    public Slice getRelationshipProperty( long relId, int propertyKeyId, int time )
     {
-        Slice toret =  this.relStore.getPointValue( relId, propertyKeyId, time );
-        return toret == null ? null : toret.copyBytes();
+        return this.relStore.getPointValue( relId, propertyKeyId, time );
     }
 
-    public byte[] getRelationshipProperty( long relId, int propertyKeyId, int startTime, int endTime,
+    public Object getRelationshipProperty( long relId, int propertyKeyId, int startTime, int endTime,
                                            RangeQueryCallBack callback )
     {
-        Slice toret = this.relStore.getRangeValue(relId, propertyKeyId, startTime, endTime, callback);
-        return toret == null ? null : toret.copyBytes();
+        return this.relStore.getRangeValue(relId, propertyKeyId, startTime, endTime, callback);
     }
 
     public void flushAll()

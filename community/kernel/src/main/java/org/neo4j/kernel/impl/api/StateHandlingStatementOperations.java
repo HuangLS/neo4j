@@ -24,7 +24,8 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.act.temporalProperty.impl.RangeQueryCallBack;
-import org.act.temporalProperty.util.DynPropertyValueConvertor;
+import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
 import org.neo4j.collection.primitive.PrimitiveIntCollection;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveIntStack;
@@ -34,7 +35,6 @@ import org.neo4j.cursor.Cursor;
 import org.neo4j.function.Predicate;
 import org.neo4j.graphdb.ConstraintViolationException;
 import org.neo4j.graphdb.TGraphInternalError;
-import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.api.EntityType;
 import org.neo4j.kernel.api.LegacyIndex;
 import org.neo4j.kernel.api.LegacyIndexHits;
@@ -94,7 +94,7 @@ import org.neo4j.kernel.impl.util.Cursors;
 import org.neo4j.kernel.impl.util.PrimitiveLongResourceIterator;
 import org.neo4j.kernel.impl.util.diffsets.ReadableDiffSets;
 
-import static org.act.temporalProperty.util.DynPropertyValueConvertor.CLASS_NAME_LENGTH_SEPERATOR;
+import static org.act.temporalProperty.util.TemporalPropertyValueConvertor.CLASS_NAME_LENGTH_SEPERATOR;
 import static org.neo4j.collection.primitive.PrimitiveLongCollections.single;
 import static org.neo4j.helpers.collection.Iterables.filter;
 import static org.neo4j.helpers.collection.IteratorUtil.iterator;
@@ -360,7 +360,7 @@ public class StateHandlingStatementOperations implements
             {
                 if ( !properties.next() )
                 {
-                    valueLength = DynPropertyValueConvertor.convert( value2store, value );
+                    valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
                     DefinedProperty property = Property.property(
                             propertyKeyId,
                             value.getClass().getSimpleName() + CLASS_NAME_LENGTH_SEPERATOR + maxValueLength
@@ -395,7 +395,7 @@ public class StateHandlingStatementOperations implements
                     String maxValueLengthStr = v.split( CLASS_NAME_LENGTH_SEPERATOR )[1];
                     int maxValueLength = Integer.parseInt(maxValueLengthStr);
                     byte[] value2store = new byte[maxValueLength];
-                    int valueLength = DynPropertyValueConvertor.convert( value2store, value );
+                    int valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
                     statement.txState().nodeDoCreateTemporalPropertyRecord( nodeId, Property.temporalProperty( propertyKeyId, time, valueLength, value2store ) );
                 }
             }
@@ -491,7 +491,7 @@ public class StateHandlingStatementOperations implements
             {
                 if ( !properties.next() )
                 {
-                    valueLength = DynPropertyValueConvertor.convert( value2store, value );
+                    valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
                     DefinedProperty property = Property.property(
                             propertyKeyId,
                             value.getClass().getSimpleName() + CLASS_NAME_LENGTH_SEPERATOR + maxValueLength
@@ -527,7 +527,7 @@ public class StateHandlingStatementOperations implements
                     String maxValueLengthStr = v.split( CLASS_NAME_LENGTH_SEPERATOR )[1];
                     int maxValueLength = Integer.parseInt(maxValueLengthStr);
                     byte[] value2store = new byte[maxValueLength];
-                    int valueLength = DynPropertyValueConvertor.convert( value2store, value );
+                    int valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
                     statement.txState().relationshipDoCreateTemporalProperty( relId, Property.temporalProperty( propertyKeyId, time, valueLength, value2store ) );
                 }
             }
@@ -763,7 +763,7 @@ public class StateHandlingStatementOperations implements
                                     int valueLength = result.valueLength();
                                     byte[] value = result.value();
                                     byte[] actualV = Arrays.copyOf(value, valueLength);
-                                    return DynPropertyValueConvertor.revers(type, actualV);
+                                    return TemporalPropertyValueConvertor.revers(type, actualV);
                                 } else
                                 {
                                     return null; // invalid record
@@ -771,13 +771,13 @@ public class StateHandlingStatementOperations implements
                             }
                             // not in TxState, then get from store
                         }
-                        byte[] value = this.temporalPropertyStore.getNodeProperty(nodeId, propertyKeyId, time);
-                        if (null != value)
-                        {
-                            return DynPropertyValueConvertor.revers(type, value);
-                        } else
+                        Slice value = this.temporalPropertyStore.getNodeProperty(nodeId, propertyKeyId, time);
+                        if (null == value)
                         {
                             return null;
+                        } else
+                        {
+                            return TemporalPropertyValueConvertor.revers(type, value.getBytes());
                         }
                     }else{
                         throw new TGraphInternalError("Get NULL value from neo4j store!");
@@ -792,16 +792,31 @@ public class StateHandlingStatementOperations implements
     @Override
     public Object nodeGetTemporalProperties(KernelStatement statement, long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback) throws EntityNotFoundException {
 //        FIXME TGraph: Should search in tx and then get from storage
-        byte[] value = this.temporalPropertyStore.getRelationshipProperty( nodeId, propertyKeyId, startTime, endTime, callback );
-        if( null != value )
+        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
         {
-            return DynPropertyValueConvertor.revers( "Integer", value );
+            NodeItem node = cursor.get();
+            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
+            {
+                if (properties.next())
+                {
+                    Object staticPro = properties.get().value();
+                    if (staticPro != null)
+                    {
+                        String type = ((String) staticPro).split(CLASS_NAME_LENGTH_SEPERATOR)[0];
+//                        if (statement.hasTxStateWithChanges())
+//                        {
+//
+//                        }
+                        callback.setValueType(type);
+                        return this.temporalPropertyStore.getRelationshipProperty( nodeId, propertyKeyId, startTime, endTime, callback );
+                    }else{
+                        throw new TGraphInternalError("Get NULL value from neo4j store!");
+                    }
+                }else{
+                    throw new TGraphInternalError("Cannot get value from neo4j store!");
+                }
+            }
         }
-        else
-        {
-            return null; //FIXME
-        }
-//        throw new TGraphNoImplementationException();
     }
 
     @Override
@@ -827,7 +842,7 @@ public class StateHandlingStatementOperations implements
                                     int valueLength = result.valueLength();
                                     byte[] value = result.value();
                                     byte[] actualV = Arrays.copyOf(value, valueLength);
-                                    return DynPropertyValueConvertor.revers(type, actualV);
+                                    return TemporalPropertyValueConvertor.revers(type, actualV);
                                 } else
                                 {
                                     return null; // invalid record
@@ -835,13 +850,13 @@ public class StateHandlingStatementOperations implements
                             }
                             // not in TxState, then get from store
                         }
-                        byte[] value = this.temporalPropertyStore.getNodeProperty(relId, propertyKeyId, time);
-                        if (null != value)
-                        {
-                            return DynPropertyValueConvertor.revers(type, value);
-                        } else
+                        Slice value = this.temporalPropertyStore.getNodeProperty(relId, propertyKeyId, time);
+                        if (null == value)
                         {
                             return null;
+                        } else
+                        {
+                            return TemporalPropertyValueConvertor.revers(type, value.getBytes());
                         }
                     }else{
                         throw new TGraphInternalError("Get NULL value from neo4j store!");
@@ -856,16 +871,7 @@ public class StateHandlingStatementOperations implements
     @Override
     public Object relationshipGetTemporalProperties(KernelStatement statement, long relId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback) throws EntityNotFoundException {
 //        FIXME TGraph: Should search in tx and then get from storage
-        byte[] value = this.temporalPropertyStore.getRelationshipProperty( relId, propertyKeyId, startTime, endTime, callback );
-        if( null != value )
-        {
-            return DynPropertyValueConvertor.revers( "Integer", value );
-        }
-        else
-        {
-            return null; //FIXME
-        }
-//        throw new TGraphNoImplementationException();
+        return this.temporalPropertyStore.getRelationshipProperty( relId, propertyKeyId, startTime, endTime, callback );
     }
 
     @Override
