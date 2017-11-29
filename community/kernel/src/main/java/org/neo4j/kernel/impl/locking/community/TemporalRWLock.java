@@ -19,7 +19,6 @@ public class TemporalRWLock extends RWLock
 {
     TemporalRWLock(Object resource, RagManager ragManager)
     {
-        super(resource, ragManager);
         this.ragManager = ragManager;
         this.resource = resource;
     }

@@ -79,7 +79,7 @@ public class LockResource
     @Override
     public String toString()
     {
-        return String.format( "%s(%d)", resourceType, resourceId );
+        return String.format( "%s(%s)", resourceType, resourceId );
     }
 
     public void acquireReference()

@@ -174,7 +174,7 @@ public class LockManagerImpl
             return new TemporalRWLock(resource, ragManager);
         }else
         {
-            return new RWLock(resource, ragManager);
+            return new Neo4jRWLock(resource, ragManager);
         }
     }
 
