@@ -61,9 +61,9 @@ import org.neo4j.temporal.TemporalPropertyReadOperation;
 public interface ReadableTxState
 {
 
-    MemTable getNodeTemporalProperty( TemporalPropertyReadOperation query );
+    MemTable getNodeTemporalProperties();
 
-    MemTable getRelationshipTemporalProperty( TemporalPropertyReadOperation query );
+    MemTable getRelationshipTemporalProperties();
 
 
     void accept( TxStateVisitor visitor ) throws ConstraintValidationKernelException, CreateConstraintFailureException;

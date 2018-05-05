@@ -266,13 +266,13 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     private MemTable relTemporalProperties;
 
     @Override
-    public MemTable getNodeTemporalProperty(TemporalPropertyReadOperation query)
+    public MemTable getNodeTemporalProperties()
     {
         return nodeTemporalProperties;
     }
 
     @Override
-    public MemTable getRelationshipTemporalProperty(TemporalPropertyReadOperation query)
+    public MemTable getRelationshipTemporalProperties()
     {
         return relTemporalProperties;
     }

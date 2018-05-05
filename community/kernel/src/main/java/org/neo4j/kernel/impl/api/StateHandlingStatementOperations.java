@@ -385,15 +385,15 @@ import static org.neo4j.kernel.impl.api.PropertyValueComparison.COMPARE_NUMBERS;
                     TemporalPropertyStore store = temporalPropertyStore.nodeStore();
                     if( statement.hasTxStateWithChanges() )
                     {
-                        MemTable oneEntityData = statement.txState().getNodeTemporalProperty( query );
-                        if( oneEntityData!=null && !oneEntityData.isEmpty() ) // has in txState
+                        MemTable txState = statement.txState().getNodeTemporalProperties();
+                        if( txState!=null && !txState.isEmpty() ) // has in txState
                         {
                             if(query.isPointQuery()){
-                                return tpQueryPointWithCache(query, oneEntityData, store, valueType);
+                                return tpQueryPointWithCache(query, txState, store, valueType);
                             }else if(query.isRangeQuery()){
-                                return tpQueryRangeWithCache(query, oneEntityData, store, valueType);
+                                return tpQueryRangeWithCache(query, txState, store, valueType);
                             }else{
-                                return tpQueryIndexWithCache(query, oneEntityData, store, valueType);
+                                return tpQueryIndexWithCache(query, txState, store, valueType);
                             }
                         }
                     }
@@ -436,15 +436,15 @@ import static org.neo4j.kernel.impl.api.PropertyValueComparison.COMPARE_NUMBERS;
                     TemporalPropertyStore store = temporalPropertyStore.relStore();
                     if( statement.hasTxStateWithChanges() )
                     {
-                        MemTable oneEntityData = statement.txState().getRelationshipTemporalProperty( query );
-                        if( oneEntityData!=null && !oneEntityData.isEmpty() ) // has in txState
+                        MemTable txState = statement.txState().getRelationshipTemporalProperties();
+                        if( txState!=null && !txState.isEmpty() ) // has in txState
                         {
                             if(query.isPointQuery()){
-                                return tpQueryPointWithCache(query, oneEntityData, store, valueType);
+                                return tpQueryPointWithCache(query, txState, store, valueType);
                             }else if(query.isRangeQuery()){
-                                return tpQueryRangeWithCache(query, oneEntityData, store, valueType);
+                                return tpQueryRangeWithCache(query, txState, store, valueType);
                             }else{
-                                return tpQueryIndexWithCache(query, oneEntityData, store, valueType);
+                                return tpQueryIndexWithCache(query, txState, store, valueType);
                             }
                         }
                     }
@@ -463,11 +463,11 @@ import static org.neo4j.kernel.impl.api.PropertyValueComparison.COMPARE_NUMBERS;
         }
     }
 
-    private Object tpQueryPointWithCache( TemporalPropertyReadOperation query, MemTable oneEntityData, TemporalPropertyStore store, String valueType )
+    private Object tpQueryPointWithCache( TemporalPropertyReadOperation query, MemTable txState, TemporalPropertyStore store, String valueType )
     {
         try
         {
-            Slice value = oneEntityData.get(new InternalKey( query.getProId(), query.getEntityId(), query.getStart(), ValueType.VALUE ));
+            Slice value = txState.get(new InternalKey( query.getProId(), query.getEntityId(), query.getStart(), ValueType.VALUE ));
             if(value==null)
             {
                 return null;
@@ -483,14 +483,14 @@ import static org.neo4j.kernel.impl.api.PropertyValueComparison.COMPARE_NUMBERS;
         }
     }
 
-    private Object tpQueryRangeWithCache( TemporalPropertyReadOperation query, MemTable oneEntityData, TemporalPropertyStore store, String valueType )
+    private Object tpQueryRangeWithCache( TemporalPropertyReadOperation query, MemTable txState, TemporalPropertyStore store, String valueType )
     {
-        return temporalPropertyStore.getRange( store, query, oneEntityData );
+        return temporalPropertyStore.getRange( store, query, txState );
     }
 
-    private Object tpQueryIndexWithCache( TemporalPropertyReadOperation query, MemTable oneEntityData, TemporalPropertyStore store, String valueType )
+    private Object tpQueryIndexWithCache( TemporalPropertyReadOperation query, MemTable txState, TemporalPropertyStore store, String valueType )
     {
-        return temporalPropertyStore.getAggrIndex( store, query, oneEntityData );
+        return temporalPropertyStore.getAggrIndex( store, query, txState );
     }
 
     private Object tpQueryPoint( TemporalPropertyReadOperation query, TemporalPropertyStore store, String valueType )
