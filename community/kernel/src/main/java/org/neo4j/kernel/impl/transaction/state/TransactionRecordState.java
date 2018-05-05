@@ -78,40 +78,18 @@ import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsField;
  */
 public class TransactionRecordState implements RecordState
 {
-    public static class TemporalProKeyValue
+    public void nodeTemporalPropertyChange( MemTable changes )
     {
-        private InternalKey key;
-        private Slice value;
-
-        public TemporalProKeyValue( InternalKey key, Slice value )
-        {
-            this.key = key;
-            this.value = value;
-        }
-
-        InternalKey getKey()
-        {
-            return key;
-        }
-
-        Slice getValue()
-        {
-            return value;
-        }
+        this.nodeTemporalPropertyChanges = changes;
     }
 
-    public void nodeTemporalPropertyChange( long id, MemTable changes )
+    public void relationshipTemporalPropertyChange( MemTable changes )
     {
-        this.nodeTemporalPropertyChanges.merge( changes );
+        this.relationshipTemporalPropertyChanges = changes ;
     }
 
-    public void relationshipTemporalPropertyChange( long id, MemTable changes )
-    {
-        this.relationshipTemporalPropertyChanges.merge( changes );
-    }
-
-    private final MemTable nodeTemporalPropertyChanges = new MemTable();
-    private final MemTable relationshipTemporalPropertyChanges = new MemTable();
+    private MemTable nodeTemporalPropertyChanges;
+    private MemTable relationshipTemporalPropertyChanges;
 //    private final List<TemporalProKeyValue> nodeDeleteTemporalPropertyPoint = new LinkedList<>();
 //    private final List<Slice> nodeDeleteTemporalProperties = new LinkedList<>();
 //    private final List<TemporalProKeyValue> relationshipDeleteTemporalPropertyPoint = new LinkedList<TemporalProKeyValue>();
@@ -185,21 +163,27 @@ public class TransactionRecordState implements RecordState
                 context.getRelationshipTypeTokenRecords().changeSize() + context.getRelGroupRecords().changeSize() +
                 (neoStoreRecord != null ? neoStoreRecord.changeSize() : 0);
 
-        PeekingIterator<Entry<TimeIntervalKey,Slice>> nodeTpIter = nodeTemporalPropertyChanges.intervalEntryIterator();
-        while ( nodeTpIter.hasNext() )
+        if ( nodeTemporalPropertyChanges != null )
         {
-            Entry<TimeIntervalKey,Slice> entry = nodeTpIter.next();
-            Command.NodeTemporalPropertyCommand command = new Command.NodeTemporalPropertyCommand( entry.getKey(), entry.getValue() );
-            commands.add( command );
-            noOfCommands++;
+            PeekingIterator<Entry<TimeIntervalKey,Slice>> nodeTpIter = nodeTemporalPropertyChanges.intervalEntryIterator();
+            while ( nodeTpIter.hasNext() )
+            {
+                Entry<TimeIntervalKey,Slice> entry = nodeTpIter.next();
+                Command.NodeTemporalPropertyCommand command = new Command.NodeTemporalPropertyCommand( entry.getKey(), entry.getValue() );
+                commands.add( command );
+                noOfCommands++;
+            }
         }
-        PeekingIterator<Entry<TimeIntervalKey,Slice>> relTpIter = relationshipTemporalPropertyChanges.intervalEntryIterator();
-        while ( relTpIter.hasNext() )
+        if ( relationshipTemporalPropertyChanges != null )
         {
-            Entry<TimeIntervalKey,Slice> entry = relTpIter.next();
-            Command.RelationshipTemporalPropertyCommand command = new Command.RelationshipTemporalPropertyCommand( entry.getKey(), entry.getValue() );
-            commands.add( command );
-            noOfCommands++;
+            PeekingIterator<Entry<TimeIntervalKey,Slice>> relTpIter = relationshipTemporalPropertyChanges.intervalEntryIterator();
+            while ( relTpIter.hasNext() )
+            {
+                Entry<TimeIntervalKey,Slice> entry = relTpIter.next();
+                Command.RelationshipTemporalPropertyCommand command = new Command.RelationshipTemporalPropertyCommand( entry.getKey(), entry.getValue() );
+                commands.add( command );
+                noOfCommands++;
+            }
         }
 
 

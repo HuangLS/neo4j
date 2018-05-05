@@ -934,13 +934,13 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
         }
 
         @Override
-        public void visitNodeTemporalPropertyChanges( long nodeId, MemTable changes )
+        public void visitNodeTemporalPropertyChanges( MemTable changes )
         {
-            recordState.nodeTemporalPropertyChange( nodeId, changes);
+            recordState.nodeTemporalPropertyChange( changes );
         }
 
         @Override
-        public void visitRelationshipTemporalPropertyChanges( long relationshipId, MemTable changes )
+        public void visitRelationshipTemporalPropertyChanges( MemTable changes )
         {
 //            List<TemporalProKeyValue> appendedlist = new LinkedList<TransactionRecordState.TemporalProKeyValue>();
 //            while ( addOrUpdate.hasNext() )
@@ -974,7 +974,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
 //                TemporalProKeyValue keyvalue = new TemporalProKeyValue( key, pro.value() );
 //                deletedlist.add( keyvalue );
 //            }
-            recordState.relationshipTemporalPropertyChange( relationshipId, changes );
+            recordState.relationshipTemporalPropertyChange( changes );
 //            recordState.relationshipDeleteTemporalPropertyPoint( relationshipId, deletedlist.iterator() );
 //            recordState.relationshipDeleteTemporalProperty( relationshipId, delProp );
         }

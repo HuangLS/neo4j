@@ -81,8 +81,6 @@ public interface PropertyContainerState
         void visitPropertyChanges( long entityId, Iterator<DefinedProperty> added,
                 Iterator<DefinedProperty> changed,
                 Iterator<Integer> removed ) throws ConstraintValidationKernelException;
-
-        void visitTemporalPropertyChanges( long entityId, MemTable changes );
     }
 
     class Mutable implements PropertyContainerState
@@ -110,7 +108,6 @@ public interface PropertyContainerState
             }
         });
 
-        private MemTable temporalProperties;
         private VersionedHashMap<Integer, DefinedProperty> addedProperties;
         private VersionedHashMap<Integer, DefinedProperty> changedProperties;
         private VersionedHashMap<Integer, DefinedProperty> removedProperties;
@@ -151,101 +148,6 @@ public interface PropertyContainerState
             {
                 removedProperties.clear();
             }
-        }
-
-
-        public void setTemporalProperty(TemporalPropertyWriteOperation op)
-        {
-            if(temporalProperties==null)
-            {
-                temporalProperties = new MemTable();
-            }
-            InternalKey start = op.getInternalKey();
-            if(op.isEndEqNow()){
-                temporalProperties.addToNow( start, op.getValueSlice() );
-            }else{
-                temporalProperties.addInterval( start, op.getEnd(), op.getValueSlice() );
-            }
-        }
-
-//        public void doCreateTemporalPropertyInvalid(TemporalProperty temporalProperty)
-//        {
-//            TemporalPropertyRecordKey key = new TemporalPropertyRecordKey( temporalProperty.propertyKeyId(), temporalProperty.time() );
-//            if( null != this.deletedTemporalPropertyRecords )
-//            {
-//                this.deletedTemporalPropertyRecords.remove( key );
-//            }
-//            if( null == this.addedInvalidTemporalPropertyRecords )
-//            {
-//                this.addedInvalidTemporalPropertyRecords = new VersionedHashMap<>();
-//            }
-//            this.addedInvalidTemporalPropertyRecords.put( key, temporalProperty );
-//        }
-//
-//        public void doDeleteTemporalPropertyRecord(TemporalProperty temporalProperty)
-//        {
-//            TemporalPropertyRecordKey key = new TemporalPropertyRecordKey( temporalProperty.propertyKeyId(), temporalProperty.time() );
-//            if( null != this.addedTemporalPropertyRecords )
-//            {
-//                this.addedTemporalPropertyRecords.remove(key);
-//            }
-//            if( null != this.addedInvalidTemporalPropertyRecords )
-//            {
-//                this.addedInvalidTemporalPropertyRecords.remove(key);
-//            }
-//            if( null == this.deletedTemporalPropertyRecords )
-//            {
-//                this.deletedTemporalPropertyRecords = new VersionedHashMap<>();
-//            }
-//            this.deletedTemporalPropertyRecords.put( key, temporalProperty );
-//        }
-//
-//        public void doDeleteTemporalProperty(int propertyKeyId)
-//        {
-//            List<TemporalPropertyRecordKey> keySet = new LinkedList<>();
-//
-//            if( null != this.addedTemporalPropertyRecords )
-//            {
-//                for( TemporalPropertyRecordKey key : this.addedTemporalPropertyRecords.keySet() )
-//                {
-//                    if( key.propertyId == propertyKeyId )
-//                    {
-//                        keySet.add(key);
-//                    }
-//                }
-//                for( TemporalPropertyRecordKey key : keySet )
-//                {
-//                    this.addedTemporalPropertyRecords.remove( key );
-//                }
-//            }
-//
-//            keySet.clear();
-//
-//            if( null != this.addedInvalidTemporalPropertyRecords )
-//            {
-//                for( TemporalPropertyRecordKey key : this.addedInvalidTemporalPropertyRecords.keySet() )
-//                {
-//                    if( key.propertyId == propertyKeyId )
-//                    {
-//                        keySet.add(key);
-//                    }
-//                }
-//                for( TemporalPropertyRecordKey key : keySet )
-//                {
-//                    this.addedInvalidTemporalPropertyRecords.remove( key );
-//                }
-//            }
-//
-//            if( null == this.deletedTemporalProperties)
-//            {
-//                this.deletedTemporalProperties = new VersionedHashMap<>();
-//            }
-//            this.deletedTemporalProperties.put( propertyKeyId, null );
-//        }
-
-        public MemTable getTemporalProperty()
-        {
-            return temporalProperties;
         }
 
         public void changeProperty( DefinedProperty property )
@@ -409,10 +311,6 @@ public interface PropertyContainerState
             if ( addedProperties != null || removedProperties != null || changedProperties != null )
             {
                 visitor.visitPropertyChanges( id, addedProperties(), changedProperties(), removedProperties() );
-            }
-            if ( temporalProperties != null && !temporalProperties.isEmpty())
-            {
-                visitor.visitTemporalPropertyChanges( id, temporalProperties);
             }
         }
 

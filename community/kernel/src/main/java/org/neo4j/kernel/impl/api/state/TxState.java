@@ -20,6 +20,7 @@
 package org.neo4j.kernel.impl.api.state;
 
 import org.act.temporalProperty.exception.TGraphNotImplementedException;
+import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.MemTable;
 
 import java.util.HashMap;
@@ -261,74 +262,52 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
         };
     }
 
+    private MemTable nodeTemporalProperties;
+    private MemTable relTemporalProperties;
+
     @Override
     public MemTable getNodeTemporalProperty(TemporalPropertyReadOperation query)
     {
-        return getOrCreateNodeState( query.getEntityId() ).getTemporalProperty();
+        return nodeTemporalProperties;
     }
 
     @Override
     public MemTable getRelationshipTemporalProperty(TemporalPropertyReadOperation query)
     {
-        return getOrCreateRelationshipState( query.getEntityId() ).getTemporalProperty();
+        return relTemporalProperties;
     }
 
     @Override
     public void nodeDoSetTemporalProperty(TemporalPropertyWriteOperation op)
     {
-        getOrCreateNodeState( op.getEntityId() ).setTemporalProperty( op );
-        this.hasChanges = true;
+        if(nodeTemporalProperties==null)
+        {
+            nodeTemporalProperties = new MemTable();
+        }
+        InternalKey start = op.getInternalKey();
+        if(op.isEndEqNow()){
+            nodeTemporalProperties.addToNow( start, op.getValueSlice() );
+        }else{
+            nodeTemporalProperties.addInterval( start, op.getEnd(), op.getValueSlice() );
+        }
+        dataChanged();
     }
-
-//    @Override
-//    public void nodeDoCreateTemporalPropertyInvalidRecord(long nodeId, TemporalProperty temporalProperty)
-//    {
-//        getOrCreateNodeState( nodeId ).doCreateTemporalPropertyInvalid( temporalProperty );
-//        this.hasChanges = true;
-//    }
-//
-//    @Override
-//    public void nodeDoDeleteTemporalPropertyRecord(long nodeId, TemporalProperty temporalProperty)
-//    {
-//        getOrCreateNodeState( nodeId ).doDeleteTemporalPropertyRecord( temporalProperty );
-//        this.hasChanges = true;
-//    }
-//
-//    @Override
-//    public void nodeDoDeleteTemporalProperty(long nodeId, int propertyKeyId)
-//    {
-//        getOrCreateNodeState( nodeId ).doDeleteTemporalProperty( propertyKeyId );
-//        this.hasChanges = true;
-//    }
 
     @Override
     public void relationshipDoSetTemporalProperty(TemporalPropertyWriteOperation op)
     {
-        getOrCreateRelationshipState( op.getEntityId() ).setTemporalProperty( op );
-        this.hasChanges = true;
+        if(relTemporalProperties==null)
+        {
+            relTemporalProperties = new MemTable();
+        }
+        InternalKey start = op.getInternalKey();
+        if(op.isEndEqNow()){
+            relTemporalProperties.addToNow( start, op.getValueSlice() );
+        }else{
+            relTemporalProperties.addInterval( start, op.getEnd(), op.getValueSlice() );
+        }
+        dataChanged();
     }
-
-//    @Override
-//    public void relationshipDoCreateTemporalPropertyInvalidRecord(long relationshipId, TemporalProperty temporalProperty)
-//    {
-//        getOrCreateRelationshipState( relationshipId ).doCreateTemporalPropertyInvalid( temporalProperty );
-//        this.hasChanges = true;
-//    }
-//
-//    @Override
-//    public void relationshipDoDeleteTemporalPropertyRecord(long relationshipId, TemporalProperty temporalProperty)
-//    {
-//        getOrCreateRelationshipState( relationshipId ).doDeleteTemporalPropertyRecord( temporalProperty );
-//        this.hasChanges = true;
-//    }
-//
-//    @Override
-//    public void relationshipDoDeleteTemporalProperty(long relationshipId, int propertyKeyId)
-//    {
-//        getOrCreateRelationshipState( relationshipId ).doDeleteTemporalProperty( propertyKeyId );
-//        this.hasChanges = true;
-//    }
-
 
 
     @Override
@@ -429,6 +408,16 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             {
                 visitor.visitCreatedRelationshipLegacyIndex( entry.getKey(), entry.getValue() );
             }
+        }
+
+        if ( nodeTemporalProperties != null )
+        {
+            visitor.visitNodeTemporalPropertyChanges( nodeTemporalProperties );
+        }
+
+        if ( relTemporalProperties != null )
+        {
+            visitor.visitRelationshipTemporalPropertyChanges( relTemporalProperties );
         }
     }
 
@@ -606,12 +595,6 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             }
 
             @Override
-            public void visitTemporalPropertyChanges(long entityId, MemTable changes)
-            {
-                visitor.visitNodeTemporalPropertyChanges( entityId, changes);
-            }
-
-            @Override
             public void visitRelationshipChanges( long nodeId, RelationshipChangesForNode added,
                     RelationshipChangesForNode removed )
             {
@@ -631,12 +614,6 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             {
                 visitor.visitRelPropertyChanges( entityId, added, changed, removed );
             }
-
-            @Override
-            public void visitTemporalPropertyChanges(long entityId, MemTable changes)
-            {
-                visitor.visitRelationshipTemporalPropertyChanges( entityId, changes );
-            }
         };
     }
 
@@ -649,12 +626,6 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
                     Iterator<DefinedProperty> changed, Iterator<Integer> removed )
             {
                 visitor.visitGraphPropertyChanges( added, changed, removed );
-            }
-
-            @Override
-            public void visitTemporalPropertyChanges( long entityId, MemTable changes )
-            {
-                throw new UnsupportedOperationException( new TGraphNotImplementedException() );
             }
         };
     }

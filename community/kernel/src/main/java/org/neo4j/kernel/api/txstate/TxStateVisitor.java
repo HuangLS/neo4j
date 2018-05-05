@@ -98,9 +98,9 @@ public interface TxStateVisitor
 
     void visitDroppedProcedure( ProcedureDescriptor procedureDescriptor );
 
-    void visitNodeTemporalPropertyChanges( long nodeId, MemTable changes );
+    void visitNodeTemporalPropertyChanges( MemTable changes );
 
-    void visitRelationshipTemporalPropertyChanges(long relationshipId, MemTable changes );
+    void visitRelationshipTemporalPropertyChanges( MemTable changes );
 
     class Adapter implements TxStateVisitor
     {
@@ -344,18 +344,18 @@ public interface TxStateVisitor
         }
 
         @Override
-        public void visitNodeTemporalPropertyChanges(long nodeId, MemTable changes) {
+        public void visitNodeTemporalPropertyChanges( MemTable changes ) {
             if( next != null )
             {
-                next.visitNodeTemporalPropertyChanges( nodeId, changes );
+                next.visitNodeTemporalPropertyChanges( changes );
             }
         }
 
         @Override
-        public void visitRelationshipTemporalPropertyChanges(long relationshipId, MemTable changes) {
+        public void visitRelationshipTemporalPropertyChanges( MemTable changes ) {
             if( next != null )
             {
-                next.visitRelationshipTemporalPropertyChanges( relationshipId, changes );
+                next.visitRelationshipTemporalPropertyChanges( changes );
             }
         }
 
