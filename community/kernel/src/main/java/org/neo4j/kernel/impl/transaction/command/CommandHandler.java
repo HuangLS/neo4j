@@ -62,9 +62,9 @@ public interface CommandHandler extends AutoCloseable
     CommandHandler EMPTY = new CommandHandler.Adapter();
 
     // Temporal commands
-    boolean visitNodeTemporalPropertyDeleteCommand( Command.NodeTemporalPropertyDeleteCommand command ) throws IOException;
-
-    boolean visitRelationshipTemporalPropertyDeleteCommand( Command.RelationshipTemporalPropertyDeleteCommand command ) throws IOException;
+//    boolean visitNodeTemporalPropertyDeleteCommand( Command.NodeTemporalPropertyDeleteCommand command ) throws IOException;
+//
+//    boolean visitRelationshipTemporalPropertyDeleteCommand( Command.RelationshipTemporalPropertyDeleteCommand command ) throws IOException;
 
     boolean visitNodeTemporalPropertyCommand( Command.NodeTemporalPropertyCommand command ) throws IOException;
 
@@ -139,15 +139,15 @@ public interface CommandHandler extends AutoCloseable
             return false;
         }
 
-        @Override
-        public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
-            return false;
-        }
-
-        @Override
-        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
-            return false;
-        }
+//        @Override
+//        public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+//            return false;
+//        }
+//
+//        @Override
+//        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+//            return false;
+//        }
 
         @Override
         public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
@@ -282,15 +282,15 @@ public interface CommandHandler extends AutoCloseable
             return delegate.visitPropertyCommand( command );
         }
 
-        @Override
-        public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
-            return delegate.visitNodeTemporalPropertyDeleteCommand(command);
-        }
-
-        @Override
-        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
-            return delegate.visitRelationshipTemporalPropertyDeleteCommand(command);
-        }
+//        @Override
+//        public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+//            return delegate.visitNodeTemporalPropertyDeleteCommand(command);
+//        }
+//
+//        @Override
+//        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+//            return delegate.visitRelationshipTemporalPropertyDeleteCommand(command);
+//        }
 
         @Override
         public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {

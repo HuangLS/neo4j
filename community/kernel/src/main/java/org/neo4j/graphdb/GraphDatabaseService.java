@@ -28,6 +28,7 @@ import org.neo4j.graphdb.schema.Schema;
 import org.neo4j.graphdb.traversal.BidirectionalTraversalDescription;
 import org.neo4j.graphdb.traversal.TraversalDescription;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
+import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.tooling.GlobalGraphOperations;
 
 /**
@@ -334,9 +335,9 @@ public interface GraphDatabaseService
     BidirectionalTraversalDescription bidirectionalTraversalDescription();
 
 
-    ResourceIterator<Node> findNodesByTemporalProperty(String key, int time, Object value);
+    TemporalIndexManager temporalIndex();
 
-    ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value);
+//    ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value);
 
 
 }

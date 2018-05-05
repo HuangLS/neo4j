@@ -20,9 +20,14 @@
 package org.neo4j.kernel.impl.transaction.state;
 
 import java.util.*;
+import java.util.Map.Entry;
 
+import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.util.Slice;
+
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.api.properties.DefinedProperty;
@@ -55,15 +60,15 @@ import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsField;
 /**
  * Transaction containing {@link org.neo4j.kernel.impl.transaction.command.Command commands} reflecting the operations
  * performed in the transaction.
- *
+ * <p>
  * This class currently has a symbiotic relationship with {@link KernelTransaction}, with which it always has a 1-1
  * relationship.
- *
+ * <p>
  * The idea here is that KernelTransaction will eventually take on the responsibilities of WriteTransaction, such as
  * keeping track of transaction state, serialization and deserialization to and from logical log, and applying things
  * to store. It would most likely do this by keeping a component derived from the current WriteTransaction
  * implementation as a sub-component, responsible for handling logical log commands.
- *
+ * <p>
  * The class XAResourceManager plays in here as well, in that it shares responsibilities with WriteTransaction to
  * write data to the logical log. As we continue to refactor this subsystem, XAResourceManager should ideally not know
  * about the logical log, but defer entirely to the Kernel to handle this. Doing that will give the kernel full
@@ -76,9 +81,9 @@ public class TransactionRecordState implements RecordState
     public static class TemporalProKeyValue
     {
         private InternalKey key;
-        private byte[] value;
+        private Slice value;
 
-        public TemporalProKeyValue(InternalKey key, byte[] value )
+        public TemporalProKeyValue( InternalKey key, Slice value )
         {
             this.key = key;
             this.value = value;
@@ -89,78 +94,28 @@ public class TransactionRecordState implements RecordState
             return key;
         }
 
-        byte[] getValue()
+        Slice getValue()
         {
             return value;
         }
     }
 
-    public void nodeAppendTemporalProperty(long id, Iterator<TemporalProKeyValue> appended )
+    public void nodeTemporalPropertyChange( long id, MemTable changes )
     {
-        while( appended.hasNext() )
-        {
-            TemporalProKeyValue keyvalue = appended.next();
-            this.nodeAppendTemporalPropertyPoint.add( keyvalue );
-        }
+        this.nodeTemporalPropertyChanges.merge( changes );
     }
 
-    public void nodeDeleteTemporalPropertyPoint(long id, Iterator<TemporalProKeyValue> deleted )
+    public void relationshipTemporalPropertyChange( long id, MemTable changes )
     {
-        while( deleted.hasNext() )
-        {
-            TemporalProKeyValue kv = deleted.next();
-            this.nodeDeleteTemporalPropertyPoint.add( kv );
-        }
+        this.relationshipTemporalPropertyChanges.merge( changes );
     }
 
-    public void nodeDeleteTemporalProperty(long id, Iterator<Integer> propertyIds )
-    {
-        while( propertyIds.hasNext() )
-        {
-            int pid = propertyIds.next();
-            //FIXME TGraph MUST!
-//            this.nodeDeleteTemporalProperties.add( pid );
-        }
-    }
-
-    public void relationshipAppendTemporalProperty(long id, Iterator<TemporalProKeyValue> appended )
-    {
-        while( appended.hasNext() )
-        {
-            TemporalProKeyValue keyvalue = appended.next();
-            this.relationshipAppendTemporalPropertyPoint.add( keyvalue );
-        }
-    }
-
-    public void relationshipDeleteTemporalPropertyPoint(long id, Iterator<TemporalProKeyValue> deleted )
-    {
-        while( deleted.hasNext() )
-        {
-            TemporalProKeyValue kv = deleted.next();
-            this.relationshipDeleteTemporalPropertyPoint.add( kv );
-        }
-    }
-
-    public void relationshipDeleteTemporalProperty( long id, Iterator<Integer> propertyIds )
-    {
-        while( propertyIds.hasNext() )
-        {
-            int pid = propertyIds.next();
-            //FIXME TGraph MUST!
-//            this.relationshipDeleteTemporalProperties.add( pid );
-        }
-    }
-
-
-    private final List<TemporalProKeyValue> nodeAppendTemporalPropertyPoint = new LinkedList<>();
-    private final List<TemporalProKeyValue> nodeDeleteTemporalPropertyPoint = new LinkedList<>();
-    private final List<Slice> nodeDeleteTemporalProperties = new LinkedList<>();
-
-    private final List<TemporalProKeyValue> relationshipAppendTemporalPropertyPoint = new LinkedList<TemporalProKeyValue>();
-    private final List<TemporalProKeyValue> relationshipDeleteTemporalPropertyPoint = new LinkedList<TemporalProKeyValue>();
-    private final List<Slice> relationshipDeleteTemporalProperties = new LinkedList<Slice>();
-
-
+    private final MemTable nodeTemporalPropertyChanges = new MemTable();
+    private final MemTable relationshipTemporalPropertyChanges = new MemTable();
+//    private final List<TemporalProKeyValue> nodeDeleteTemporalPropertyPoint = new LinkedList<>();
+//    private final List<Slice> nodeDeleteTemporalProperties = new LinkedList<>();
+//    private final List<TemporalProKeyValue> relationshipDeleteTemporalPropertyPoint = new LinkedList<TemporalProKeyValue>();
+//    private final List<Slice> relationshipDeleteTemporalProperties = new LinkedList<Slice>();
 
     private final IntegrityValidator integrityValidator;
     private final NeoStoreTransactionContext context;
@@ -168,12 +123,11 @@ public class TransactionRecordState implements RecordState
     private final MetaDataStore metaDataStore;
     private final SchemaStore schemaStore;
 
-    private RecordChanges<Long,NeoStoreRecord, Void> neoStoreRecord;
+    private RecordChanges<Long,NeoStoreRecord,Void> neoStoreRecord;
     private long lastCommittedTxWhenTransactionStarted;
     private boolean prepared;
 
-    public TransactionRecordState( NeoStores neoStores, IntegrityValidator integrityValidator,
-                         NeoStoreTransactionContext context )
+    public TransactionRecordState( NeoStores neoStores, IntegrityValidator integrityValidator, NeoStoreTransactionContext context )
     {
         this.nodeStore = neoStores.getNodeStore();
         this.metaDataStore = neoStores.getMetaDataStore();
@@ -186,13 +140,13 @@ public class TransactionRecordState implements RecordState
      * Set this record state to a pristine state, acting as if it had never been used.
      *
      * @param lastCommittedTxWhenTransactionStarted is the highest committed transaction id when this transaction
-     *                                       begun. No operations in this transaction are allowed to have
-     *                                       taken place before that transaction id. This is used by
-     *                                       constraint validation - if a constraint was not online when this
-     *                                       transaction begun, it will be verified during prepare. If you are
-     *                                       writing code against this API and are unsure about what to set
-     *                                       this value to, 0 is a safe choice. That will ensure all
-     *                                       constraints are checked.
+     * begun. No operations in this transaction are allowed to have
+     * taken place before that transaction id. This is used by
+     * constraint validation - if a constraint was not online when this
+     * transaction begun, it will be verified during prepare. If you are
+     * writing code against this API and are unsure about what to set
+     * this value to, 0 is a safe choice. That will ensure all
+     * constraints are checked.
      */
     public void initialize( long lastCommittedTxWhenTransactionStarted )
     {
@@ -210,8 +164,7 @@ public class TransactionRecordState implements RecordState
     @Override
     public boolean hasChanges()
     {
-        return context.hasChanges() ||
-                (neoStoreRecord != null && neoStoreRecord.changeSize() > 0);
+        return context.hasChanges() || (neoStoreRecord != null && neoStoreRecord.changeSize() > 0);
     }
 
     // Only for test-access
@@ -223,74 +176,46 @@ public class TransactionRecordState implements RecordState
     @Override
     public void extractCommands( Collection<Command> commands ) throws TransactionFailureException
     {
-    	assert !prepared : "Transaction has already been prepared";
+        assert !prepared : "Transaction has already been prepared";
 
         integrityValidator.validateTransactionStartKnowledge( lastCommittedTxWhenTransactionStarted );
 
-        int noOfCommands = context.getNodeRecords().changeSize() +
-                           context.getRelRecords().changeSize() +
-                           context.getPropertyRecords().changeSize() +
-                           context.getSchemaRuleChanges().changeSize() +
-                           context.getPropertyKeyTokenRecords().changeSize() +
-                           context.getLabelTokenRecords().changeSize() +
-                           context.getRelationshipTypeTokenRecords().changeSize() +
-                           context.getRelGroupRecords().changeSize() +
-                           (neoStoreRecord != null ? neoStoreRecord.changeSize() : 0) +
-                this.nodeAppendTemporalPropertyPoint.size() +
-                this.nodeDeleteTemporalPropertyPoint.size() +
-                this.nodeDeleteTemporalProperties.size() +
-                this.relationshipAppendTemporalPropertyPoint.size()+
-                this.relationshipDeleteTemporalPropertyPoint.size()+
-                this.relationshipDeleteTemporalProperties.size();
+        int noOfCommands = context.getNodeRecords().changeSize() + context.getRelRecords().changeSize() + context.getPropertyRecords().changeSize() +
+                context.getSchemaRuleChanges().changeSize() + context.getPropertyKeyTokenRecords().changeSize() + context.getLabelTokenRecords().changeSize() +
+                context.getRelationshipTypeTokenRecords().changeSize() + context.getRelGroupRecords().changeSize() +
+                (neoStoreRecord != null ? neoStoreRecord.changeSize() : 0);
 
-        for( TemporalProKeyValue p : nodeAppendTemporalPropertyPoint )
+        PeekingIterator<Entry<TimeIntervalKey,Slice>> nodeTpIter = nodeTemporalPropertyChanges.intervalEntryIterator();
+        while ( nodeTpIter.hasNext() )
         {
-            Command.NodeTemporalPropertyCommand command = new Command.NodeTemporalPropertyCommand(p.key,p.value );
+            Entry<TimeIntervalKey,Slice> entry = nodeTpIter.next();
+            Command.NodeTemporalPropertyCommand command = new Command.NodeTemporalPropertyCommand( entry.getKey(), entry.getValue() );
             commands.add( command );
+            noOfCommands++;
         }
-        for( Slice id : nodeDeleteTemporalProperties )
+        PeekingIterator<Entry<TimeIntervalKey,Slice>> relTpIter = relationshipTemporalPropertyChanges.intervalEntryIterator();
+        while ( relTpIter.hasNext() )
         {
-            Command.NodeTemporalPropertyDeleteCommand command = new Command.NodeTemporalPropertyDeleteCommand( id );
+            Entry<TimeIntervalKey,Slice> entry = relTpIter.next();
+            Command.RelationshipTemporalPropertyCommand command = new Command.RelationshipTemporalPropertyCommand( entry.getKey(), entry.getValue() );
             commands.add( command );
-        }
-        for( TemporalProKeyValue p : nodeDeleteTemporalPropertyPoint )
-        {
-            Command.NodeTemporalPropertyCommand command = new Command.NodeTemporalPropertyCommand(p.key,p.value );
-            commands.add( command );
-        }
-
-        for( TemporalProKeyValue p : relationshipAppendTemporalPropertyPoint )
-        {
-            Command.RelationshipTemporalPropertyCommand command = new Command.RelationshipTemporalPropertyCommand(p.key,p.value );
-            commands.add( command );
-        }
-
-        for( TemporalProKeyValue p : relationshipDeleteTemporalPropertyPoint )
-        {
-            Command.RelationshipTemporalPropertyCommand command = new Command.RelationshipTemporalPropertyCommand(p.key,p.value );
-            commands.add( command );
-        }
-        for( Slice id : relationshipDeleteTemporalProperties )
-        {
-            Command.RelationshipTemporalPropertyDeleteCommand command = new Command.RelationshipTemporalPropertyDeleteCommand( id );
-            commands.add( command );
+            noOfCommands++;
         }
 
 
-
-        for ( RecordProxy<Integer, LabelTokenRecord, Void> record : context.getLabelTokenRecords().changes() )
+        for ( RecordProxy<Integer,LabelTokenRecord,Void> record : context.getLabelTokenRecords().changes() )
         {
             Command.LabelTokenCommand command = new Command.LabelTokenCommand();
             command.init( record.forReadingLinkage() );
             commands.add( command );
         }
-        for ( RecordProxy<Integer, RelationshipTypeTokenRecord, Void> record : context.getRelationshipTypeTokenRecords().changes() )
+        for ( RecordProxy<Integer,RelationshipTypeTokenRecord,Void> record : context.getRelationshipTypeTokenRecords().changes() )
         {
             Command.RelationshipTypeTokenCommand command = new Command.RelationshipTypeTokenCommand();
             command.init( record.forReadingLinkage() );
             commands.add( command );
         }
-        for ( RecordProxy<Integer, PropertyKeyTokenRecord, Void> record : context.getPropertyKeyTokenRecords().changes() )
+        for ( RecordProxy<Integer,PropertyKeyTokenRecord,Void> record : context.getPropertyKeyTokenRecords().changes() )
         {
             Command.PropertyKeyTokenCommand command = new Command.PropertyKeyTokenCommand();
             command.init( record.forReadingLinkage() );
@@ -300,7 +225,7 @@ public class TransactionRecordState implements RecordState
         // Collect nodes, relationships, properties
         List<Command> nodeCommands = new ArrayList<>( context.getNodeRecords().changeSize() );
         int skippedCommands = 0;
-        for ( RecordProxy<Long, NodeRecord, Void> change : context.getNodeRecords().changes() )
+        for ( RecordProxy<Long,NodeRecord,Void> change : context.getNodeRecords().changes() )
         {
             NodeRecord record = change.forReadingLinkage();
             integrityValidator.validateNodeRecord( record );
@@ -311,7 +236,7 @@ public class TransactionRecordState implements RecordState
         Collections.sort( nodeCommands, COMMAND_SORTER );
 
         List<Command> relCommands = new ArrayList<>( context.getRelRecords().changeSize() );
-        for ( RecordProxy<Long, RelationshipRecord, Void> record : context.getRelRecords().changes() )
+        for ( RecordProxy<Long,RelationshipRecord,Void> record : context.getRelRecords().changes() )
         {
             Command.RelationshipCommand command = new Command.RelationshipCommand();
             command.init( record.forReadingLinkage() );
@@ -320,7 +245,7 @@ public class TransactionRecordState implements RecordState
         Collections.sort( relCommands, COMMAND_SORTER );
 
         List<Command> propCommands = new ArrayList<>( context.getPropertyRecords().changeSize() );
-        for ( RecordProxy<Long, PropertyRecord, PrimitiveRecord> change : context.getPropertyRecords().changes() )
+        for ( RecordProxy<Long,PropertyRecord,PrimitiveRecord> change : context.getPropertyRecords().changes() )
         {
             Command.PropertyCommand command = new Command.PropertyCommand();
             command.init( change.getBefore(), change.forReadingLinkage() );
@@ -329,7 +254,7 @@ public class TransactionRecordState implements RecordState
         Collections.sort( propCommands, COMMAND_SORTER );
 
         List<Command> relGroupCommands = new ArrayList<>( context.getRelGroupRecords().changeSize() );
-        for ( RecordProxy<Long, RelationshipGroupRecord, Integer> change : context.getRelGroupRecords().changes() )
+        for ( RecordProxy<Long,RelationshipGroupRecord,Integer> change : context.getRelGroupRecords().changes() )
         {
             if ( change.isCreated() && !change.forReadingLinkage().inUse() )
             {
@@ -369,22 +294,22 @@ public class TransactionRecordState implements RecordState
 
         if ( neoStoreRecord != null )
         {
-            for ( RecordProxy<Long,NeoStoreRecord, Void> change : neoStoreRecord.changes() )
+            for ( RecordProxy<Long,NeoStoreRecord,Void> change : neoStoreRecord.changes() )
             {
                 Command.NeoStoreCommand command = new Command.NeoStoreCommand();
                 command.init( change.forReadingData() );
                 commands.add( command );
             }
         }
-        for ( RecordProxy<Long, Collection<DynamicRecord>, SchemaRule> change : context.getSchemaRuleChanges().changes() )
+        for ( RecordProxy<Long,Collection<DynamicRecord>,SchemaRule> change : context.getSchemaRuleChanges().changes() )
         {
             integrityValidator.validateSchemaRule( change.getAdditionalData() );
             Command.SchemaRuleCommand command = new Command.SchemaRuleCommand();
             command.init( change.getBefore(), change.forChangingData(), change.getAdditionalData() );
             commands.add( command );
         }
-        assert commands.size() == noOfCommands - skippedCommands: format( "Expected %d final commands, got %d " +
-                "instead, with %d skipped", noOfCommands, commands.size(), skippedCommands );
+        assert commands.size() == noOfCommands - skippedCommands :
+                format( "Expected %d final commands, got %d " + "instead, with %d skipped", noOfCommands, commands.size(), skippedCommands );
 
         prepared = true;
     }
@@ -400,8 +325,7 @@ public class TransactionRecordState implements RecordState
     }
 
     @SafeVarargs
-    private final void addFiltered( Collection<Command> target, Mode mode,
-                                    Collection<? extends Command>... commands )
+    private final void addFiltered( Collection<Command> target, Mode mode, Collection<? extends Command>... commands )
     {
         for ( Collection<? extends Command> c : commands )
         {
@@ -426,12 +350,10 @@ public class TransactionRecordState implements RecordState
         NodeRecord nodeRecord = context.getNodeRecords().getOrLoad( nodeId, null ).forChangingData();
         if ( !nodeRecord.inUse() )
         {
-            throw new IllegalStateException( "Unable to delete Node[" + nodeId +
-                                             "] since it has already been deleted." );
+            throw new IllegalStateException( "Unable to delete Node[" + nodeId + "] since it has already been deleted." );
         }
         nodeRecord.setInUse( false );
-        nodeRecord.setLabelField( Record.NO_LABELS_FIELD.intValue(),
-                markNotInUse( nodeRecord.getDynamicLabelRecords() ) );
+        nodeRecord.setLabelField( Record.NO_LABELS_FIELD.intValue(), markNotInUse( nodeRecord.getDynamicLabelRecords() ) );
         getAndDeletePropertyChain( nodeRecord );
     }
 
@@ -454,12 +376,12 @@ public class TransactionRecordState implements RecordState
      * with the given id.
      *
      * @param relId The id of the relationship that is to have the property
-     *            removed.
+     * removed.
      * @param propertyKey The index key of the property.
      */
     public void relRemoveProperty( long relId, int propertyKey )
     {
-        RecordProxy<Long, RelationshipRecord, Void> rel = context.getRelRecords().getOrLoad( relId, null );
+        RecordProxy<Long,RelationshipRecord,Void> rel = context.getRelRecords().getOrLoad( relId, null );
         context.removeProperty( rel, propertyKey );
     }
 
@@ -472,7 +394,7 @@ public class TransactionRecordState implements RecordState
      */
     public void nodeRemoveProperty( long nodeId, int propertyKey )
     {
-        RecordProxy<Long, NodeRecord, Void> node = context.getNodeRecords().getOrLoad( nodeId, null );
+        RecordProxy<Long,NodeRecord,Void> node = context.getNodeRecords().getOrLoad( nodeId, null );
         context.removeProperty( node, propertyKey );
     }
 
@@ -481,14 +403,14 @@ public class TransactionRecordState implements RecordState
      * given index to the passed value
      *
      * @param relId The id of the relationship which holds the property to
-     *            change.
+     * change.
      * @param propertyKey The index of the key of the property to change.
      * @param value The new value of the property.
      * @return The changed property, as a PropertyData object.
      */
     public DefinedProperty relChangeProperty( long relId, int propertyKey, Object value )
     {
-        RecordProxy<Long, RelationshipRecord, Void> rel = context.getRelRecords().getOrLoad( relId, null );
+        RecordProxy<Long,RelationshipRecord,Void> rel = context.getRelRecords().getOrLoad( relId, null );
         context.primitiveSetProperty( rel, propertyKey, value );
         return Property.property( propertyKey, value );
     }
@@ -504,7 +426,7 @@ public class TransactionRecordState implements RecordState
      */
     public DefinedProperty nodeChangeProperty( long nodeId, int propertyKey, Object value )
     {
-        RecordProxy<Long, NodeRecord, Void> node = context.getNodeRecords().getOrLoad( nodeId, null ); //getNodeRecord( nodeId );
+        RecordProxy<Long,NodeRecord,Void> node = context.getNodeRecords().getOrLoad( nodeId, null ); //getNodeRecord( nodeId );
         context.primitiveSetProperty( node, propertyKey, value );
         return Property.property( propertyKey, value );
     }
@@ -520,7 +442,7 @@ public class TransactionRecordState implements RecordState
      */
     public DefinedProperty relAddProperty( long relId, int propertyKey, Object value )
     {
-        RecordProxy<Long, RelationshipRecord, Void> rel = context.getRelRecords().getOrLoad( relId, null );
+        RecordProxy<Long,RelationshipRecord,Void> rel = context.getRelRecords().getOrLoad( relId, null );
         context.primitiveSetProperty( rel, propertyKey, value );
         return Property.property( propertyKey, value );
     }
@@ -535,7 +457,7 @@ public class TransactionRecordState implements RecordState
      */
     public DefinedProperty nodeAddProperty( long nodeId, int propertyKey, Object value )
     {
-        RecordProxy<Long, NodeRecord, Void> node = context.getNodeRecords().getOrLoad( nodeId, null );
+        RecordProxy<Long,NodeRecord,Void> node = context.getNodeRecords().getOrLoad( nodeId, null );
         context.primitiveSetProperty( node, propertyKey, value );
         return Property.property( propertyKey, value );
     }
@@ -623,12 +545,12 @@ public class TransactionRecordState implements RecordState
 
     private static final CommandSorter COMMAND_SORTER = new CommandSorter();
 
-    private RecordProxy<Long,NeoStoreRecord, Void> getOrLoadNeoStoreRecord()
+    private RecordProxy<Long,NeoStoreRecord,Void> getOrLoadNeoStoreRecord()
     {
         // TODO Move this neo store record thingie into RecordAccessSet
         if ( neoStoreRecord == null )
         {
-            neoStoreRecord = new RecordChanges<>( new RecordChanges.Loader<Long,NeoStoreRecord, Void>()
+            neoStoreRecord = new RecordChanges<>( new RecordChanges.Loader<Long,NeoStoreRecord,Void>()
             {
                 @Override
                 public NeoStoreRecord newUnused( Long key, Void additionalData )
@@ -648,9 +570,10 @@ public class TransactionRecordState implements RecordState
                 }
 
                 @Override
-                public NeoStoreRecord clone(NeoStoreRecord neoStoreRecord ) {
+                public NeoStoreRecord clone( NeoStoreRecord neoStoreRecord )
+                {
                     // We do not expect to manage the before state, so this operation will not be called.
-                    throw new UnsupportedOperationException("Clone on NeoStoreRecord");
+                    throw new UnsupportedOperationException( "Clone on NeoStoreRecord" );
                 }
             }, false, new IntCounter() );
         }
@@ -692,13 +615,13 @@ public class TransactionRecordState implements RecordState
      */
     public void graphRemoveProperty( int propertyKey )
     {
-        RecordProxy<Long,NeoStoreRecord, Void> recordChange = getOrLoadNeoStoreRecord();
+        RecordProxy<Long,NeoStoreRecord,Void> recordChange = getOrLoadNeoStoreRecord();
         context.removeProperty( recordChange, propertyKey );
     }
 
     public void createSchemaRule( SchemaRule schemaRule )
     {
-        for(DynamicRecord change : context.getSchemaRuleChanges().create( schemaRule.getId(), schemaRule ).forChangingData())
+        for ( DynamicRecord change : context.getSchemaRuleChanges().create( schemaRule.getId(), schemaRule ).forChangingData() )
         {
             change.setInUse( true );
             change.setCreated();
@@ -707,8 +630,7 @@ public class TransactionRecordState implements RecordState
 
     public void dropSchemaRule( SchemaRule rule )
     {
-        RecordProxy<Long, Collection<DynamicRecord>, SchemaRule> change =
-                context.getSchemaRuleChanges().getOrLoad( rule.getId(), rule );
+        RecordProxy<Long,Collection<DynamicRecord>,SchemaRule> change = context.getSchemaRuleChanges().getOrLoad( rule.getId(), rule );
         Collection<DynamicRecord> records = change.forChangingData();
         for ( DynamicRecord record : records )
         {
@@ -730,8 +652,7 @@ public class TransactionRecordState implements RecordState
 
     public void setConstraintIndexOwner( IndexRule indexRule, long constraintId )
     {
-        RecordProxy<Long, Collection<DynamicRecord>, SchemaRule> change =
-                context.getSchemaRuleChanges().getOrLoad( indexRule.getId(), indexRule );
+        RecordProxy<Long,Collection<DynamicRecord>,SchemaRule> change = context.getSchemaRuleChanges().getOrLoad( indexRule.getId(), indexRule );
         Collection<DynamicRecord> records = change.forChangingData();
 
         indexRule = indexRule.withOwningConstraint( constraintId );

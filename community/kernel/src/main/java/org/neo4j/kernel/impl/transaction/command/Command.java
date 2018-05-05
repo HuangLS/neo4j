@@ -20,12 +20,11 @@
 package org.neo4j.kernel.impl.transaction.command;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
 
-import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.util.Slice;
-import org.neo4j.graphdb.TGraphNoImplementationException;
+
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.LabelTokenRecord;
@@ -318,35 +317,29 @@ public abstract class Command
     public static class NodeTemporalPropertyCommand extends Command
     {
 
-        private InternalKey key;
-        private byte[] value;
+        private TimeIntervalKey key;
+        private Slice value;
 
-        public NodeTemporalPropertyCommand(InternalKey key, byte[] value )
-        {
+        public NodeTemporalPropertyCommand( TimeIntervalKey key, Slice value ) {
             this.key = key;
             this.value = value;
         }
 
-        public NodeTemporalPropertyCommand() {}
+        public NodeTemporalPropertyCommand(){}
 
-        public InternalKey getInternalKey()
+        public TimeIntervalKey getIntervalKey()
         {
             return key;
         }
 
-        public int getTime()
-        {
-            return key.getStartTime();
-        }
-
-        public byte[] getValue()
+        public Slice getValue()
         {
             return value;
         }
 
         @Override
         public String toString() {
-            return key.toString()+ Arrays.toString(value);
+            return key.toString()+ value.toString();
         }
 
         @Override
@@ -354,18 +347,18 @@ public abstract class Command
             return handler.visitNodeTemporalPropertyCommand(this);
         }
 
-        public void init(InternalKey internalKey, byte[] value) {
-            this.key = internalKey;
+        public void init(TimeIntervalKey key, Slice value ) {
+            this.key = key;
             this.value = value;
         }
     }
 
     public static class RelationshipTemporalPropertyCommand extends Command
     {
-        private InternalKey key;
-        private byte[] value;
+        private TimeIntervalKey key;
+        private Slice value;
 
-        public RelationshipTemporalPropertyCommand(InternalKey key, byte[] value )
+        public RelationshipTemporalPropertyCommand(TimeIntervalKey key, Slice value )
         {
             this.key = key;
             this.value = value;
@@ -373,24 +366,19 @@ public abstract class Command
 
         public RelationshipTemporalPropertyCommand() {}
 
-        public InternalKey getInternalKey()
+        public TimeIntervalKey getIntervalKey()
         {
             return key;
         }
 
-        public int getTime()
-        {
-            return key.getStartTime();
-        }
-
-        public byte[] getValue()
+        public Slice getValue()
         {
             return value;
         }
 
         @Override
         public String toString() {
-            return key.toString()+ Arrays.toString(value);
+            return key.toString()+ value.toString();
         }
 
         @Override
@@ -398,8 +386,8 @@ public abstract class Command
             return handler.visitRelationshipTemporalPropertyCommand(this);
         }
 
-        public void init(InternalKey internalKey, byte[] value) {
-            this.key = internalKey;
+        public void init(TimeIntervalKey key, Slice value ) {
+            this.key = key;
             this.value = value;
         }
     }

@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.util.Slice;
 import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
@@ -132,12 +133,12 @@ public class PhysicalLogCommandReaderV2_2_10 implements CommandReader, CommandHa
         case NeoCommandType.UPDATE_NODE_COUNTS_COMMAND:
             return new NodeCountsCommand();
 
-        case NeoCommandType.NODE_TEMPORAL_PRO_DELETE:
-            return new Command.NodeTemporalPropertyDeleteCommand();
+//        case NeoCommandType.NODE_TEMPORAL_PRO_DELETE:
+//            return new Command.NodeTemporalPropertyDeleteCommand();
         case NeoCommandType.NODE_TEMPORAL_PROPERTY_COMMAND:
             return new Command.NodeTemporalPropertyCommand();
-        case NeoCommandType.REL_TEMPORAL_PRO_DELETE:
-            return new Command.RelationshipTemporalPropertyDeleteCommand();
+//        case NeoCommandType.REL_TEMPORAL_PRO_DELETE:
+//            return new Command.RelationshipTemporalPropertyDeleteCommand();
         case NeoCommandType.REL_TEMPORAL_PROPERTY_COMMAND:
             return new Command.RelationshipTemporalPropertyCommand();
 
@@ -172,45 +173,39 @@ public class PhysicalLogCommandReaderV2_2_10 implements CommandReader, CommandHa
         }
     }
 
-    @Override
-    public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
-        byte[] id = new byte[8];
-        channel.get( id , 8 );
-        command.init( new Slice( id ) );
-        return false;
-    }
-
-    @Override
-    public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
-        byte[] id = new byte[8];
-        channel.get( id , 8 );
-        command.init( new Slice( id ) );
-        return false;
-    }
+//    @Override
+//    public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+//        byte[] id = new byte[8];
+//        channel.get( id , 8 );
+//        command.init( new Slice( id ) );
+//        return false;
+//    }
+//
+//    @Override
+//    public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+//        byte[] id = new byte[8];
+//        channel.get( id , 8 );
+//        command.init( new Slice( id ) );
+//        return false;
+//    }
 
     @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
-        int keyLength = channel.getInt();
-        byte[] key = new byte[ keyLength ];
-        channel.get( key, keyLength );
-        InternalKey internalKey = new InternalKey( new Slice( key ) );
-        int valueLength = channel.getInt();
-        byte[] value = new byte[ valueLength ];
-        channel.get( value, valueLength );
-        command.init( internalKey, value );
+        int len = channel.getInt();
+        byte[] raw = new byte[ len ];
+        channel.get( raw, len );
+        MemTable.TimeIntervalValueEntry entry = MemTable.decode( new Slice( raw ).input() );
+        command.init( entry.getKey(), entry.getValue() );
         return false;
     }
 
     @Override
     public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
-        int keyLength = channel.getInt();
-        byte[] key = new byte[ keyLength ];
-        channel.get( key, keyLength );
-        InternalKey internalKey = new InternalKey( new Slice( key ) );
-        int valueLength = channel.getInt();
-        byte[] value = new byte[ valueLength ];
-        channel.get( value, valueLength );
-        command.init( internalKey, value );
+        int len = channel.getInt();
+        byte[] raw = new byte[ len ];
+        channel.get( raw, len );
+        MemTable.TimeIntervalValueEntry entry = MemTable.decode( new Slice( raw ).input() );
+        command.init( entry.getKey(), entry.getValue() );
         return false;
     }
 

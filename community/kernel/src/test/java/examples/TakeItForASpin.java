@@ -20,15 +20,15 @@
 package examples;
 
 import java.io.File;
-import java.io.IOException;
 
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
-import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
+import org.neo4j.temporal.TemporalIndexManager;
 
 import static java.lang.System.getProperty;
+import static java.util.Calendar.SECOND;
 
 public class TakeItForASpin
 {
@@ -44,15 +44,13 @@ public class TakeItForASpin
             System.out.println(i);
             tx.success();
         }
-//        try
-//        {
-//            Thread.sleep(40000);
-//        } catch (InterruptedException e)
-//        {
-//            e.printStackTrace();
-//        }
+
         try ( Transaction tx = db.beginTx() )
         {
+            TemporalIndexManager ti = db.temporalIndex();
+            ti.nodeCreateValueIndex(10, 20, "hehe");
+            ti.nodeCreateAggregationDurationIndex(10, 20, "haha", 2, SECOND);
+
             Node node = db.getNodeById(i);
             node.setProperty("hehe", "haha");
             node.getProperty("hehe");
@@ -61,12 +59,13 @@ public class TakeItForASpin
 
         try ( Transaction tx = db.beginTx() )
         {
+            db.schema();
             Node node = db.getNodeById(i);
             Object s = node.getProperty("hehe");
             System.out.println(s);
 
             int t = time();
-            node.createTemporalProperty("haha", t, 4, "hehe");
+            node.getTemporalPropertyWithIndex("haha", t, 4, "hehe");
             node.setTemporalProperty("haha", t, "hehe");
             Object v = node.getTemporalProperty("haha", t);
             if(v instanceof String){

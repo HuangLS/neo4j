@@ -588,7 +588,7 @@ public class NeoStoreDataSource implements NeoStoresSupplier, Lifecycle, IndexPr
             this.cacheModule = cacheModule;
             this.indexingModule = indexingModule;
             this.storeLayerModule = storeLayerModule;
-            this.temporalStoreModule = temporalStoreModule;
+//            this.temporalStoreModule = temporalStoreModule;
             this.transactionLogModule = transactionLogModule;
             this.kernelModule = kernelModule;
 

@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.api.txstate;
 
+import org.act.temporalProperty.impl.MemTable;
+
 import java.util.Iterator;
 
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
@@ -47,6 +49,7 @@ import org.neo4j.kernel.impl.api.state.RelationshipState;
 import org.neo4j.kernel.impl.api.store.RelationshipIterator;
 import org.neo4j.kernel.impl.util.diffsets.ReadableDiffSets;
 import org.neo4j.kernel.impl.util.diffsets.ReadableRelationshipDiffSets;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
 
 /**
  * Kernel transaction state.
@@ -58,9 +61,9 @@ import org.neo4j.kernel.impl.util.diffsets.ReadableRelationshipDiffSets;
 public interface ReadableTxState
 {
 
-    TemporalProperty getNodeTemporalProperty(long nodeId, int propertyKeyId, int time );
+    MemTable getNodeTemporalProperty( TemporalPropertyReadOperation query );
 
-    TemporalProperty getRelationshipTemporalProperty(long relId, int propertyKeyId, int time );
+    MemTable getRelationshipTemporalProperty( TemporalPropertyReadOperation query );
 
 
     void accept( TxStateVisitor visitor ) throws ConstraintValidationKernelException, CreateConstraintFailureException;

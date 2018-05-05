@@ -40,6 +40,7 @@ import org.neo4j.kernel.impl.transaction.command.IndexTransactionApplier;
 import org.neo4j.kernel.impl.transaction.command.NeoStoreTransactionApplier;
 import org.neo4j.kernel.impl.util.IdOrderingQueue;
 import org.neo4j.kernel.impl.util.function.Optional;
+import org.neo4j.temporal.TemporalPropertyStoreHandler;
 import org.neo4j.unsafe.batchinsert.LabelScanWriter;
 
 /**

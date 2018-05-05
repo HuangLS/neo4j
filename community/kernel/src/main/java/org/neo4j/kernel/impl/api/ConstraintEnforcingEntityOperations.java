@@ -21,7 +21,7 @@ package org.neo4j.kernel.impl.api;
 
 import java.util.Iterator;
 
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.query.range.TimeRangeQuery;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
@@ -65,6 +65,8 @@ import org.neo4j.kernel.impl.api.operations.SchemaWriteOperations;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
 import org.neo4j.kernel.impl.constraints.ConstraintSemantics;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 import static org.neo4j.kernel.api.StatementConstants.NO_SUCH_NODE;
 import static org.neo4j.kernel.impl.locking.ResourceTypes.INDEX_ENTRY;
@@ -205,62 +207,17 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
     }
 
     @Override
-    public void nodeCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
-        entityWriteOperations.nodeCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
-    }
-
-    @Override
-    public void nodeSetTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException
+    public void nodeSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException
     {
-        entityWriteOperations.nodeSetTemporalProperty(statement, nodeId, propertyKeyId, time, value);
+        entityWriteOperations.nodeSetTemporalProperty(statement, operation);
     }
 
     @Override
-    public void nodeInvalidTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    public void relationshipSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException
     {
-        entityWriteOperations.nodeInvalidTemporalProperty(statement, nodeId, propertyKeyId, time);
+        entityWriteOperations.relationshipSetTemporalProperty(statement, operation);
     }
 
-    @Override
-    public void nodeDeleteTemporalPropertyPoint(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        entityWriteOperations.nodeDeleteTemporalPropertyPoint(statement, nodeId, propertyKeyId, time);
-    }
-
-    @Override
-    public void nodeDeleteTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        entityWriteOperations.nodeDeleteTemporalProperty(statement, nodeId, propertyKeyId);
-    }
-
-    @Override
-    public void relationshipCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
-        entityWriteOperations.relationshipCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
-    }
-
-    @Override
-    public void relationshipSetTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        entityWriteOperations.relationshipSetTemporalProperty(statement, relId, propertyKeyId, time, value);
-    }
-
-    @Override
-    public void relationshipInvalidTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        entityWriteOperations.relationshipInvalidTemporalProperty(statement, relId, propertyKeyId, time);
-    }
-
-    @Override
-    public void relationshipDeleteTemporalProperty(KernelStatement statement, long relId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        entityWriteOperations.relationshipDeleteTemporalProperty(statement, relId, propertyKeyId);
-    }
-
-    @Override
-    public void relationshipDeleteTemporalPropertyRecord(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        entityWriteOperations.relationshipDeleteTemporalPropertyRecord(statement, relId, propertyKeyId, time);
-    }
 
     @Override
     public long relationshipCreate( KernelStatement statement,
@@ -320,27 +277,15 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
     }
 
     @Override
-    public Object nodeGetTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    public Object nodeGetTemporalProperty(KernelStatement statement, TemporalPropertyReadOperation query) throws EntityNotFoundException, PropertyNotFoundException
     {
-        return entityReadOperations.nodeGetTemporalProperty(statement, nodeId, propertyKeyId, time);
+        return entityReadOperations.nodeGetTemporalProperty(statement, query);
     }
 
     @Override
-    public Object nodeGetTemporalProperties(KernelStatement statement, long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback) throws EntityNotFoundException, PropertyNotFoundException
+    public Object relationshipGetTemporalProperty(KernelStatement statement, TemporalPropertyReadOperation query) throws EntityNotFoundException, PropertyNotFoundException
     {
-        return entityReadOperations.nodeGetTemporalProperties(statement, nodeId, propertyKeyId, startTime, endTime, callback);
-    }
-
-    @Override
-    public Object relationshipGetTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        return entityReadOperations.relationshipGetTemporalProperty(statement, relId, propertyKeyId, time);
-    }
-
-    @Override
-    public Object relationshipGetTemporalProperties(KernelStatement statement, long relId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        return entityReadOperations.relationshipGetTemporalProperties(statement, relId, propertyKeyId, startTime, endTime, callback);
+        return entityReadOperations.relationshipGetTemporalProperty(statement, query);
     }
 
     @Override

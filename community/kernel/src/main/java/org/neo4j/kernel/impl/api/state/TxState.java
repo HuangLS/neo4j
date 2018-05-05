@@ -19,6 +19,9 @@
  */
 package org.neo4j.kernel.impl.api.state;
 
+import org.act.temporalProperty.exception.TGraphNotImplementedException;
+import org.act.temporalProperty.impl.MemTable;
+
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -35,7 +38,6 @@ import org.neo4j.function.Consumer;
 import org.neo4j.function.Function;
 import org.neo4j.function.Predicate;
 import org.neo4j.graphdb.Direction;
-import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.api.constraints.NodePropertyConstraint;
 import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
@@ -75,6 +77,8 @@ import org.neo4j.kernel.impl.util.diffsets.DiffSetsVisitor;
 import org.neo4j.kernel.impl.util.diffsets.ReadableDiffSets;
 import org.neo4j.kernel.impl.util.diffsets.ReadableRelationshipDiffSets;
 import org.neo4j.kernel.impl.util.diffsets.RelationshipDiffSets;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 import static org.neo4j.collection.primitive.PrimitiveLongCollections.toPrimitiveIterator;
 import static org.neo4j.helpers.collection.Iterables.map;
@@ -258,16 +262,74 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     }
 
     @Override
-    public TemporalProperty getNodeTemporalProperty(long nodeId, int propertyKeyId, int time)
+    public MemTable getNodeTemporalProperty(TemporalPropertyReadOperation query)
     {
-        return getOrCreateNodeState( nodeId ).getTemporalProperty( propertyKeyId, time );
+        return getOrCreateNodeState( query.getEntityId() ).getTemporalProperty();
     }
 
     @Override
-    public TemporalProperty getRelationshipTemporalProperty(long relId, int propertyKeyId, int time)
+    public MemTable getRelationshipTemporalProperty(TemporalPropertyReadOperation query)
     {
-        return getOrCreateRelationshipState( relId ).getTemporalProperty( propertyKeyId, time );
+        return getOrCreateRelationshipState( query.getEntityId() ).getTemporalProperty();
     }
+
+    @Override
+    public void nodeDoSetTemporalProperty(TemporalPropertyWriteOperation op)
+    {
+        getOrCreateNodeState( op.getEntityId() ).setTemporalProperty( op );
+        this.hasChanges = true;
+    }
+
+//    @Override
+//    public void nodeDoCreateTemporalPropertyInvalidRecord(long nodeId, TemporalProperty temporalProperty)
+//    {
+//        getOrCreateNodeState( nodeId ).doCreateTemporalPropertyInvalid( temporalProperty );
+//        this.hasChanges = true;
+//    }
+//
+//    @Override
+//    public void nodeDoDeleteTemporalPropertyRecord(long nodeId, TemporalProperty temporalProperty)
+//    {
+//        getOrCreateNodeState( nodeId ).doDeleteTemporalPropertyRecord( temporalProperty );
+//        this.hasChanges = true;
+//    }
+//
+//    @Override
+//    public void nodeDoDeleteTemporalProperty(long nodeId, int propertyKeyId)
+//    {
+//        getOrCreateNodeState( nodeId ).doDeleteTemporalProperty( propertyKeyId );
+//        this.hasChanges = true;
+//    }
+
+    @Override
+    public void relationshipDoSetTemporalProperty(TemporalPropertyWriteOperation op)
+    {
+        getOrCreateRelationshipState( op.getEntityId() ).setTemporalProperty( op );
+        this.hasChanges = true;
+    }
+
+//    @Override
+//    public void relationshipDoCreateTemporalPropertyInvalidRecord(long relationshipId, TemporalProperty temporalProperty)
+//    {
+//        getOrCreateRelationshipState( relationshipId ).doCreateTemporalPropertyInvalid( temporalProperty );
+//        this.hasChanges = true;
+//    }
+//
+//    @Override
+//    public void relationshipDoDeleteTemporalPropertyRecord(long relationshipId, TemporalProperty temporalProperty)
+//    {
+//        getOrCreateRelationshipState( relationshipId ).doDeleteTemporalPropertyRecord( temporalProperty );
+//        this.hasChanges = true;
+//    }
+//
+//    @Override
+//    public void relationshipDoDeleteTemporalProperty(long relationshipId, int propertyKeyId)
+//    {
+//        getOrCreateRelationshipState( relationshipId ).doDeleteTemporalProperty( propertyKeyId );
+//        this.hasChanges = true;
+//    }
+
+
 
     @Override
     public void accept( final TxStateVisitor visitor )
@@ -544,9 +606,9 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             }
 
             @Override
-            public void visitTemporalPropertyChanges(long entityId, Iterator<TemporalProperty> added, Iterator<TemporalProperty> addedInvalid, Iterator<TemporalProperty> deletedRecord, Iterator<Integer> deleted)
+            public void visitTemporalPropertyChanges(long entityId, MemTable changes)
             {
-                visitor.visitNodeTemporalPropertyChanges( entityId, added, addedInvalid, deletedRecord, deleted );
+                visitor.visitNodeTemporalPropertyChanges( entityId, changes);
             }
 
             @Override
@@ -571,9 +633,9 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             }
 
             @Override
-            public void visitTemporalPropertyChanges(long entityId, Iterator<TemporalProperty> added, Iterator<TemporalProperty> addedInvalid, Iterator<TemporalProperty> deletedRecord, Iterator<Integer> deleted)
+            public void visitTemporalPropertyChanges(long entityId, MemTable changes)
             {
-                visitor.visitRelationshipTemporalPropertyChanges( entityId, added, addedInvalid, deletedRecord, deleted );
+                visitor.visitRelationshipTemporalPropertyChanges( entityId, changes );
             }
         };
     }
@@ -590,9 +652,9 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             }
 
             @Override
-            public void visitTemporalPropertyChanges(long entityId, Iterator<TemporalProperty> added, Iterator<TemporalProperty> addedInvalid, Iterator<TemporalProperty> deletedRecord, Iterator<Integer> deleted)
+            public void visitTemporalPropertyChanges( long entityId, MemTable changes )
             {
-                //FIXME TGraph: Not Implement. Should Graph has temporal property?
+                throw new UnsupportedOperationException( new TGraphNotImplementedException() );
             }
         };
     }
@@ -688,62 +750,6 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             }
         }
         dataChanged();
-    }
-
-    @Override
-    public void nodeDoCreateTemporalPropertyRecord(long nodeId, TemporalProperty temporalProperty)
-    {
-        getOrCreateNodeState( nodeId ).doCreateTemporalPropertyRecord( temporalProperty );
-        this.hasChanges = true;
-    }
-
-    @Override
-    public void nodeDoCreateTemporalPropertyInvalidRecord(long nodeId, TemporalProperty temporalProperty)
-    {
-        getOrCreateNodeState( nodeId ).doCreateTemporalPropertyInvalid( temporalProperty );
-        this.hasChanges = true;
-    }
-
-    @Override
-    public void nodeDoDeleteTemporalPropertyRecord(long nodeId, TemporalProperty temporalProperty)
-    {
-        getOrCreateNodeState( nodeId ).doDeleteTemporalPropertyRecord( temporalProperty );
-        this.hasChanges = true;
-    }
-
-    @Override
-    public void nodeDoDeleteTemporalProperty(long nodeId, int propertyKeyId)
-    {
-        getOrCreateNodeState( nodeId ).doDeleteTemporalProperty( propertyKeyId );
-        this.hasChanges = true;
-    }
-
-    @Override
-    public void relationshipDoCreateTemporalProperty(long relationshipId, TemporalProperty temporalProperty)
-    {
-        getOrCreateRelationshipState( relationshipId ).doCreateTemporalPropertyRecord( temporalProperty );
-        this.hasChanges = true;
-    }
-
-    @Override
-    public void relationshipDoCreateTemporalPropertyInvalidRecord(long relationshipId, TemporalProperty temporalProperty)
-    {
-        getOrCreateRelationshipState( relationshipId ).doCreateTemporalPropertyInvalid( temporalProperty );
-        this.hasChanges = true;
-    }
-
-    @Override
-    public void relationshipDoDeleteTemporalPropertyRecord(long relationshipId, TemporalProperty temporalProperty)
-    {
-        getOrCreateRelationshipState( relationshipId ).doDeleteTemporalPropertyRecord( temporalProperty );
-        this.hasChanges = true;
-    }
-
-    @Override
-    public void relationshipDoDeleteTemporalProperty(long relationshipId, int propertyKeyId)
-    {
-        getOrCreateRelationshipState( relationshipId ).doDeleteTemporalProperty( propertyKeyId );
-        this.hasChanges = true;
     }
 
     @Override

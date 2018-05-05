@@ -19,7 +19,7 @@
  */
 package org.neo4j.kernel.impl.api.operations;
 
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.query.range.TimeRangeQuery;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
@@ -34,16 +34,13 @@ import org.neo4j.kernel.api.txstate.TxStateHolder;
 import org.neo4j.kernel.impl.api.KernelStatement;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
 
 public interface EntityReadOperations
 {
 
-    Object nodeGetTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId, int time ) throws PropertyNotFoundException, EntityNotFoundException;
-    Object nodeGetTemporalProperties(KernelStatement statement, long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback )
-            throws EntityNotFoundException, PropertyNotFoundException;
-    Object relationshipGetTemporalProperty( KernelStatement statement, long relId, int propertyKeyId, int time ) throws PropertyNotFoundException, EntityNotFoundException;
-    Object relationshipGetTemporalProperties(KernelStatement statement, long relId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback )
-            throws EntityNotFoundException, PropertyNotFoundException;
+    Object nodeGetTemporalProperty( KernelStatement statement, TemporalPropertyReadOperation query) throws PropertyNotFoundException, EntityNotFoundException;
+    Object relationshipGetTemporalProperty( KernelStatement statement, TemporalPropertyReadOperation query ) throws PropertyNotFoundException, EntityNotFoundException;
 
     /**
      * @param labelId the label id of the label that returned nodes are guaranteed to have
@@ -181,5 +178,6 @@ public interface EntityReadOperations
     Cursor<NodeItem> nodeCursorGetFromUniqueIndexSeek( KernelStatement statement,
             IndexDescriptor index,
             Object value ) throws IndexBrokenKernelException, IndexNotFoundKernelException;
+
 
 }

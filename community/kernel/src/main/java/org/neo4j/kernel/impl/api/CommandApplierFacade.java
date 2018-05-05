@@ -84,31 +84,31 @@ public class CommandApplierFacade implements CommandHandler, Visitor<Command,IOE
         return false;
     }
 
-    @Override
-    public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
-        boolean result = false;
-        for ( CommandHandler handler : handlers )
-        {
-            if ( handler.visitNodeTemporalPropertyDeleteCommand( command ) )
-            {
-                result = true;
-            }
-        }
-        return result;
-    }
-
-    @Override
-    public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
-        boolean result = false;
-        for ( CommandHandler handler : handlers )
-        {
-            if ( handler.visitRelationshipTemporalPropertyDeleteCommand( command ) )
-            {
-                result = true;
-            }
-        }
-        return result;
-    }
+//    @Override
+//    public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+//        boolean result = false;
+//        for ( CommandHandler handler : handlers )
+//        {
+//            if ( handler.visitNodeTemporalPropertyDeleteCommand( command ) )
+//            {
+//                result = true;
+//            }
+//        }
+//        return result;
+//    }
+//
+//    @Override
+//    public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+//        boolean result = false;
+//        for ( CommandHandler handler : handlers )
+//        {
+//            if ( handler.visitRelationshipTemporalPropertyDeleteCommand( command ) )
+//            {
+//                result = true;
+//            }
+//        }
+//        return result;
+//    }
 
     @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {

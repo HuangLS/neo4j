@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.api.txstate;
 
+import org.act.temporalProperty.impl.MemTable;
+
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -96,13 +98,9 @@ public interface TxStateVisitor
 
     void visitDroppedProcedure( ProcedureDescriptor procedureDescriptor );
 
-    void visitNodeTemporalPropertyChanges( long nodeId,
-                                           Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid,
-                                           Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp );
+    void visitNodeTemporalPropertyChanges( long nodeId, MemTable changes );
 
-    void visitRelationshipTemporalPropertyChanges(long relationshipId,
-                                                  Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid,
-                                                  Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp );
+    void visitRelationshipTemporalPropertyChanges(long relationshipId, MemTable changes );
 
     class Adapter implements TxStateVisitor
     {
@@ -346,18 +344,18 @@ public interface TxStateVisitor
         }
 
         @Override
-        public void visitNodeTemporalPropertyChanges(long nodeId, Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid, Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp) {
+        public void visitNodeTemporalPropertyChanges(long nodeId, MemTable changes) {
             if( next != null )
             {
-                next.visitNodeTemporalPropertyChanges( nodeId, addOrUpdate, addInvalid, delPoint, delProp );
+                next.visitNodeTemporalPropertyChanges( nodeId, changes );
             }
         }
 
         @Override
-        public void visitRelationshipTemporalPropertyChanges(long relationshipId, Iterator<TemporalProperty> addOrUpdate, Iterator<TemporalProperty> addInvalid, Iterator<TemporalProperty> delPoint, Iterator<Integer> delProp) {
+        public void visitRelationshipTemporalPropertyChanges(long relationshipId, MemTable changes) {
             if( next != null )
             {
-                next.visitRelationshipTemporalPropertyChanges( relationshipId, addOrUpdate, addInvalid, delPoint, delProp );
+                next.visitRelationshipTemporalPropertyChanges( relationshipId, changes );
             }
         }
 

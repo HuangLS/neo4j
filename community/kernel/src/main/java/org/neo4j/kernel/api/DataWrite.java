@@ -25,6 +25,7 @@ import org.neo4j.kernel.api.exceptions.RelationshipTypeIdNotFoundKernelException
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 interface DataWrite
 {
@@ -78,27 +79,11 @@ interface DataWrite
     /**
      * TGraph operations
      */
-    void nodeCreateTemporalProperty( long nodeId, int maxValueLength, int propertyKeyId, int time, Object value )
-            throws EntityNotFoundException, ConstraintValidationKernelException;
-
-    void nodeSetTemporalProperty( long nodeId, int propertyKeyId, int time, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void nodeSetTemporalPropertyInvalid( long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void nodeRemoveTemporalPropertyPoint( long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void nodeRemoveTemporalProperty( long nodeId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
-
-
-    void relationshipCreateTemporalProperty( long nodeId, int maxValueLength, int propertyKeyId, int time, Object value )
-            throws EntityNotFoundException, ConstraintValidationKernelException;
-
-    void relationshipSetTemporalProperty( long relationshipId, int propertyKeyId, int time, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void relationshipSetTemporalPropertyInvalid( long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void relationshipRemoveTemporalPropertyPoint( long relationshipId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void relationshipRemoveTemporalProperty( long relationshipId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
+    void nodeSetTemporalProperty(TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException;
+    void relationshipSetTemporalProperty(TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException;
+//    void nodeSetTemporalProperty( TemporalPropertyKey tpKey, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
+//    void nodeRemoveTemporalProperty( long nodeId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
+//    void relationshipSetTemporalProperty( TemporalPropertyKey tpKey, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
+//    void relationshipRemoveTemporalProperty( long relId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
 
 }

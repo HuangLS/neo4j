@@ -61,6 +61,7 @@ import org.neo4j.kernel.impl.api.operations.SchemaWriteOperations;
 import org.neo4j.kernel.impl.locking.Locks;
 import org.neo4j.kernel.impl.locking.ResourceTypes;
 import org.neo4j.kernel.impl.store.SchemaStorage;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 import static java.lang.Math.max;
 import static java.lang.Math.min;
@@ -300,75 +301,23 @@ public class LockingStatementOperations implements
     }
 
     @Override
-    public void nodeCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
-        entityWriteDelegate.nodeCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
-    }
-
-    @Override
-    public void nodeSetTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException
+    public void nodeSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException
     {
-        acquireShared(statement, NODE, nodeId);
-        statement.locks().optimistic().acquireTemporalPropExclusive(NODE_TEMPORAL_PROP, nodeId, propertyKeyId, time);
-        entityWriteDelegate.nodeSetTemporalProperty(statement, nodeId, propertyKeyId, time, value);
+        //FIXME: TGraph lock naive version!
+//        acquireShared(statement, NODE, operation.getEntityId());
+//        statement.locks().optimistic().acquireTemporalPropExclusive(NODE_TEMPORAL_PROP, nodeId, propertyKeyId, time);
+        acquireExclusive( statement, NODE, operation.getEntityId() );
+        entityWriteDelegate.nodeSetTemporalProperty(statement, operation);
     }
 
     @Override
-    public void nodeInvalidTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    public void relationshipSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException
     {
-        acquireShared(statement, NODE, nodeId);
-        statement.locks().optimistic().acquireTemporalPropExclusive(NODE_TEMPORAL_PROP, nodeId, propertyKeyId, time);
-        entityWriteDelegate.nodeInvalidTemporalProperty(statement, nodeId, propertyKeyId, time);
-    }
-
-    @Override
-    public void nodeDeleteTemporalPropertyPoint(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        acquireShared(statement, NODE, nodeId);
-        statement.locks().optimistic().acquireTemporalPropExclusive(NODE_TEMPORAL_PROP, nodeId, propertyKeyId, time);
-        entityWriteDelegate.nodeDeleteTemporalPropertyPoint(statement, nodeId, propertyKeyId, time);
-    }
-
-    @Override
-    public void nodeDeleteTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        acquireExclusiveNodeLock(statement, nodeId);
-        entityWriteDelegate.nodeDeleteTemporalProperty(statement, nodeId, propertyKeyId);
-    }
-
-    @Override
-    public void relationshipCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
-        entityWriteDelegate.relationshipCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
-    }
-
-    @Override
-    public void relationshipSetTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        acquireShared(statement, RELATIONSHIP, relId);
-        statement.locks().optimistic().acquireTemporalPropExclusive(REL_TEMPORAL_PROP, relId, propertyKeyId, time);
-        entityWriteDelegate.relationshipSetTemporalProperty(statement, relId, propertyKeyId, time, value);
-    }
-
-    @Override
-    public void relationshipInvalidTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        acquireShared(statement, RELATIONSHIP, relId);
-        statement.locks().optimistic().acquireTemporalPropExclusive(REL_TEMPORAL_PROP, relId, propertyKeyId, time);
-        entityWriteDelegate.relationshipInvalidTemporalProperty(statement, relId, propertyKeyId, time);
-    }
-
-    @Override
-    public void relationshipDeleteTemporalProperty(KernelStatement statement, long relId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        acquireExclusiveRelationshipLock(statement, relId);
-        entityWriteDelegate.relationshipDeleteTemporalProperty(statement, relId, propertyKeyId);
-    }
-
-    @Override
-    public void relationshipDeleteTemporalPropertyRecord(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        acquireShared( statement, RELATIONSHIP, relId );
-        statement.locks().optimistic().acquireTemporalPropExclusive(REL_TEMPORAL_PROP, relId, propertyKeyId, time );
-        entityWriteDelegate.relationshipDeleteTemporalPropertyRecord( statement, relId, propertyKeyId, time );
+        //FIXME: TGraph lock naive version!
+//        acquireShared(statement, RELATIONSHIP, operation.getEntityId());
+//        statement.locks().optimistic().acquireTemporalPropExclusive(REL_TEMPORAL_PROP, );
+        acquireExclusive( statement, RELATIONSHIP, operation.getEntityId() );
+        entityWriteDelegate.relationshipSetTemporalProperty(statement, operation);
     }
 
     @Override
@@ -634,7 +583,7 @@ public class LockingStatementOperations implements
         {
             state.locks().optimistic().acquireShared(ResourceTypes.RELATIONSHIP, resourceId);
         }
-        state.locks().optimistic().acquireTemporalPropExclusive( resourceType, resourceId, propertyKeyId, time );
+//        state.locks().optimistic().acquireTemporalPropExclusive( resourceType, resourceId, propertyKeyId, time );
 
     }
 
@@ -648,7 +597,7 @@ public class LockingStatementOperations implements
         {
             state.locks().optimistic().acquireShared(ResourceTypes.RELATIONSHIP, resourceId);
         }
-        state.locks().optimistic().acquireTemporalPropShared( resourceType, resourceId, propertyKeyId, start, end );
+//        state.locks().optimistic().acquireTemporalPropShared( resourceType, resourceId, propertyKeyId, start, end );
     }
 
     @Override

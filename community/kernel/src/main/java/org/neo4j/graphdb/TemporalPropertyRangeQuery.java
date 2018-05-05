@@ -1,13 +1,13 @@
 package org.neo4j.graphdb;
 
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.query.range.TimeRangeQuery;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
 
 /**
  * Created by song on 2017/8/1 0001.
  */
-public abstract class TemporalPropertyRangeQuery extends RangeQueryCallBack
+public abstract class TemporalPropertyRangeQuery extends TimeRangeQuery
 {
 //    public static TemporalPropertyRangeQuery COUNT = new TemporalPropertyRangeQuery()
 //    {
@@ -20,7 +20,7 @@ public abstract class TemporalPropertyRangeQuery extends RangeQueryCallBack
 //        }
 //
 //        @Override
-//        public void onCall(int time, Slice value)
+//        public void onNewValue(int time, Slice value)
 //        {
 //            //FIXME TGraph: Not Implement.
 //            throw new TGraphNoImplementationException();
@@ -60,7 +60,7 @@ public abstract class TemporalPropertyRangeQuery extends RangeQueryCallBack
 //        }
 //
 //        @Override
-//        public void onCall(int time, Slice value)
+//        public void onNewValue(int time, Slice value)
 //        {
 //            //FIXME TGraph: Not Implement.
 //            throw new TGraphNoImplementationException();
@@ -100,7 +100,7 @@ public abstract class TemporalPropertyRangeQuery extends RangeQueryCallBack
 //        }
 //
 //        @Override
-//        public void onCall(int time, Slice value)
+//        public void onNewValue(int time, Slice value)
 //        {
 //            //FIXME TGraph: Not Implement.
 //            throw new TGraphNoImplementationException();
@@ -140,7 +140,7 @@ public abstract class TemporalPropertyRangeQuery extends RangeQueryCallBack
 //        }
 //
 //        @Override
-//        public void onCall(int time, Slice value)
+//        public void onNewValue(int time, Slice value)
 //        {
 //            //FIXME TGraph: Not Implement.
 //            throw new TGraphNoImplementationException();
@@ -184,7 +184,7 @@ public abstract class TemporalPropertyRangeQuery extends RangeQueryCallBack
     }
 
     @Override
-    public void onCall(int time, Slice value)
+    public void onNewValue(int time, Slice value)
     {
         if(value==null)
         {
@@ -195,4 +195,11 @@ public abstract class TemporalPropertyRangeQuery extends RangeQueryCallBack
     }
 
     abstract public boolean onTimePoint(int time, Object value);
+
+    @Override
+    public void onCallBatch(Slice batchValue)
+    {
+        //FIXME TGraph: Not Implement.
+        //throw new TGraphNoImplementationException();
+    }
 }

@@ -23,7 +23,12 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.act.temporalProperty.impl.RangeQueryCallBack;
+import org.act.temporalProperty.TemporalPropertyStore;
+import org.act.temporalProperty.exception.TPSRuntimeException;
+import org.act.temporalProperty.exception.ValueUnknownException;
+import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.util.Slice;
 import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
 import org.neo4j.collection.primitive.PrimitiveIntCollection;
@@ -33,7 +38,6 @@ import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.function.Predicate;
-import org.neo4j.graphdb.ConstraintViolationException;
 import org.neo4j.graphdb.TGraphInternalError;
 import org.neo4j.kernel.api.EntityType;
 import org.neo4j.kernel.api.LegacyIndex;
@@ -93,8 +97,13 @@ import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.util.Cursors;
 import org.neo4j.kernel.impl.util.PrimitiveLongResourceIterator;
 import org.neo4j.kernel.impl.util.diffsets.ReadableDiffSets;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 import static org.act.temporalProperty.util.TemporalPropertyValueConvertor.CLASS_NAME_LENGTH_SEPERATOR;
+import static org.act.temporalProperty.util.TemporalPropertyValueConvertor.TemporalPropertyMarker;
+import static org.act.temporalProperty.util.TemporalPropertyValueConvertor.fromSlice;
+import static org.act.temporalProperty.util.TemporalPropertyValueConvertor.toSlice;
 import static org.neo4j.collection.primitive.PrimitiveLongCollections.single;
 import static org.neo4j.helpers.collection.Iterables.filter;
 import static org.neo4j.helpers.collection.IteratorUtil.iterator;
@@ -103,7 +112,7 @@ import static org.neo4j.helpers.collection.IteratorUtil.singleOrNull;
 import static org.neo4j.kernel.api.StatementConstants.NO_SUCH_NODE;
 import static org.neo4j.kernel.impl.api.PropertyValueComparison.COMPARE_NUMBERS;
 
-public class StateHandlingStatementOperations implements
+    public class StateHandlingStatementOperations implements
         KeyReadOperations,
         KeyWriteOperations,
         EntityOperations,
@@ -348,269 +357,499 @@ public class StateHandlingStatementOperations implements
         return 0;
     }
 
+
     @Override
-    public void nodeCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
-        byte[] value2store = new byte[maxValueLength];
-        int valueLength;
-        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
+    public Object nodeGetTemporalProperty(KernelStatement statement, TemporalPropertyReadOperation query) throws EntityNotFoundException
+    {
+        // FIXME TGraph: Should search in tx and then get from storage
+        // query static property first.
+        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, query.getEntityId() ) )
         {
             NodeItem node = cursor.get();
-
-            try ( Cursor<PropertyItem> properties = node.property( propertyKeyId ) )
+            try (Cursor<PropertyItem> properties = node.property( query.getProId() ))
             {
-                if ( !properties.next() )
+                if (properties.next())
                 {
-                    valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
-                    DefinedProperty property = Property.property(
-                            propertyKeyId,
-                            value.getClass().getSimpleName() + CLASS_NAME_LENGTH_SEPERATOR + maxValueLength
-                    );
+                    // return static property value if not a temporal property.
+                    Object staticPro = properties.get().value();
+                    if( staticPro == null || !(staticPro instanceof String))
+                    {
+                        return staticPro;
+                    }
+                    String[] arr = ((String)staticPro).split( CLASS_NAME_LENGTH_SEPERATOR );
+                    if(arr.length!=2 || !arr[1].toUpperCase().equals( TemporalPropertyMarker )){
+                        return staticPro;
+                    }
+
+                    String valueType = arr[0];
+                    TemporalPropertyStore store = temporalPropertyStore.nodeStore();
+                    if( statement.hasTxStateWithChanges() )
+                    {
+                        MemTable oneEntityData = statement.txState().getNodeTemporalProperty( query );
+                        if( oneEntityData!=null && !oneEntityData.isEmpty() ) // has in txState
+                        {
+                            if(query.isPointQuery()){
+                                return tpQueryPointWithCache(query, oneEntityData, store, valueType);
+                            }else if(query.isRangeQuery()){
+                                return tpQueryRangeWithCache(query, oneEntityData, store, valueType);
+                            }else{
+                                return tpQueryIndexWithCache(query, oneEntityData, store, valueType);
+                            }
+                        }
+                    }
+                    // not in TxState, then get from store
+                    if(query.isPointQuery()){
+                        return tpQueryPoint(query, store, valueType);
+                    }else if(query.isRangeQuery()){
+                        return tpQueryRange(query, store, valueType);
+                    }else{
+                        return tpQueryIndex(query, store, valueType);
+                    }
+                }else{
+                    return null; //Cannot get value from neo4j store
+                }
+            }
+        }
+    }
+
+    @Override
+    public Object relationshipGetTemporalProperty(KernelStatement statement, TemporalPropertyReadOperation query) throws EntityNotFoundException {
+        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, query.getEntityId() ) )
+        {
+            RelationshipItem rel = cursor.get();
+            try (Cursor<PropertyItem> properties = rel.property( query.getProId() ))
+            {
+                if (properties.next())
+                {
+                    // return static property value if not a temporal property.
+                    Object staticPro = properties.get().value();
+                    if( staticPro == null || !(staticPro instanceof String))
+                    {
+                        return staticPro;
+                    }
+                    String[] arr = ((String)staticPro).split( CLASS_NAME_LENGTH_SEPERATOR );
+                    if(arr.length!=2 || !arr[1].toUpperCase().equals( TemporalPropertyMarker )){
+                        return staticPro;
+                    }
+
+                    String valueType = arr[0];
+                    TemporalPropertyStore store = temporalPropertyStore.relStore();
+                    if( statement.hasTxStateWithChanges() )
+                    {
+                        MemTable oneEntityData = statement.txState().getRelationshipTemporalProperty( query );
+                        if( oneEntityData!=null && !oneEntityData.isEmpty() ) // has in txState
+                        {
+                            if(query.isPointQuery()){
+                                return tpQueryPointWithCache(query, oneEntityData, store, valueType);
+                            }else if(query.isRangeQuery()){
+                                return tpQueryRangeWithCache(query, oneEntityData, store, valueType);
+                            }else{
+                                return tpQueryIndexWithCache(query, oneEntityData, store, valueType);
+                            }
+                        }
+                    }
+                    // not in TxState, then get from store
+                    if(query.isPointQuery()){
+                        return tpQueryPoint(query, store, valueType);
+                    }else if(query.isRangeQuery()){
+                        return tpQueryRange(query, store, valueType);
+                    }else{
+                        return tpQueryIndex(query, store, valueType);
+                    }
+                }else{
+                    return null; //Cannot get value from neo4j store
+                }
+            }
+        }
+    }
+
+    private Object tpQueryPointWithCache( TemporalPropertyReadOperation query, MemTable oneEntityData, TemporalPropertyStore store, String valueType )
+    {
+        try
+        {
+            Slice value = oneEntityData.get(new InternalKey( query.getProId(), query.getEntityId(), query.getStart(), ValueType.VALUE ));
+            if(value==null)
+            {
+                return null;
+            }
+            else
+            {
+                return fromSlice(valueType, value);
+            }
+        }
+        catch ( ValueUnknownException e )
+        {
+            return tpQueryPoint( query, store, valueType );
+        }
+    }
+
+    private Object tpQueryRangeWithCache( TemporalPropertyReadOperation query, MemTable oneEntityData, TemporalPropertyStore store, String valueType )
+    {
+        return temporalPropertyStore.getRange( store, query, oneEntityData );
+    }
+
+    private Object tpQueryIndexWithCache( TemporalPropertyReadOperation query, MemTable oneEntityData, TemporalPropertyStore store, String valueType )
+    {
+        return temporalPropertyStore.getAggrIndex( store, query, oneEntityData );
+    }
+
+    private Object tpQueryPoint( TemporalPropertyReadOperation query, TemporalPropertyStore store, String valueType )
+    {
+        Slice value = temporalPropertyStore.getPoint( store, query );
+        if(value!=null)
+        {
+            return fromSlice( valueType, value );
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    private Object tpQueryRange( TemporalPropertyReadOperation query, TemporalPropertyStore store, String valueType )
+    {
+        return temporalPropertyStore.getRange( store, query, null );
+    }
+
+    private Object tpQueryIndex( TemporalPropertyReadOperation query, TemporalPropertyStore store, String valueType )
+    {
+        return temporalPropertyStore.getAggrIndex( store, query, null );
+    }
+
+    @Override
+    public void nodeSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation op) throws EntityNotFoundException
+    {
+        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, op.getEntityId() ) )
+        {
+            NodeItem node = cursor.get();
+            try ( Cursor<PropertyItem> properties = node.property( op.getProId() ) )
+            {
+                if ( !properties.next() ) // create new property
+                {
+                    DefinedProperty property = Property.property(op.getProId(), op.getValue().getClass().getSimpleName()+CLASS_NAME_LENGTH_SEPERATOR+TemporalPropertyMarker);
                     legacyPropertyTrackers.nodeAddStoreProperty( node.id(), property );
                     Property existingProperty = Property.noProperty( property.propertyKeyId(), EntityType.NODE, node.id() );
-                    statement.txState().nodeDoReplaceProperty( node.id(), existingProperty, property );
-                    statement.txState().nodeDoCreateTemporalPropertyRecord( nodeId, Property.temporalProperty(propertyKeyId, time, valueLength, value2store));
+                    statement.txState().nodeDoReplaceProperty( op.getEntityId(), existingProperty, property );
                 }
-                else
+                else if(op.getInternalKey().getValueType()==ValueType.VALUE) //check exist property value type
                 {
-                    throw new ConstraintViolationException( "Temporal property already exist! Can not be created!" );
+                    Object staticPro = properties.get().value();
+                    if( staticPro == null || !(staticPro instanceof String))
+                    {
+                        throw new TPSRuntimeException( "operation performed on a non-temporal property!" );
+                    }
+                    String[] arr = ((String)staticPro).split( CLASS_NAME_LENGTH_SEPERATOR );
+                    if(arr.length!=2 || !arr[1].toUpperCase().equals( TemporalPropertyMarker )){
+                        throw new TPSRuntimeException( "operation performed on a non-temporal property!" );
+                    }
+                    String valueType = arr[0];
+                    String thisValType = op.getValue().getClass().getSimpleName();
+                    if(!thisValType.equals( valueType )){
+                        throw new TPSRuntimeException( "value type error: property type {} but try to set {} value!", valueType, thisValType );
+                    }
                 }
+//                else
+//                {
+//                    existingProperty = Property.property( properties.get().propertyKeyId(), properties.get().value() );
+//                    legacyPropertyTrackers.nodeChangeStoreProperty( node.id(), (DefinedProperty) existingProperty, property ); // TGraph: no need, for value not change.
+//                }
+                if(op.getInternalKey().getValueType() != ValueType.INVALID){
+                    op.setValueSlice( toSlice(op.getValue()) );
+                }else{
+                    op.setValueSlice( new Slice(0) );
+                }
+                statement.txState().nodeDoSetTemporalProperty( op );
             }
         }
     }
 
+
+
+//    @Override
+//    public void nodeCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
+//        byte[] value2store = new byte[maxValueLength];
+//        int valueLength;
+//        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
+//        {
+//            NodeItem node = cursor.get();
+//
+//            try ( Cursor<PropertyItem> properties = node.property( propertyKeyId ) )
+//            {
+//                if ( !properties.next() )
+//                {
+//                    valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
+//                    DefinedProperty property = Property.property(
+//                            propertyKeyId,
+//                            value.getClass().getSimpleName() + CLASS_NAME_LENGTH_SEPERATOR + maxValueLength
+//                    );
+//                    legacyPropertyTrackers.nodeAddStoreProperty( node.id(), property );
+//                    Property existingProperty = Property.noProperty( property.propertyKeyId(), EntityType.NODE, node.id() );
+//                    statement.txState().nodeDoReplaceProperty( node.id(), existingProperty, property );
+//                    statement.txState().nodeDoCreateTemporalPropertyRecord( nodeId, Property.temporalProperty(propertyKeyId, time, valueLength, value2store));
+//                }
+//                else
+//                {
+//                    throw new ConstraintViolationException( "Temporal property already exist! Can not be created!" );
+//                }
+//            }
+//        }
+//    }
+
+//    @Override
+//    public void nodeSetTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException {
+//        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
+//        {
+//            NodeItem node = cursor.get();
+//            try ( Cursor<PropertyItem> properties = node.property( propertyKeyId ) )
+//            {
+//                if ( !properties.next() )
+//                {
+//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId );
+//                }
+//                else
+//                {
+//                    String v = (String) properties.get().value();
+//                    String maxValueLengthStr = v.split( CLASS_NAME_LENGTH_SEPERATOR )[1];
+//                    int maxValueLength = Integer.parseInt(maxValueLengthStr);
+//                    byte[] value2store = new byte[maxValueLength];
+//                    int valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
+//                    statement.txState().nodeDoCreateTemporalPropertyRecord( nodeId, Property.temporalProperty( propertyKeyId, time, valueLength, value2store ) );
+//                }
+//            }
+//        }
+//    }
+
+//    @Override
+//    public void nodeInvalidTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException {
+//        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
+//        {
+//            NodeItem node = cursor.get();
+//            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
+//            {
+//                if (!properties.next())
+//                {
+//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
+//                } else
+//                {
+//                    int maxValueLength;
+//                    try
+//                    {
+//                        String v = (String) properties.get().value();
+//                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
+//                        maxValueLength = Integer.parseInt(maxValueLengthStr);
+//                    } catch (NumberFormatException | NullPointerException e)
+//                    {
+//                        throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
+//                    }
+//                    statement.txState().nodeDoCreateTemporalPropertyInvalidRecord(nodeId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
+//                }
+//            }
+//        }
+//    }
+
+//    @Override
+//    public void nodeDeleteTemporalPropertyPoint(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+//    {
+//        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
+//        {
+//            NodeItem node = cursor.get();
+//            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
+//            {
+//                if (!properties.next())
+//                {
+//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
+//                } else
+//                {
+//                    int maxValueLength;
+//                    try
+//                    {
+//                        String v = (String) properties.get().value();
+//                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
+//                        maxValueLength = Integer.parseInt(maxValueLengthStr);
+//                    } catch (NumberFormatException | NullPointerException e)
+//                    {
+//                        throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
+//                    }
+//                    statement.txState().nodeDoDeleteTemporalPropertyRecord(nodeId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
+//                }
+//            }
+//        }
+//    }
+//
+//    @Override
+//    public void nodeDeleteTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
+//    {
+//        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
+//        {
+//            NodeItem node = cursor.get();
+//            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
+//            {
+//                if (!properties.next())
+//                {
+//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
+//                } else
+//                {
+//                    statement.txState().nodeDoDeleteTemporalProperty( nodeId, propertyKeyId );
+//                    nodeRemoveProperty( statement, nodeId, propertyKeyId );
+//                }
+//            }
+//        }
+//    }
+//
+//    @Override
+//    public void relationshipCreateTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
+//        byte[] value2store = new byte[maxValueLength];
+//        int valueLength;
+//        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
+//        {
+//            RelationshipItem rel = cursor.get();
+//            Property existingProperty;
+//            try ( Cursor<PropertyItem> properties = rel.property( propertyKeyId ) )
+//            {
+//                if ( !properties.next() )
+//                {
+//                    valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
+//                    DefinedProperty property = Property.property(
+//                            propertyKeyId,
+//                            value.getClass().getSimpleName() + CLASS_NAME_LENGTH_SEPERATOR + maxValueLength
+//                    );
+//                    legacyPropertyTrackers.nodeAddStoreProperty( relId, property );
+//                    existingProperty = Property.noProperty( property.propertyKeyId(), EntityType.RELATIONSHIP, relId );
+//                    statement.txState().relationshipDoReplaceProperty( relId, existingProperty, property );
+//                    statement.txState().relationshipDoCreateTemporalProperty( relId, Property.temporalProperty(propertyKeyId, time, valueLength, value2store));
+//                }
+//                else
+//                {
+//                    throw new ConstraintViolationException( "Temporal property already exist! Can not be created!" );
+//                }
+//            }
+//        }
+//    }
+
     @Override
-    public void nodeSetTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException {
-        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
+    public void relationshipSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation op) throws EntityNotFoundException
+    {
+        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, op.getEntityId() ) )
         {
-            NodeItem node = cursor.get();
-            try ( Cursor<PropertyItem> properties = node.property( propertyKeyId ) )
+            RelationshipItem relationship = cursor.get();
+            try ( Cursor<PropertyItem> properties = relationship.property( op.getProId() ) )
             {
                 if ( !properties.next() )
                 {
-                    throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId );
+                    DefinedProperty property = Property.property(op.getProId(), op.getValue().getClass().getSimpleName()+CLASS_NAME_LENGTH_SEPERATOR+TemporalPropertyMarker);
+                    legacyPropertyTrackers.relationshipAddStoreProperty( relationship.id(), property );
+                    Property existingProperty = Property.noProperty( op.getProId(), EntityType.RELATIONSHIP, relationship.id() );
+                    statement.txState().relationshipDoReplaceProperty( op.getEntityId(), existingProperty, property );
                 }
-                else
+                else if(op.getInternalKey().getValueType()==ValueType.VALUE) //check exist property value type
                 {
-                    String v = (String) properties.get().value();
-                    String maxValueLengthStr = v.split( CLASS_NAME_LENGTH_SEPERATOR )[1];
-                    int maxValueLength = Integer.parseInt(maxValueLengthStr);
-                    byte[] value2store = new byte[maxValueLength];
-                    int valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
-                    statement.txState().nodeDoCreateTemporalPropertyRecord( nodeId, Property.temporalProperty( propertyKeyId, time, valueLength, value2store ) );
-                }
-            }
-        }
-    }
-
-    @Override
-    public void nodeInvalidTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException {
-        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
-        {
-            NodeItem node = cursor.get();
-            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
-            {
-                if (!properties.next())
-                {
-                    throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
-                } else
-                {
-                    int maxValueLength;
-                    try
+                    Object staticPro = properties.get().value();
+                    if( staticPro == null || !(staticPro instanceof String))
                     {
-                        String v = (String) properties.get().value();
-                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
-                        maxValueLength = Integer.parseInt(maxValueLengthStr);
-                    } catch (NumberFormatException | NullPointerException e)
-                    {
-                        throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
+                        throw new TPSRuntimeException( "operation performed on a non-temporal property!" );
                     }
-                    statement.txState().nodeDoCreateTemporalPropertyInvalidRecord(nodeId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
-                }
-            }
-        }
-    }
-
-    @Override
-    public void nodeDeleteTemporalPropertyPoint(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
-        {
-            NodeItem node = cursor.get();
-            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
-            {
-                if (!properties.next())
-                {
-                    throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
-                } else
-                {
-                    int maxValueLength;
-                    try
-                    {
-                        String v = (String) properties.get().value();
-                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
-                        maxValueLength = Integer.parseInt(maxValueLengthStr);
-                    } catch (NumberFormatException | NullPointerException e)
-                    {
-                        throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
+                    String[] arr = ((String)staticPro).split( CLASS_NAME_LENGTH_SEPERATOR );
+                    if(arr.length!=2 || !arr[1].toUpperCase().equals( TemporalPropertyMarker )){
+                        throw new TPSRuntimeException( "operation performed on a non-temporal property!" );
                     }
-                    statement.txState().nodeDoDeleteTemporalPropertyRecord(nodeId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
-                }
-            }
-        }
-    }
-
-    @Override
-    public void nodeDeleteTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
-        {
-            NodeItem node = cursor.get();
-            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
-            {
-                if (!properties.next())
-                {
-                    throw new PropertyNotFoundException(propertyKeyId, EntityType.NODE, nodeId);
-                } else
-                {
-                    statement.txState().nodeDoDeleteTemporalProperty( nodeId, propertyKeyId );
-                    nodeRemoveProperty( statement, nodeId, propertyKeyId );
-                }
-            }
-        }
-    }
-
-    @Override
-    public void relationshipCreateTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException {
-        byte[] value2store = new byte[maxValueLength];
-        int valueLength;
-        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
-        {
-            RelationshipItem rel = cursor.get();
-            Property existingProperty;
-            try ( Cursor<PropertyItem> properties = rel.property( propertyKeyId ) )
-            {
-                if ( !properties.next() )
-                {
-                    valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
-                    DefinedProperty property = Property.property(
-                            propertyKeyId,
-                            value.getClass().getSimpleName() + CLASS_NAME_LENGTH_SEPERATOR + maxValueLength
-                    );
-                    legacyPropertyTrackers.nodeAddStoreProperty( relId, property );
-                    existingProperty = Property.noProperty( property.propertyKeyId(), EntityType.RELATIONSHIP, relId );
-                    statement.txState().relationshipDoReplaceProperty( relId, existingProperty, property );
-                    statement.txState().relationshipDoCreateTemporalProperty( relId, Property.temporalProperty(propertyKeyId, time, valueLength, value2store));
-                }
-                else
-                {
-                    throw new ConstraintViolationException( "Temporal property already exist! Can not be created!" );
-                }
-            }
-        }
-    }
-
-    @Override
-    public void relationshipSetTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
-        {
-            RelationshipItem rel = cursor.get();
-            try ( Cursor<PropertyItem> properties = rel.property( propertyKeyId ) )
-            {
-                if ( !properties.next() )
-                {
-                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId );
-                }
-                else
-                {
-                    String v = (String) properties.get().value();
-                    String maxValueLengthStr = v.split( CLASS_NAME_LENGTH_SEPERATOR )[1];
-                    int maxValueLength = Integer.parseInt(maxValueLengthStr);
-                    byte[] value2store = new byte[maxValueLength];
-                    int valueLength = TemporalPropertyValueConvertor.convert( value2store, value );
-                    statement.txState().relationshipDoCreateTemporalProperty( relId, Property.temporalProperty( propertyKeyId, time, valueLength, value2store ) );
-                }
-            }
-        }
-    }
-
-    @Override
-    public void relationshipInvalidTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
-        {
-            RelationshipItem rel = cursor.get();
-            try (Cursor<PropertyItem> properties = rel.property(propertyKeyId))
-            {
-                if (!properties.next())
-                {
-                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
-                } else
-                {
-                    int maxValueLength;
-                    try
-                    {
-                        String v = (String) properties.get().value();
-                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
-                        maxValueLength = Integer.parseInt(maxValueLengthStr);
-                    } catch (NumberFormatException | NullPointerException e)
-                    {
-                        throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+                    String valueType = arr[0];
+                    String thisValType = op.getValue().getClass().getSimpleName();
+                    if(!thisValType.equals( valueType )){
+                        throw new TPSRuntimeException( "value type error: property type {} but try to set {} value!", valueType, thisValType );
                     }
-                    statement.txState().relationshipDoCreateTemporalPropertyInvalidRecord(relId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
                 }
+//                else
+//                {
+//                    existingProperty = Property.property( properties.get().propertyKeyId(), properties.get().value() );
+//                    legacyPropertyTrackers.relationshipChangeStoreProperty( relationship.id(), (DefinedProperty) existingProperty, property );
+//                }
+                if(op.getInternalKey().getValueType() != ValueType.INVALID){
+                    op.setValueSlice( toSlice(op.getValue()) );
+                }else{
+                    op.setValueSlice( new Slice(0) );
+                }
+                statement.txState().relationshipDoSetTemporalProperty( op );
             }
         }
     }
 
-    @Override
-    public void relationshipDeleteTemporalProperty(KernelStatement statement, long relId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
-        {
-            RelationshipItem node = cursor.get();
-            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
-            {
-                if (!properties.next())
-                {
-                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
-                } else
-                {
-                    statement.txState().nodeDoDeleteTemporalProperty( relId, propertyKeyId );
-                    relationshipRemoveProperty( statement, relId, propertyKeyId );
-                }
-            }
-        }
-    }
-
-    @Override
-    public void relationshipDeleteTemporalPropertyRecord(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-    {
-        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
-        {
-            RelationshipItem rel = cursor.get();
-            try (Cursor<PropertyItem> properties = rel.property(propertyKeyId))
-            {
-                if (!properties.next())
-                {
-                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
-                } else
-                {
-                    int maxValueLength;
-                    try
-                    {
-                        String v = (String) properties.get().value();
-                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
-                        maxValueLength = Integer.parseInt(maxValueLengthStr);
-                    } catch (NumberFormatException | NullPointerException e)
-                    {
-                        throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
-                    }
-                    statement.txState().relationshipDoDeleteTemporalPropertyRecord(relId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
-                }
-            }
-        }
-    }
+//    @Override
+//    public void relationshipInvalidTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+//    {
+//        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
+//        {
+//            RelationshipItem rel = cursor.get();
+//            try (Cursor<PropertyItem> properties = rel.property(propertyKeyId))
+//            {
+//                if (!properties.next())
+//                {
+//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+//                } else
+//                {
+//                    int maxValueLength;
+//                    try
+//                    {
+//                        String v = (String) properties.get().value();
+//                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
+//                        maxValueLength = Integer.parseInt(maxValueLengthStr);
+//                    } catch (NumberFormatException | NullPointerException e)
+//                    {
+//                        throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+//                    }
+//                    statement.txState().relationshipDoCreateTemporalPropertyInvalidRecord(relId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
+//                }
+//            }
+//        }
+//    }
+//
+//    @Override
+//    public void relationshipDeleteTemporalProperty(KernelStatement statement, long relId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
+//    {
+//        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
+//        {
+//            RelationshipItem node = cursor.get();
+//            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
+//            {
+//                if (!properties.next())
+//                {
+//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+//                } else
+//                {
+//                    statement.txState().nodeDoDeleteTemporalProperty( relId, propertyKeyId );
+//                    relationshipRemoveProperty( statement, relId, propertyKeyId );
+//                }
+//            }
+//        }
+//    }
+//
+//    @Override
+//    public void relationshipDeleteTemporalPropertyRecord(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+//    {
+//        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
+//        {
+//            RelationshipItem rel = cursor.get();
+//            try (Cursor<PropertyItem> properties = rel.property(propertyKeyId))
+//            {
+//                if (!properties.next())
+//                {
+//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+//                } else
+//                {
+//                    int maxValueLength;
+//                    try
+//                    {
+//                        String v = (String) properties.get().value();
+//                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
+//                        maxValueLength = Integer.parseInt(maxValueLengthStr);
+//                    } catch (NumberFormatException | NullPointerException e)
+//                    {
+//                        throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+//                    }
+//                    statement.txState().relationshipDoDeleteTemporalPropertyRecord(relId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
+//                }
+//            }
+//        }
+//    }
 
     @Override
     public long relationshipCreate( KernelStatement state,
@@ -739,140 +978,6 @@ public class StateHandlingStatementOperations implements
         }
     }
 
-    @Override
-    public Object nodeGetTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time) throws EntityNotFoundException
-    {
-        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
-        {
-            NodeItem node = cursor.get();
-            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
-            {
-                if (properties.next())
-                {
-                    Object staticPro = properties.get().value();
-                    if( staticPro != null )
-                    {
-                        String type = ((String)staticPro).split( CLASS_NAME_LENGTH_SEPERATOR )[0];
-                        if( statement.hasTxStateWithChanges() )
-                        {
-                            TemporalProperty result = statement.txState().getNodeTemporalProperty( nodeId, propertyKeyId, time );
-                            if( result != null ) // has in txState
-                            {
-                                if (result.valueLength() != 0) // normal record
-                                {
-                                    int valueLength = result.valueLength();
-                                    byte[] value = result.value();
-                                    byte[] actualV = Arrays.copyOf(value, valueLength);
-                                    return TemporalPropertyValueConvertor.revers(type, actualV);
-                                } else
-                                {
-                                    return null; // invalid record
-                                }
-                            }
-                            // not in TxState, then get from store
-                        }
-                        Slice value = this.temporalPropertyStore.getNodeProperty(nodeId, propertyKeyId, time);
-                        if (null == value)
-                        {
-                            return null;
-                        } else
-                        {
-                            return TemporalPropertyValueConvertor.revers(type, value.getBytes());
-                        }
-                    }else{
-                        throw new TGraphInternalError("Get NULL value from neo4j store!");
-                    }
-                }else{
-                    throw new TGraphInternalError("Cannot get value from neo4j store!");
-                }
-            }
-        }
-    }
-
-    @Override
-    public Object nodeGetTemporalProperties(KernelStatement statement, long nodeId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback) throws EntityNotFoundException {
-//        FIXME TGraph: Should search in tx and then get from storage
-        try ( Cursor<NodeItem> cursor = nodeCursorById( statement, nodeId ) )
-        {
-            NodeItem node = cursor.get();
-            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
-            {
-                if (properties.next())
-                {
-                    Object staticPro = properties.get().value();
-                    if (staticPro != null)
-                    {
-                        String type = ((String) staticPro).split(CLASS_NAME_LENGTH_SEPERATOR)[0];
-//                        if (statement.hasTxStateWithChanges())
-//                        {
-//
-//                        }
-                        callback.setValueType(type);
-                        return this.temporalPropertyStore.getRelationshipProperty( nodeId, propertyKeyId, startTime, endTime, callback );
-                    }else{
-                        throw new TGraphInternalError("Get NULL value from neo4j store!");
-                    }
-                }else{
-                    throw new TGraphInternalError("Cannot get value from neo4j store!");
-                }
-            }
-        }
-    }
-
-    @Override
-    public Object relationshipGetTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException {
-        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
-        {
-            RelationshipItem rel = cursor.get();
-            try (Cursor<PropertyItem> properties = rel.property(propertyKeyId))
-            {
-                if (properties.next())
-                {
-                    Object staticPro = properties.get().value();
-                    if( staticPro != null )
-                    {
-                        String type = ((String)staticPro).split( CLASS_NAME_LENGTH_SEPERATOR )[0];
-                        if( statement.hasTxStateWithChanges() )
-                        {
-                            TemporalProperty result = statement.txState().getRelationshipTemporalProperty( relId, propertyKeyId, time );
-                            if( result != null ) // has in txState
-                            {
-                                if (result.valueLength() != 0) // normal record
-                                {
-                                    int valueLength = result.valueLength();
-                                    byte[] value = result.value();
-                                    byte[] actualV = Arrays.copyOf(value, valueLength);
-                                    return TemporalPropertyValueConvertor.revers(type, actualV);
-                                } else
-                                {
-                                    return null; // invalid record
-                                }
-                            }
-                            // not in TxState, then get from store
-                        }
-                        Slice value = this.temporalPropertyStore.getNodeProperty(relId, propertyKeyId, time);
-                        if (null == value)
-                        {
-                            return null;
-                        } else
-                        {
-                            return TemporalPropertyValueConvertor.revers(type, value.getBytes());
-                        }
-                    }else{
-                        throw new TGraphInternalError("Get NULL value from neo4j store!");
-                    }
-                }else{
-                    throw new TGraphInternalError("Cannot get value from neo4j store!");
-                }
-            }
-        }
-    }
-
-    @Override
-    public Object relationshipGetTemporalProperties(KernelStatement statement, long relId, int propertyKeyId, int startTime, int endTime, RangeQueryCallBack callback) throws EntityNotFoundException {
-//        FIXME TGraph: Should search in tx and then get from storage
-        return this.temporalPropertyStore.getRelationshipProperty( relId, propertyKeyId, startTime, endTime, callback );
-    }
 
     @Override
     public PrimitiveLongIterator nodesGetForLabel( KernelStatement state, int labelId )

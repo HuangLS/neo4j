@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.graphdb.ConstraintViolationException;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -41,6 +40,9 @@ import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.schema.IllegalTokenNameException;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.operations.KeyReadOperations;
+
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
+import org.act.temporalProperty.query.range.TimeRangeQuery;
 
 import static java.lang.String.format;
 
@@ -249,7 +251,13 @@ public class GraphPropertiesProxy implements GraphProperties
     }
 
     @Override
-    public Object getTemporalProperties(String key, int startTime, int endTime, RangeQueryCallBack callBack) {
+    public Object getTemporalProperty(String key, int startTime, int endTime, TimeRangeQuery callBack) {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, int start, int end, long indexId )
+    {
         throw new TGraphNoImplementationException();
     }
 
@@ -259,24 +267,12 @@ public class GraphPropertiesProxy implements GraphProperties
     }
 
     @Override
-    public void setTemporalPropertyInvalid(String key, int time) {
+    public void setTemporalProperty(String key, int start, int end, Object value) {
         throw new TGraphNoImplementationException();
     }
 
     @Override
-    public void deleteTemporalProperty(String key) {
-        throw new TGraphNoImplementationException();
-    }
-
-    @Override
-    public void deleteTemporalPropertyPoint(String key, int time) {
-        throw new TGraphNoImplementationException();
-    }
-
-    @Override
-    public void createTemporalProperty(String key, int time, int maxValueLength, Object value)
-    {
-        //FIXME TGraph: Not Implement.
+    public void removeTemporalProperty(String key) {
         throw new TGraphNoImplementationException();
     }
 

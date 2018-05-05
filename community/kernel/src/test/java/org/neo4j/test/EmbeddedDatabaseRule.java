@@ -32,6 +32,7 @@ import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.io.fs.FileUtils;
+import org.neo4j.temporal.TemporalIndexManager;
 
 /**
  * JUnit @Rule for configuring, creating and managing an EmbeddedGraphDatabase instance.
@@ -174,13 +175,7 @@ public class EmbeddedDatabaseRule extends DatabaseRule
     }
 
     @Override
-    public ResourceIterator<Node> findNodesByTemporalProperty(String key, int time, Object value) {
-        //FIXME TGraph: Not Implement.
-        throw new TGraphNoImplementationException();
-    }
-
-    @Override
-    public ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value) {
+    public TemporalIndexManager temporalIndex(){
         //FIXME TGraph: Not Implement.
         throw new TGraphNoImplementationException();
     }

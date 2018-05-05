@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.impl.factory;
 
+import org.act.temporalProperty.index.TemporalIndex;
+
 import java.io.File;
 import java.net.URL;
 import java.util.Collections;
@@ -71,6 +73,7 @@ import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.LifecycleException;
 import org.neo4j.kernel.security.URLAccessValidationError;
 import org.neo4j.logging.Log;
+import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.tooling.GlobalGraphOperations;
 
 import static java.lang.String.format;
@@ -528,18 +531,16 @@ public class GraphDatabaseFacade
     }
 
     @Override
-    public ResourceIterator<Node> findNodesByTemporalProperty(String key, int time, Object value) {
-        //FIXME TGraph: Not Implement.
-        throw new TGraphNoImplementationException();
-        //return null;
+    public TemporalIndexManager temporalIndex() {
+        return TemporalIndexManager.getInstance(threadToTransactionBridge);
     }
 
-    @Override
-    public ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value) {
-        //FIXME TGraph: Not Implement.
-        throw new TGraphNoImplementationException();
-        //return null;
-    }
+//    @Override
+//    public ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value) {
+//        //FIXME TGraph: Not Implement.
+//        throw new TGraphNoImplementationException();
+//        //return null;
+//    }
 
     // GraphDatabaseAPI
     @Override
@@ -612,5 +613,9 @@ public class GraphDatabaseFacade
             }
             return false;
         }
+    }
+
+    public int proKeyId(String key){
+        return threadToTransactionBridge.get().readOperations().propertyKeyGetForName( key );
     }
 }

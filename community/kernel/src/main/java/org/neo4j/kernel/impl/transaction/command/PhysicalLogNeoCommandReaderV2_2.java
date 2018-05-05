@@ -213,27 +213,13 @@ public class PhysicalLogNeoCommandReaderV2_2 implements CommandReader
     private class PhysicalNeoCommandReader implements CommandHandler
     {
         @Override
-        public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
-            //FIXME TGraph: Not Implement.
-            return false;
-        }
-
-        @Override
-        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
-            //FIXME TGraph: Not Implement.
-            return false;
-        }
-
-        @Override
         public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
-            //FIXME TGraph: Not Implement.
-            return false;
+            throw new UnsupportedOperationException( "TGraph: not implement." );
         }
 
         @Override
         public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
-            //FIXME TGraph: Not Implement.
-            return false;
+            throw new UnsupportedOperationException( "TGraph: not implement." );
         }
 
         @Override

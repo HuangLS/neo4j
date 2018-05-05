@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.act.temporalProperty.impl.RangeQueryCallBack;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.function.IntFunction;
@@ -64,23 +63,30 @@ import org.neo4j.kernel.api.exceptions.schema.TooManyLabelsException;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.operations.KeyReadOperations;
 import org.neo4j.kernel.impl.traversal.OldTraverserWrapper;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
+
+import org.act.temporalProperty.exception.TPSNHException;
+import org.act.temporalProperty.impl.ValueType;
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
+import org.act.temporalProperty.query.range.TimeRangeQuery;
 
 import static java.lang.String.format;
 
+import static org.act.temporalProperty.impl.ValueType.INVALID;
+import static org.act.temporalProperty.impl.ValueType.VALUE;
 import static org.neo4j.collection.primitive.PrimitiveIntCollections.map;
 import static org.neo4j.graphdb.DynamicLabel.label;
 import static org.neo4j.helpers.collection.IteratorUtil.asList;
 import static org.neo4j.kernel.api.StatementConstants.NO_SUCH_RELATIONSHIP_TYPE;
 import static org.neo4j.kernel.impl.core.TokenHolder.NO_ID;
 
-public class NodeProxy
-        extends PropertyContainerProxy
-        implements Node
+public class NodeProxy extends PropertyContainerProxy implements Node
 {
     public interface NodeActions
     {
         Statement statement();
-        
+
         GraphDatabaseService getGraphDatabase();
 
         void assertInUnterminatedTransaction();
@@ -128,8 +134,7 @@ public class NodeProxy
         }
         catch ( EntityNotFoundException e )
         {
-            throw new NotFoundException( "Unable to delete Node[" + nodeId +
-                                             "] since it has already been deleted." );
+            throw new NotFoundException( "Unable to delete Node[" + nodeId + "] since it has already been deleted." );
         }
     }
 
@@ -199,8 +204,7 @@ public class NodeProxy
                 try
                 {
                     RelationshipConversion result = new RelationshipConversion( actions );
-                    result.iterator = statement.readOperations().nodeGetRelationships(
-                            nodeId, direction, typeIds );
+                    result.iterator = statement.readOperations().nodeGetRelationships( nodeId, direction, typeIds );
                     result.statement = statement;
                     return result;
                 }
@@ -270,8 +274,7 @@ public class NodeProxy
                 Relationship other = rels.next();
                 if ( !other.equals( rel ) )
                 {
-                    throw new NotFoundException( "More than one relationship[" +
-                                                 type + ", " + dir + "] found for " + this );
+                    throw new NotFoundException( "More than one relationship[" + type + ", " + dir + "] found for " + this );
                 }
             }
             return rel;
@@ -295,8 +298,7 @@ public class NodeProxy
             }
             catch ( ConstraintValidationKernelException e )
             {
-                throw new ConstraintViolationException(
-                        e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
+                throw new ConstraintViolationException( e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
             }
             catch ( IllegalArgumentException e )
             {
@@ -352,7 +354,7 @@ public class NodeProxy
         try ( Statement statement = actions.statement() )
         {
             int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
-            Object value =  statement.readOperations().nodeGetProperty( nodeId, propertyKeyId );
+            Object value = statement.readOperations().nodeGetProperty( nodeId, propertyKeyId );
             return value == null ? defaultValue : value;
         }
         catch ( EntityNotFoundException e )
@@ -380,13 +382,12 @@ public class NodeProxy
         }
         catch ( PropertyKeyIdNotFoundKernelException e )
         {
-            throw new ThisShouldNotHappenError( "Jake",
-                    "Property key retrieved through kernel API should exist.", e );
+            throw new ThisShouldNotHappenError( "Jake", "Property key retrieved through kernel API should exist.", e );
         }
     }
 
     @Override
-    public Map<String, Object> getProperties( String... keys )
+    public Map<String,Object> getProperties( String... keys )
     {
         if ( keys == null )
         {
@@ -404,8 +405,7 @@ public class NodeProxy
             {
                 if ( !node.next() )
                 {
-                    throw new NotFoundException( "Node not found",
-                            new EntityNotFoundException( EntityType.NODE, getId() ) );
+                    throw new NotFoundException( "Node not found", new EntityNotFoundException( EntityType.NODE, getId() ) );
                 }
 
                 try ( Cursor<PropertyItem> propertyCursor = node.get().properties() )
@@ -417,7 +417,7 @@ public class NodeProxy
     }
 
     @Override
-    public Map<String, Object> getAllProperties()
+    public Map<String,Object> getAllProperties()
     {
         try ( Statement statement = actions.statement() )
         {
@@ -425,19 +425,17 @@ public class NodeProxy
             {
                 if ( !node.next() )
                 {
-                    throw new NotFoundException( "Node not found",
-                            new EntityNotFoundException( EntityType.NODE, getId() ) );
+                    throw new NotFoundException( "Node not found", new EntityNotFoundException( EntityType.NODE, getId() ) );
                 }
 
                 try ( Cursor<PropertyItem> propertyCursor = node.get().properties() )
                 {
-                    Map<String, Object> properties = new HashMap<>();
+                    Map<String,Object> properties = new HashMap<>();
 
                     // Get all properties
                     while ( propertyCursor.next() )
                     {
-                        String name = statement.readOperations().propertyKeyGetName(
-                                propertyCursor.get().propertyKeyId() );
+                        String name = statement.readOperations().propertyKeyGetName( propertyCursor.get().propertyKeyId() );
                         properties.put( name, propertyCursor.get().value() );
                     }
 
@@ -447,22 +445,22 @@ public class NodeProxy
         }
         catch ( PropertyKeyIdNotFoundKernelException e )
         {
-            throw new ThisShouldNotHappenError( "Rickard",
-                    "Property key retrieved through kernel API should exist.", e );
+            throw new ThisShouldNotHappenError( "Rickard", "Property key retrieved through kernel API should exist.", e );
         }
     }
 
     @Override
-    public Object getTemporalProperty(String key, int time) {
+    public Object getTemporalProperty( String key, int time )
+    {
         if ( null == key )
         {
             throw new IllegalArgumentException( "(null) property key is not allowed" );
         }
-
         try ( Statement statement = actions.statement() )
         {
             int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
-            return statement.readOperations().nodeGetTemporalPropertyPoint( nodeId, propertyKeyId, time );
+            TemporalPropertyReadOperation query = new TemporalPropertyReadOperation( this.getId(), propertyKeyId, time );
+            return statement.readOperations().nodeGetTemporalProperty( query );
         }
         catch ( EntityNotFoundException | PropertyNotFoundException e )
         {
@@ -471,7 +469,8 @@ public class NodeProxy
     }
 
     @Override
-    public Object getTemporalProperties(String key, int startTime, int endTime, RangeQueryCallBack callBack) {
+    public Object getTemporalProperty( String key, int startTime, int endTime, TimeRangeQuery callBack )
+    {
         if ( null == key )
         {
             throw new IllegalArgumentException( "(null) property key is not allowed" );
@@ -480,8 +479,8 @@ public class NodeProxy
         try ( Statement statement = actions.statement() )
         {
             int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
-            return statement.readOperations().nodeGetTemporalPropertyRange( this.getId(), propertyKeyId, startTime, endTime, callBack );
-            //return statement.readOperations().nodeGetProperty( nodeId, propertyKeyId, startTime, endTime, callback ).value();
+            TemporalPropertyReadOperation query = new TemporalPropertyReadOperation( this.getId(), propertyKeyId, startTime, endTime, callBack );
+            return statement.readOperations().nodeGetTemporalProperty( query );
         }
         catch ( EntityNotFoundException | PropertyNotFoundException e )
         {
@@ -490,20 +489,91 @@ public class NodeProxy
     }
 
     @Override
-    public void createTemporalProperty( String key, int time, int maxValueLength, Object value )
+    public AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, int startTime, int endTime, long indexId )
+    {
+        if ( null == key )
+        {
+            throw new IllegalArgumentException( "(null) property key is not allowed" );
+        }
+
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.readOperations().propertyKeyGetForName( key );
+            TemporalPropertyReadOperation query = new TemporalPropertyReadOperation( this.getId(), propertyKeyId, startTime, endTime, indexId );
+            Object val = statement.readOperations().nodeGetTemporalProperty( query );
+            if(val!=null && val instanceof AggregationIndexQueryResult) return (AggregationIndexQueryResult) val;
+            else throw new TPSNHException( "null or wrong type" );
+        }
+        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+    }
+
+    @Override
+    public void setTemporalProperty( String key, int time, Object value )
     {
         try ( Statement statement = actions.statement() )
         {
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                //statement.dataWriteOperations().nodeSetProperty( nodeId, Property.property( propertyKeyId, time, value ) );
-                statement.dataWriteOperations().nodeCreateTemporalProperty( nodeId, maxValueLength, propertyKeyId, time, value );
+                ValueType valueType;
+                if(value==null)
+                {
+                    valueType = INVALID;
+                }else{
+                    valueType = VALUE;
+                }
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, time, TemporalPropertyWriteOperation.NOW, valueType, value );
+                statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
+            }
+            catch ( IllegalArgumentException e )
+            {
+                // Trying to set an illegal value is a critical error - fail this transaction
+                actions.failTransaction();
+                throw e;
             }
             catch ( ConstraintValidationKernelException e )
             {
-                throw new ConstraintViolationException(
-                        e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
+                throw new ConstraintViolationException( e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
+            }
+        }
+        catch ( EntityNotFoundException e )
+        {
+            throw new NotFoundException( e );
+        }
+        catch ( IllegalTokenNameException e )
+        {
+            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
+        }
+        catch ( InvalidTransactionTypeKernelException e )
+        {
+            throw new ConstraintViolationException( e.getMessage(), e );
+        }
+    }
+
+    @Override
+    public void setTemporalProperty( String key, int start, int end, Object value )
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
+            try
+            {
+                ValueType valueType;
+                if(value==null)
+                {
+                    valueType = INVALID;
+                }else{
+                    valueType = VALUE;
+                }
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, start, end, valueType, value );
+                statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
+            }
+            catch ( ConstraintValidationKernelException e )
+            {
+                throw new ConstraintViolationException( e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
             }
             catch ( IllegalArgumentException e )
             {
@@ -527,14 +597,19 @@ public class NodeProxy
     }
 
     @Override
-    public void setTemporalProperty(String key, int time, Object value)
+    public void removeTemporalProperty( String key )
     {
         try ( Statement statement = actions.statement() )
         {
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                statement.dataWriteOperations().nodeSetTemporalProperty( nodeId, propertyKeyId, time, value );
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, INVALID, null );
+                statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
+            }
+            catch ( ConstraintValidationKernelException e )
+            {
+                throw new ConstraintViolationException( e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
             }
             catch ( IllegalArgumentException e )
             {
@@ -543,7 +618,7 @@ public class NodeProxy
                 throw e;
             }
         }
-        catch ( EntityNotFoundException | PropertyNotFoundException e )
+        catch ( EntityNotFoundException e )
         {
             throw new NotFoundException( e );
         }
@@ -557,98 +632,6 @@ public class NodeProxy
         }
     }
 
-    @Override
-    public void setTemporalPropertyInvalid(String key, int time)
-    {
-        try ( Statement statement = actions.statement() )
-        {
-            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
-            try
-            {
-                statement.dataWriteOperations().nodeSetTemporalPropertyInvalid( nodeId, propertyKeyId, time );
-            }
-            catch ( IllegalArgumentException e )
-            {
-                // Trying to set an illegal value is a critical error - fail this transaction
-                actions.failTransaction();
-                throw e;
-            }
-        }
-        catch ( EntityNotFoundException | PropertyNotFoundException e )
-        {
-            throw new NotFoundException( e );
-        }
-        catch ( IllegalTokenNameException e )
-        {
-            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
-        }
-        catch ( InvalidTransactionTypeKernelException e )
-        {
-            throw new ConstraintViolationException( e.getMessage(), e );
-        }
-    }
-
-    @Override
-    public void deleteTemporalProperty(String key)
-    {
-        try ( Statement statement = actions.statement() )
-        {
-            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
-            try
-            {
-                statement.dataWriteOperations().nodeRemoveTemporalProperty( nodeId, propertyKeyId );
-            }
-            catch ( IllegalArgumentException e )
-            {
-                // Trying to set an illegal value is a critical error - fail this transaction
-                actions.failTransaction();
-                throw e;
-            }
-        }
-        catch ( EntityNotFoundException | PropertyNotFoundException e )
-        {
-            throw new NotFoundException( e );
-        }
-        catch ( IllegalTokenNameException e )
-        {
-            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
-        }
-        catch ( InvalidTransactionTypeKernelException e )
-        {
-            throw new ConstraintViolationException( e.getMessage(), e );
-        }
-    }
-
-    @Override
-    public void deleteTemporalPropertyPoint(String key, int time)
-    {
-        try ( Statement statement = actions.statement() )
-        {
-            int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
-            try
-            {
-                statement.dataWriteOperations().nodeRemoveTemporalPropertyPoint( nodeId, propertyKeyId, time );
-            }
-            catch ( IllegalArgumentException e )
-            {
-                // Trying to set an illegal value is a critical error - fail this transaction
-                actions.failTransaction();
-                throw e;
-            }
-        }
-        catch ( EntityNotFoundException | PropertyNotFoundException e )
-        {
-            throw new NotFoundException( e );
-        }
-        catch ( IllegalTokenNameException e )
-        {
-            throw new IllegalArgumentException( format( "Invalid property key '%s'.", key ), e );
-        }
-        catch ( InvalidTransactionTypeKernelException e )
-        {
-            throw new ConstraintViolationException( e.getMessage(), e );
-        }
-    }
 
     @Override
     public Object getProperty( String key ) throws NotFoundException
@@ -670,16 +653,16 @@ public class NodeProxy
 
                 Object value = statement.readOperations().nodeGetProperty( nodeId, propertyKeyId );
 
-                if (value == null)
+                if ( value == null )
+                {
                     throw new PropertyNotFoundException( propertyKeyId, EntityType.NODE, nodeId );
+                }
 
                 return value;
-
             }
             catch ( EntityNotFoundException | PropertyNotFoundException e )
             {
-                throw new NotFoundException(
-                        e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
+                throw new NotFoundException( e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
             }
         }
     }
@@ -755,9 +738,8 @@ public class NodeProxy
         try ( Statement statement = actions.statement() )
         {
             int relationshipTypeId = statement.tokenWriteOperations().relationshipTypeGetOrCreateForName( type.name() );
-            long relationshipId = statement.dataWriteOperations()
-                                           .relationshipCreate( relationshipTypeId, nodeId, otherNode.getId() );
-            return actions.newRelationshipProxy( relationshipId, nodeId, relationshipTypeId, otherNode.getId()  );
+            long relationshipId = statement.dataWriteOperations().relationshipCreate( relationshipTypeId, nodeId, otherNode.getId() );
+            return actions.newRelationshipProxy( relationshipId, nodeId, relationshipTypeId, otherNode.getId() );
         }
         catch ( IllegalTokenNameException | RelationshipTypeIdNotFoundKernelException e )
         {
@@ -765,8 +747,7 @@ public class NodeProxy
         }
         catch ( EntityNotFoundException e )
         {
-            throw new NotFoundException( "Node[" + e.entityId() +
-                                             "] is deleted and cannot be used to create a relationship" );
+            throw new NotFoundException( "Node[" + e.entityId() + "] is deleted and cannot be used to create a relationship" );
         }
         catch ( InvalidTransactionTypeKernelException e )
         {
@@ -775,38 +756,28 @@ public class NodeProxy
     }
 
     @Override
-    public Traverser traverse( Order traversalOrder,
-                               StopEvaluator stopEvaluator, ReturnableEvaluator returnableEvaluator,
-                               RelationshipType relationshipType, Direction direction )
+    public Traverser traverse( Order traversalOrder, StopEvaluator stopEvaluator, ReturnableEvaluator returnableEvaluator, RelationshipType relationshipType,
+            Direction direction )
     {
         assertInUnterminatedTransaction();
-        return OldTraverserWrapper.traverse( this,
-                traversalOrder, stopEvaluator,
-                returnableEvaluator, relationshipType, direction );
+        return OldTraverserWrapper.traverse( this, traversalOrder, stopEvaluator, returnableEvaluator, relationshipType, direction );
     }
 
     @Override
-    public Traverser traverse( Order traversalOrder,
-                               StopEvaluator stopEvaluator, ReturnableEvaluator returnableEvaluator,
-                               RelationshipType firstRelationshipType, Direction firstDirection,
-                               RelationshipType secondRelationshipType, Direction secondDirection )
+    public Traverser traverse( Order traversalOrder, StopEvaluator stopEvaluator, ReturnableEvaluator returnableEvaluator,
+            RelationshipType firstRelationshipType, Direction firstDirection, RelationshipType secondRelationshipType, Direction secondDirection )
     {
         assertInUnterminatedTransaction();
-        return OldTraverserWrapper.traverse( this,
-                traversalOrder, stopEvaluator,
-                returnableEvaluator, firstRelationshipType, firstDirection,
+        return OldTraverserWrapper.traverse( this, traversalOrder, stopEvaluator, returnableEvaluator, firstRelationshipType, firstDirection,
                 secondRelationshipType, secondDirection );
     }
 
     @Override
-    public Traverser traverse( Order traversalOrder,
-                               StopEvaluator stopEvaluator, ReturnableEvaluator returnableEvaluator,
-                               Object... relationshipTypesAndDirections )
+    public Traverser traverse( Order traversalOrder, StopEvaluator stopEvaluator, ReturnableEvaluator returnableEvaluator,
+            Object... relationshipTypesAndDirections )
     {
         assertInUnterminatedTransaction();
-        return OldTraverserWrapper.traverse( this,
-                traversalOrder, stopEvaluator,
-                returnableEvaluator, relationshipTypesAndDirections );
+        return OldTraverserWrapper.traverse( this, traversalOrder, stopEvaluator, returnableEvaluator, relationshipTypesAndDirections );
     }
 
     @Override
@@ -816,13 +787,11 @@ public class NodeProxy
         {
             try
             {
-                statement.dataWriteOperations().nodeAddLabel( getId(),
-                        statement.tokenWriteOperations().labelGetOrCreateForName( label.name() ) );
+                statement.dataWriteOperations().nodeAddLabel( getId(), statement.tokenWriteOperations().labelGetOrCreateForName( label.name() ) );
             }
             catch ( ConstraintValidationKernelException e )
             {
-                throw new ConstraintViolationException(
-                        e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
+                throw new ConstraintViolationException( e.getUserMessage( new StatementTokenNameLookup( statement.readOperations() ) ), e );
             }
         }
         catch ( IllegalTokenNameException e )
@@ -1015,8 +984,7 @@ public class NodeProxy
                 }
                 catch ( RelationshipTypeIdNotFoundKernelException e )
                 {
-                    throw new ThisShouldNotHappenError( "Jake",
-                            "Kernel API returned non-existent relationship type: " + id );
+                    throw new ThisShouldNotHappenError( "Jake", "Kernel API returned non-existent relationship type: " + id );
                 }
             }
         }, input ) );

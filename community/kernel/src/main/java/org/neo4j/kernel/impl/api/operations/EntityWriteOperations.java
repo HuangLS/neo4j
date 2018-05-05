@@ -25,28 +25,31 @@ import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelExceptio
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.KernelStatement;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 public interface EntityWriteOperations
 {
-    void nodeCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException;
-
-    void nodeSetTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId, int time, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void nodeInvalidTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void nodeDeleteTemporalPropertyPoint( KernelStatement statement, long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void nodeDeleteTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void relationshipCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException;
-
-    void relationshipSetTemporalProperty( KernelStatement statement, long relId, int propertyKeyId, int time, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void relationshipInvalidTemporalProperty( KernelStatement statement, long relId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void relationshipDeleteTemporalProperty( KernelStatement statement, long relId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
-
-    void relationshipDeleteTemporalPropertyRecord( KernelStatement statement, long relId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
+    void nodeSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation op) throws ConstraintValidationKernelException, EntityNotFoundException;
+    void relationshipSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation op) throws ConstraintValidationKernelException, EntityNotFoundException;
+//    void nodeCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException;
+//
+//    void nodeSetTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId, int time, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void nodeInvalidTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void nodeDeleteTemporalPropertyPoint( KernelStatement statement, long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void nodeDeleteTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void relationshipCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException;
+//
+//    void relationshipSetTemporalProperty( KernelStatement statement, long relId, int propertyKeyId, int time, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void relationshipInvalidTemporalProperty( KernelStatement statement, long relId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void relationshipDeleteTemporalProperty( KernelStatement statement, long relId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void relationshipDeleteTemporalPropertyRecord( KernelStatement statement, long relId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
 
     // Currently, of course, most relevant operations here are still in the old core API implementation.
 
