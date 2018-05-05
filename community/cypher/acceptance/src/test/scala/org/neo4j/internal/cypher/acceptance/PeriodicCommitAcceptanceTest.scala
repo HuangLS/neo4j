@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -122,7 +122,7 @@ class PeriodicCommitAcceptanceTest extends ExecutionEngineFunSuite
     val (_, txCounts) = executeAndTrackTxCounts(queryText)
 
     // then
-    txCounts should equal(TxCounts(commits = 3, rollbacks = 0))
+    txCounts should equal(TxCounts(commits = 2, rollbacks = 0))
   }
 
   test("should commit first tx and abort second tx when failing on second batch during periodic commit") {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -103,7 +103,7 @@ case class LoadCSVPipe(source: Pipe,
       implicit val s = state
       val url = getImportURL(urlExpression(context).asInstanceOf[String], state.query)
 
-      val iterator: Iterator[Array[String]] = state.resources.getCsvIterator(url, fieldTerminator)
+      val iterator: Iterator[Array[String]] = state.resources.getCsvIterator(url, fieldTerminator, format match {case HasHeaders => true; case _ => false})
       format match {
         case HasHeaders =>
           val headers = if (iterator.nonEmpty) iterator.next().toIndexedSeq else IndexedSeq.empty // First row is headers

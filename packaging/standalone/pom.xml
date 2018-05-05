@@ -4,7 +4,7 @@
   <parent>
     <groupId>org.neo4j</groupId>
     <artifactId>parent</artifactId>
-    <version>2.3.12-SNAPSHOT</version>
+    <version>2.3.13-SNAPSHOT</version>
     <relativePath>../..</relativePath>
   </parent>
 
@@ -14,7 +14,7 @@
 
   <name>Neo4j - Server Assembler</name>
 
-  <version>2.3.12-SNAPSHOT</version>
+  <version>2.3.13-SNAPSHOT</version>
 
   <description>This project assembles the Neo4j stand-alone distribution,
     pulling together all the deliverable artifacts and packaging them
@@ -165,7 +165,7 @@ terms of the relevant Commercial Agreement.
           <failIfMissing>true</failIfMissing>
           <plainTextReport>true</plainTextReport>
           <prependText>notice-agpl-prefix.txt</prependText>
-          <excludedGroups>^((org.neo4j){1}|(org.neo4j.app){1}|(org.neo4j.browser){1}|(org.neo4j.doc){1}|(org.neo4j.server.plugin){1}|(org.neo4j.assembly){1})$</excludedGroups>
+          <excludedGroups>^((org.neo4j){1}|(org.neo4j.app){1}|(org.neo4j.doc){1}|(org.neo4j.server.plugin){1}|(org.neo4j.assembly){1})$</excludedGroups>
         </configuration>
         <executions>
           <execution>

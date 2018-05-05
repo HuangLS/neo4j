@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2017 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,12 +29,11 @@ import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.DirectionConverter.toGraphDb
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{KernelPredicate, OnlyDirectionExpander, TypeAndDirectionExpander}
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.JavaConversionSupport
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.JavaConversionSupport._
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.PatternNode
 import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.{IndexDescriptor, NodePropertyExistenceConstraint, RelationshipPropertyExistenceConstraint, UniquenessConstraint}
 import org.neo4j.cypher.internal.compiler.v2_3.spi._
 import org.neo4j.cypher.internal.frontend.v2_3.{Bound, EntityNotFoundException, FailedIndexException, SemanticDirection}
+import org.neo4j.cypher.internal.helpers.JavaConversionSupport
 import org.neo4j.cypher.internal.spi.v2_3.TransactionBoundQueryContext.IndexSearchMonitor
 import org.neo4j.function.Predicate
 import org.neo4j.graphalgo.impl.path.ShortestPath
@@ -291,7 +290,7 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
   }
 
   def indexScan(index: IndexDescriptor) =
-    mapToScalaENFXSafe(statement.readOperations().nodesGetFromIndexScan(index))(nodeOps.getById)
+    JavaConversionSupport.mapToScalaENFXSafe(statement.readOperations().nodesGetFromIndexScan(index))(nodeOps.getById)
 
   def lockingExactUniqueIndexSearch(index: IndexDescriptor, value: Any): Option[Node] = {
     val nodeId: Long = statement.readOperations().nodeGetFromUniqueIndexSeek(index, value)
@@ -314,11 +313,7 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
 
   override def nodeIsDense(node: Long): Boolean = statement.readOperations().nodeIsDense(node)
 
-  private def kernelStatement: KernelStatement =
-    txBridge
-      .getKernelTransactionBoundToThisThread(true)
-      .acquireStatement()
-      .asInstanceOf[KernelStatement]
+  private def kernelStatement = statement.asInstanceOf[KernelStatement]
 
   class NodeOperations extends BaseOperations[Node] {
     def delete(obj: Node) {
