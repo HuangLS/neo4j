@@ -392,71 +392,71 @@ public abstract class Command
         }
     }
 
-    public static class RelationshipTemporalPropertyDeleteCommand extends Command
-    {
-        private Slice id;
+//    public static class RelationshipTemporalPropertyDeleteCommand extends Command
+//    {
+//        private Slice id;
+//
+//        public RelationshipTemporalPropertyDeleteCommand(Slice id )
+//        {
+//            this.id = id;
+//        }
+//
+//        public RelationshipTemporalPropertyDeleteCommand() {}
+//
+//        public Slice getId()
+//        {
+//            return this.id;
+//        }
+//
+//        @Override
+//        public String toString()
+//        {
+//            return this.id.toString();
+//        }
+//
+//        @Override
+//        public boolean handle( CommandHandler handler ) throws IOException
+//        {
+//            return false;
+//        }
+//
+//        public void init(Slice slice) {
+//            this.id = slice;
+//        }
+//    }
 
-        public RelationshipTemporalPropertyDeleteCommand(Slice id )
-        {
-            this.id = id;
-        }
-
-        public RelationshipTemporalPropertyDeleteCommand() {}
-
-        public Slice getId()
-        {
-            return this.id;
-        }
-
-        @Override
-        public String toString()
-        {
-            return this.id.toString();
-        }
-
-        @Override
-        public boolean handle( CommandHandler handler ) throws IOException
-        {
-            return false;
-        }
-
-        public void init(Slice slice) {
-            this.id = slice;
-        }
-    }
-
-    public static class NodeTemporalPropertyDeleteCommand extends Command
-    {
-        private Slice id;
-
-        public NodeTemporalPropertyDeleteCommand(Slice id )
-        {
-            this.id = id;
-        }
-
-        public NodeTemporalPropertyDeleteCommand() {}
-
-        public Slice getId()
-        {
-            return this.id;
-        }
-
-        @Override
-        public String toString()
-        {
-            return this.id.toString();
-        }
-
-        @Override
-        public boolean handle( CommandHandler handler ) throws IOException
-        {
-            return false;
-        }
-
-        public void init(Slice slice) {
-            this.id = slice;
-        }
-    }
+//    public static class NodeTemporalPropertyDeleteCommand extends Command
+//    {
+//        private Slice id;
+//
+//        public NodeTemporalPropertyDeleteCommand(Slice id )
+//        {
+//            this.id = id;
+//        }
+//
+//        public NodeTemporalPropertyDeleteCommand() {}
+//
+//        public Slice getId()
+//        {
+//            return this.id;
+//        }
+//
+//        @Override
+//        public String toString()
+//        {
+//            return this.id.toString();
+//        }
+//
+//        @Override
+//        public boolean handle( CommandHandler handler ) throws IOException
+//        {
+//            return false;
+//        }
+//
+//        public void init(Slice slice) {
+//            this.id = slice;
+//        }
+//    }
 
     public static abstract class TokenCommand<RECORD extends TokenRecord> extends Command
     {

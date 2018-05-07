@@ -29,6 +29,8 @@ import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.range.TimeRangeQuery;
+import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
+
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.graphdb.*;
@@ -391,7 +393,7 @@ public class RelationshipProxy
                 {
                     valueType = INVALID;
                 }else{
-                    valueType = VALUE;
+                    valueType = ValueType.fromValueContentType( TemporalPropertyValueConvertor.str2type( value.getClass().getSimpleName() ));
                 }
                 TemporalPropertyWriteOperation
                         tpOp = new TemporalPropertyWriteOperation( this.getId(), propertyKeyId, time, TemporalPropertyWriteOperation.NOW, valueType, value );
@@ -435,7 +437,7 @@ public class RelationshipProxy
                 {
                     valueType = INVALID;
                 }else{
-                    valueType = VALUE;
+                    valueType = ValueType.fromValueContentType(TemporalPropertyValueConvertor.str2type( value.getClass().getSimpleName() ));
                 }
                 TemporalPropertyWriteOperation
                         tpOp = new TemporalPropertyWriteOperation( this.getId(), propertyKeyId, start, end, valueType, value );

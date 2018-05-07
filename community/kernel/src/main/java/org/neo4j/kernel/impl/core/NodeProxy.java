@@ -70,6 +70,7 @@ import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.range.TimeRangeQuery;
+import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
 
 import static java.lang.String.format;
 
@@ -523,7 +524,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
                 {
                     valueType = INVALID;
                 }else{
-                    valueType = VALUE;
+                    valueType = ValueType.fromValueContentType(TemporalPropertyValueConvertor.str2type( value.getClass().getSimpleName() ));
                 }
                 TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, time, TemporalPropertyWriteOperation.NOW, valueType, value );
                 statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
@@ -566,7 +567,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
                 {
                     valueType = INVALID;
                 }else{
-                    valueType = VALUE;
+                    valueType = ValueType.fromValueContentType(TemporalPropertyValueConvertor.str2type( value.getClass().getSimpleName() ));
                 }
                 TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, start, end, valueType, value );
                 statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
