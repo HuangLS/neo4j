@@ -19,8 +19,10 @@
  */
 package org.neo4j.kernel.impl.api;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import org.act.temporalProperty.TemporalPropertyStore;
@@ -29,9 +31,15 @@ import org.act.temporalProperty.exception.ValueUnknownException;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.MemTable;
 import org.act.temporalProperty.impl.ValueType;
+import org.act.temporalProperty.index.IndexValueType;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.act.temporalProperty.index.value.PropertyValueInterval;
+import org.act.temporalProperty.index.value.rtree.IndexEntry;
 import org.act.temporalProperty.meta.ValueContentType;
 import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.util.Slices;
 import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
+import org.apache.commons.lang3.tuple.Triple;
 
 import org.neo4j.collection.primitive.PrimitiveIntCollection;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
@@ -40,7 +48,7 @@ import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.function.Predicate;
-import org.neo4j.graphdb.TGraphInternalError;
+import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.kernel.api.EntityType;
 import org.neo4j.kernel.api.LegacyIndex;
 import org.neo4j.kernel.api.LegacyIndexHits;
@@ -76,7 +84,6 @@ import org.neo4j.kernel.api.procedures.ProcedureSignature.ProcedureName;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.api.properties.PropertyKeyIdIterator;
-import org.neo4j.kernel.api.properties.TemporalProperty;
 import org.neo4j.kernel.api.txstate.TransactionState;
 import org.neo4j.kernel.api.txstate.TxStateHolder;
 import org.neo4j.kernel.impl.api.operations.CountsOperations;
@@ -99,6 +106,9 @@ import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.util.Cursors;
 import org.neo4j.kernel.impl.util.PrimitiveLongResourceIterator;
 import org.neo4j.kernel.impl.util.diffsets.ReadableDiffSets;
+import org.neo4j.temporal.IntervalEntry;
+import org.neo4j.temporal.TGraphUserInputException;
+import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
@@ -256,43 +266,49 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public Cursor<NodeItem> nodeCursorGetFromIndexSeekByPrefix( KernelStatement statement, IndexDescriptor index, String prefix ) throws
-            IndexNotFoundKernelException
+    public Cursor<NodeItem> nodeCursorGetFromIndexSeekByPrefix( KernelStatement statement, IndexDescriptor index, String prefix ) throws IndexNotFoundKernelException
     {
         // TODO Filter this properly
         return statement.getStoreStatement().acquireIteratorNodeCursor( storeLayer.nodesGetFromIndexRangeSeekByPrefix( statement, index, prefix ) );
     }
 
     @Override
-    public Cursor<NodeItem> nodeCursorGetFromIndexRangeSeekByNumber( KernelStatement statement, IndexDescriptor index, Number lower, boolean includeLower, Number upper, boolean includeUpper ) throws
-            IndexNotFoundKernelException
+    public Cursor<NodeItem> nodeCursorGetFromIndexRangeSeekByNumber( KernelStatement statement, IndexDescriptor index, Number lower, boolean includeLower, Number upper, boolean includeUpper ) throws IndexNotFoundKernelException
 
     {
         // TODO Filter this properly
-        return COMPARE_NUMBERS.isEmptyRange( lower, includeLower, upper, includeUpper ) ? Cursors.<NodeItem>empty()
-                                                                                        : statement.getStoreStatement().acquireIteratorNodeCursor( storeLayer.nodesGetFromInclusiveNumericIndexRangeSeek( statement, index, lower, upper ) );
+        return COMPARE_NUMBERS.isEmptyRange( lower, includeLower, upper, includeUpper ) ? Cursors.<NodeItem>empty() : statement.getStoreStatement()
+                                                                                                                               .acquireIteratorNodeCursor(
+                                                                                                                                       storeLayer.nodesGetFromInclusiveNumericIndexRangeSeek(
+                                                                                                                                               statement,
+                                                                                                                                               index,
+                                                                                                                                               lower,
+                                                                                                                                               upper ) );
     }
 
     @Override
-    public Cursor<NodeItem> nodeCursorGetFromIndexRangeSeekByString( KernelStatement statement, IndexDescriptor index, String lower, boolean includeLower, String upper, boolean includeUpper ) throws
-            IndexNotFoundKernelException
+    public Cursor<NodeItem> nodeCursorGetFromIndexRangeSeekByString( KernelStatement statement, IndexDescriptor index, String lower, boolean includeLower, String upper, boolean includeUpper ) throws IndexNotFoundKernelException
 
     {
         // TODO Filter this properly
-        return statement.getStoreStatement().acquireIteratorNodeCursor( storeLayer.nodesGetFromIndexRangeSeekByString( statement, index, lower, includeLower, upper, includeUpper ) );
+        return statement.getStoreStatement()
+                        .acquireIteratorNodeCursor( storeLayer.nodesGetFromIndexRangeSeekByString( statement,
+                                                                                                   index,
+                                                                                                   lower,
+                                                                                                   includeLower,
+                                                                                                   upper,
+                                                                                                   includeUpper ) );
     }
 
     @Override
-    public Cursor<NodeItem> nodeCursorGetFromIndexRangeSeekByPrefix( KernelStatement statement, IndexDescriptor index, String prefix ) throws
-            IndexNotFoundKernelException
+    public Cursor<NodeItem> nodeCursorGetFromIndexRangeSeekByPrefix( KernelStatement statement, IndexDescriptor index, String prefix ) throws IndexNotFoundKernelException
     {
         // TODO Filter this properly
         return statement.getStoreStatement().acquireIteratorNodeCursor( storeLayer.nodesGetFromIndexRangeSeekByPrefix( statement, index, prefix ) );
     }
 
     @Override
-    public Cursor<NodeItem> nodeCursorGetFromUniqueIndexSeek( KernelStatement statement, IndexDescriptor index, Object value ) throws
-            IndexBrokenKernelException, IndexNotFoundKernelException
+    public Cursor<NodeItem> nodeCursorGetFromUniqueIndexSeek( KernelStatement statement, IndexDescriptor index, Object value ) throws IndexBrokenKernelException, IndexNotFoundKernelException
     {
         // TODO Filter this properly
         return statement.getStoreStatement().acquireIteratorNodeCursor( storeLayer.nodeGetFromUniqueIndexSeek( statement, index, value ) );
@@ -326,9 +342,78 @@ public class StateHandlingStatementOperations
     }
 
     @Override
+    public List<IntervalEntry> getTemporalPropertyByIndex( KernelStatement statement, TemporalIndexManager.PropertyValueIntervalBuilder builder )
+    {
+        IndexQueryRegion queryRegion = build2query( builder );
+        List<IndexEntry> result;
+        if ( builder.isNode() )
+        {
+            result = temporalPropertyStore.nodeStore().getEntries( queryRegion, statement.txState().getNodeTemporalProperties() );
+        }
+        else
+        {
+            result = temporalPropertyStore.relStore().getEntries( queryRegion, statement.txState().getRelationshipTemporalProperties() );
+        }
+        List<IntervalEntry> r = new ArrayList<>();
+        for ( IndexEntry i : result )
+        {
+            int propertyCount = queryRegion.getPropertyValueIntervals().size();
+            Object[] val = new Object[propertyCount];
+            for ( int j = 0; j < propertyCount; j++ )
+            {
+                val[j] = i.getValue( j );
+            }
+            r.add( new IntervalEntry( i.getStart(), i.getEnd(), i.getEntityId(), val ) );
+        }
+        return r;
+    }
+
+    private IndexQueryRegion build2query( TemporalIndexManager.PropertyValueIntervalBuilder builder )
+    {
+        IndexQueryRegion condition = new IndexQueryRegion( builder.getStart(), builder.getEnd() );
+        for ( Map.Entry<Integer,Triple<String,Object,Object>> entry : builder.getPropertyValues().entrySet() )
+        {
+            int proId = entry.getKey();
+            ValueContentType type = tpType( proId, builder.isNode() );
+            if ( type == null )
+            {
+                throw new NotFoundException( "property " + entry.getValue().getLeft() + "(id=" + proId + ") not found!" );
+            }
+            else
+            {
+                Slice min = tpValConvert( entry.getValue().getMiddle(), type );
+                Slice max = tpValConvert( entry.getValue().getRight(), type );
+                condition.add( new PropertyValueInterval( proId, min, max, IndexValueType.convertFrom( type ) ) );
+            }
+        }
+        return condition;
+    }
+
+    private Slice tpValConvert( Object val, ValueContentType type )
+    {
+        if ( val != null )
+        {
+            String className = val.getClass().getSimpleName();
+            if ( type != TemporalPropertyValueConvertor.str2type( className ) )
+            {
+                throw new TGraphUserInputException( "property type not match!" );
+            }
+            return TemporalPropertyValueConvertor.toSlice( val );
+        }
+        else
+        {
+            throw new TGraphUserInputException( "property value is null!" );
+        }
+    }
+
+    private ValueContentType tpType( int proId, boolean isNode )
+    {
+        return isNode ? temporalPropertyStore.nodeStore().getPropertyValueType( proId ) : temporalPropertyStore.relStore().getPropertyValueType( proId );
+    }
+
+    @Override
     public Object nodeGetTemporalProperty( KernelStatement statement, TemporalPropertyReadOperation query ) throws EntityNotFoundException
     {
-        // FIXME TGraph: Should search in tx and then get from storage
         // query static property first.
         try ( Cursor<NodeItem> cursor = nodeCursorById( statement, query.getEntityId() ) )
         {
@@ -541,20 +626,22 @@ public class StateHandlingStatementOperations
                     Property existingProperty = Property.noProperty( property.propertyKeyId(), EntityType.NODE, node.id() );
                     statement.txState().nodeDoReplaceProperty( op.getEntityId(), existingProperty, property );
                 }
-                else if ( op.getInternalKey().getValueType() == ValueType.VALUE ) //check exist property value type
+                else if ( op.getInternalKey().getValueType().isValue() ) //check exist property value type
                 {
                     Object staticPro = properties.get().value();
                     ValueContentType valueType = decodeTemporalPropertyMeta( staticPro );
                     if ( !op.getInternalKey().getValueType().toValueContentType().equals( valueType ) )
                     {
-                        throw new TPSRuntimeException( "value type error: property type {} but try to set {} value!", valueType, op.getInternalKey().getValueType().toValueContentType() );
+                        throw new TPSRuntimeException( "value type error: property type {} but try to set {} value!",
+                                                       valueType,
+                                                       op.getInternalKey().getValueType().toValueContentType() );
                     }
                 }
-//                else
-//                {
-//                    existingProperty = Property.property( properties.get().propertyKeyId(), properties.get().value() );
-//                    legacyPropertyTrackers.nodeChangeStoreProperty( node.id(), (DefinedProperty) existingProperty, property ); // TGraph: no need, for value not change.
-//                }
+                //                else
+                //                {
+                //                    existingProperty = Property.property( properties.get().propertyKeyId(), properties.get().value() );
+                //                    legacyPropertyTrackers.nodeChangeStoreProperty( node.id(), (DefinedProperty) existingProperty, property ); // TGraph: no need, for value not change.
+                //                }
                 if ( op.getInternalKey().getValueType() != ValueType.INVALID )
                 {
                     op.setValueSlice( toSlice( op.getValue() ) );
@@ -586,20 +673,22 @@ public class StateHandlingStatementOperations
                     Property existingProperty = Property.noProperty( op.getProId(), EntityType.RELATIONSHIP, relationship.id() );
                     statement.txState().relationshipDoReplaceProperty( op.getEntityId(), existingProperty, property );
                 }
-                else if ( op.getInternalKey().getValueType() == ValueType.VALUE ) //check exist property value type
+                else if ( op.getInternalKey().getValueType().isValue() ) //check exist property value type
                 {
                     Object staticPro = properties.get().value();
                     ValueContentType valueType = decodeTemporalPropertyMeta( staticPro );
                     if ( !op.getInternalKey().getValueType().toValueContentType().equals( valueType ) )
                     {
-                        throw new TPSRuntimeException( "value type error: property type {} but try to set {} value!", valueType, op.getInternalKey().getValueType().toValueContentType() );
+                        throw new TPSRuntimeException( "value type error: property type {} but try to set {} value!",
+                                                       valueType,
+                                                       op.getInternalKey().getValueType().toValueContentType() );
                     }
                 }
-//                else
-//                {
-//                    existingProperty = Property.property( properties.get().propertyKeyId(), properties.get().value() );
-//                    legacyPropertyTrackers.relationshipChangeStoreProperty( relationship.id(), (DefinedProperty) existingProperty, property );
-//                }
+                //                else
+                //                {
+                //                    existingProperty = Property.property( properties.get().propertyKeyId(), properties.get().value() );
+                //                    legacyPropertyTrackers.relationshipChangeStoreProperty( relationship.id(), (DefinedProperty) existingProperty, property );
+                //                }
                 if ( op.getInternalKey().getValueType() != ValueType.INVALID )
                 {
                     op.setValueSlice( toSlice( op.getValue() ) );
@@ -613,83 +702,83 @@ public class StateHandlingStatementOperations
         }
     }
 
-//    @Override
-//    public void relationshipInvalidTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-//    {
-//        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
-//        {
-//            RelationshipItem rel = cursor.get();
-//            try (Cursor<PropertyItem> properties = rel.property(propertyKeyId))
-//            {
-//                if (!properties.next())
-//                {
-//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
-//                } else
-//                {
-//                    int maxValueLength;
-//                    try
-//                    {
-//                        String v = (String) properties.get().value();
-//                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
-//                        maxValueLength = Integer.parseInt(maxValueLengthStr);
-//                    } catch (NumberFormatException | NullPointerException e)
-//                    {
-//                        throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
-//                    }
-//                    statement.txState().relationshipDoCreateTemporalPropertyInvalidRecord(relId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
-//                }
-//            }
-//        }
-//    }
-//
-//    @Override
-//    public void relationshipDeleteTemporalProperty(KernelStatement statement, long relId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
-//    {
-//        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
-//        {
-//            RelationshipItem node = cursor.get();
-//            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
-//            {
-//                if (!properties.next())
-//                {
-//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
-//                } else
-//                {
-//                    statement.txState().nodeDoDeleteTemporalProperty( relId, propertyKeyId );
-//                    relationshipRemoveProperty( statement, relId, propertyKeyId );
-//                }
-//            }
-//        }
-//    }
-//
-//    @Override
-//    public void relationshipDeleteTemporalPropertyRecord(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
-//    {
-//        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
-//        {
-//            RelationshipItem rel = cursor.get();
-//            try (Cursor<PropertyItem> properties = rel.property(propertyKeyId))
-//            {
-//                if (!properties.next())
-//                {
-//                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
-//                } else
-//                {
-//                    int maxValueLength;
-//                    try
-//                    {
-//                        String v = (String) properties.get().value();
-//                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
-//                        maxValueLength = Integer.parseInt(maxValueLengthStr);
-//                    } catch (NumberFormatException | NullPointerException e)
-//                    {
-//                        throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
-//                    }
-//                    statement.txState().relationshipDoDeleteTemporalPropertyRecord(relId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
-//                }
-//            }
-//        }
-//    }
+    //    @Override
+    //    public void relationshipInvalidTemporalProperty(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    //    {
+    //        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
+    //        {
+    //            RelationshipItem rel = cursor.get();
+    //            try (Cursor<PropertyItem> properties = rel.property(propertyKeyId))
+    //            {
+    //                if (!properties.next())
+    //                {
+    //                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+    //                } else
+    //                {
+    //                    int maxValueLength;
+    //                    try
+    //                    {
+    //                        String v = (String) properties.get().value();
+    //                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
+    //                        maxValueLength = Integer.parseInt(maxValueLengthStr);
+    //                    } catch (NumberFormatException | NullPointerException e)
+    //                    {
+    //                        throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+    //                    }
+    //                    statement.txState().relationshipDoCreateTemporalPropertyInvalidRecord(relId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
+    //                }
+    //            }
+    //        }
+    //    }
+    //
+    //    @Override
+    //    public void relationshipDeleteTemporalProperty(KernelStatement statement, long relId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException
+    //    {
+    //        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
+    //        {
+    //            RelationshipItem node = cursor.get();
+    //            try (Cursor<PropertyItem> properties = node.property(propertyKeyId))
+    //            {
+    //                if (!properties.next())
+    //                {
+    //                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+    //                } else
+    //                {
+    //                    statement.txState().nodeDoDeleteTemporalProperty( relId, propertyKeyId );
+    //                    relationshipRemoveProperty( statement, relId, propertyKeyId );
+    //                }
+    //            }
+    //        }
+    //    }
+    //
+    //    @Override
+    //    public void relationshipDeleteTemporalPropertyRecord(KernelStatement statement, long relId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException
+    //    {
+    //        try ( Cursor<RelationshipItem> cursor = relationshipCursorById( statement, relId ) )
+    //        {
+    //            RelationshipItem rel = cursor.get();
+    //            try (Cursor<PropertyItem> properties = rel.property(propertyKeyId))
+    //            {
+    //                if (!properties.next())
+    //                {
+    //                    throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+    //                } else
+    //                {
+    //                    int maxValueLength;
+    //                    try
+    //                    {
+    //                        String v = (String) properties.get().value();
+    //                        String maxValueLengthStr = v.split(CLASS_NAME_LENGTH_SEPERATOR)[1];
+    //                        maxValueLength = Integer.parseInt(maxValueLengthStr);
+    //                    } catch (NumberFormatException | NullPointerException e)
+    //                    {
+    //                        throw new PropertyNotFoundException(propertyKeyId, EntityType.RELATIONSHIP, relId);
+    //                    }
+    //                    statement.txState().relationshipDoDeleteTemporalPropertyRecord(relId, Property.temporalProperty(propertyKeyId, time, 0, new byte[maxValueLength]));
+    //                }
+    //            }
+    //        }
+    //    }
 
     @Override
     public long relationshipCreate( KernelStatement state, int relationshipTypeId, long startNodeId, long endNodeId ) throws EntityNotFoundException
@@ -878,8 +967,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public NodePropertyExistenceConstraint nodePropertyExistenceConstraintCreate( KernelStatement state, int labelId, int propertyKeyId ) throws
-            CreateConstraintFailureException
+    public NodePropertyExistenceConstraint nodePropertyExistenceConstraintCreate( KernelStatement state, int labelId, int propertyKeyId ) throws CreateConstraintFailureException
     {
         NodePropertyExistenceConstraint constraint = new NodePropertyExistenceConstraint( labelId, propertyKeyId );
         state.txState().constraintDoAdd( constraint );
@@ -887,8 +975,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public RelationshipPropertyExistenceConstraint relationshipPropertyExistenceConstraintCreate( KernelStatement state, int relTypeId, int propertyKeyId ) throws
-            AlreadyConstrainedException, CreateConstraintFailureException
+    public RelationshipPropertyExistenceConstraint relationshipPropertyExistenceConstraintCreate( KernelStatement state, int relTypeId, int propertyKeyId ) throws AlreadyConstrainedException, CreateConstraintFailureException
     {
         RelationshipPropertyExistenceConstraint constraint = new RelationshipPropertyExistenceConstraint( relTypeId, propertyKeyId );
         state.txState().constraintDoAdd( constraint );
@@ -1050,8 +1137,9 @@ public class StateHandlingStatementOperations
         }
         if ( diffSet.isRemoved( indexRule ) )
         {
-            throw new IndexNotFoundKernelException( String.format( "Index for label id %d on property id %d has been " +
-                                                                           "dropped in this transaction.", indexRule.getLabelId(), indexRule.getPropertyKeyId() ) );
+            throw new IndexNotFoundKernelException( String.format( "Index for label id %d on property id %d has been " + "dropped in this transaction.",
+                                                                   indexRule.getLabelId(),
+                                                                   indexRule.getPropertyKeyId() ) );
         }
         return false;
     }
@@ -1101,8 +1189,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public long nodeGetFromUniqueIndexSeek( KernelStatement state, IndexDescriptor index, Object value ) throws IndexNotFoundKernelException,
-            IndexBrokenKernelException
+    public long nodeGetFromUniqueIndexSeek( KernelStatement state, IndexDescriptor index, Object value ) throws IndexNotFoundKernelException, IndexBrokenKernelException
     {
         PrimitiveLongResourceIterator committed = storeLayer.nodeGetFromUniqueIndexSeek( state, index, value );
         PrimitiveLongIterator exactMatches = filterExactIndexMatches( state, index, value, committed );
@@ -1119,19 +1206,21 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public PrimitiveLongIterator nodesGetFromIndexRangeSeekByNumber( KernelStatement state, IndexDescriptor index, Number lower, boolean includeLower, Number upper, boolean includeUpper ) throws
-            IndexNotFoundKernelException
+    public PrimitiveLongIterator nodesGetFromIndexRangeSeekByNumber( KernelStatement state, IndexDescriptor index, Number lower, boolean includeLower, Number upper, boolean includeUpper ) throws IndexNotFoundKernelException
 
     {
         PrimitiveLongIterator committed = COMPARE_NUMBERS.isEmptyRange( lower, includeLower, upper, includeUpper ) ? PrimitiveLongCollections.emptyIterator()
-                                                                                                                   : storeLayer.nodesGetFromInclusiveNumericIndexRangeSeek( state, index, lower, upper );
+                                                                                                                   : storeLayer.nodesGetFromInclusiveNumericIndexRangeSeek(
+                                                                                                                           state,
+                                                                                                                           index,
+                                                                                                                           lower,
+                                                                                                                           upper );
         PrimitiveLongIterator exactMatches = filterExactRangeMatches( state, index, committed, lower, includeLower, upper, includeUpper );
         return filterIndexStateChangesForRangeSeekByNumber( state, index, lower, includeLower, upper, includeUpper, exactMatches );
     }
 
     @Override
-    public PrimitiveLongIterator nodesGetFromIndexRangeSeekByString( KernelStatement state, IndexDescriptor index, String lower, boolean includeLower, String upper, boolean includeUpper ) throws
-            IndexNotFoundKernelException
+    public PrimitiveLongIterator nodesGetFromIndexRangeSeekByString( KernelStatement state, IndexDescriptor index, String lower, boolean includeLower, String upper, boolean includeUpper ) throws IndexNotFoundKernelException
 
     {
         PrimitiveLongIterator committed = storeLayer.nodesGetFromIndexRangeSeekByString( state, index, lower, includeLower, upper, includeUpper );
@@ -1139,8 +1228,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public PrimitiveLongIterator nodesGetFromIndexRangeSeekByPrefix( KernelStatement state, IndexDescriptor index, String prefix ) throws
-            IndexNotFoundKernelException
+    public PrimitiveLongIterator nodesGetFromIndexRangeSeekByPrefix( KernelStatement state, IndexDescriptor index, String prefix ) throws IndexNotFoundKernelException
     {
         PrimitiveLongIterator committed = storeLayer.nodesGetFromIndexRangeSeekByPrefix( state, index, prefix );
         return filterIndexStateChangesForRangeSeekByPrefix( state, index, prefix, committed );
@@ -1242,8 +1330,12 @@ public class StateHandlingStatementOperations
 
             PrimitiveIntCollection labelIds = getLabels( node );
 
-            indexesUpdateProperty( state, node.id(), labelIds, property.propertyKeyId(),
-                                   existingProperty instanceof DefinedProperty ? (DefinedProperty) existingProperty : null, property );
+            indexesUpdateProperty( state,
+                                   node.id(),
+                                   labelIds,
+                                   property.propertyKeyId(),
+                                   existingProperty instanceof DefinedProperty ? (DefinedProperty) existingProperty : null,
+                                   property );
 
             return existingProperty;
         }
@@ -1572,8 +1664,7 @@ public class StateHandlingStatementOperations
 
     // <Legacy index>
     @Override
-    public <EXCEPTION extends Exception> void relationshipVisit( KernelStatement statement, long relId, RelationshipVisitor<EXCEPTION> visitor ) throws
-            EntityNotFoundException, EXCEPTION
+    public <EXCEPTION extends Exception> void relationshipVisit( KernelStatement statement, long relId, RelationshipVisitor<EXCEPTION> visitor ) throws EntityNotFoundException, EXCEPTION
     {
         if ( statement.hasTxStateWithChanges() )
         {
@@ -1592,22 +1683,19 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public LegacyIndexHits nodeLegacyIndexQuery( KernelStatement statement, String indexName, String key, Object queryOrQueryObject ) throws
-            LegacyIndexNotFoundKernelException
+    public LegacyIndexHits nodeLegacyIndexQuery( KernelStatement statement, String indexName, String key, Object queryOrQueryObject ) throws LegacyIndexNotFoundKernelException
     {
         return statement.legacyIndexTxState().nodeChanges( indexName ).query( key, queryOrQueryObject );
     }
 
     @Override
-    public LegacyIndexHits nodeLegacyIndexQuery( KernelStatement statement, String indexName, Object queryOrQueryObject ) throws
-            LegacyIndexNotFoundKernelException
+    public LegacyIndexHits nodeLegacyIndexQuery( KernelStatement statement, String indexName, Object queryOrQueryObject ) throws LegacyIndexNotFoundKernelException
     {
         return statement.legacyIndexTxState().nodeChanges( indexName ).query( queryOrQueryObject );
     }
 
     @Override
-    public LegacyIndexHits relationshipLegacyIndexGet( KernelStatement statement, String indexName, String key, Object value, long startNode, long endNode ) throws
-            LegacyIndexNotFoundKernelException
+    public LegacyIndexHits relationshipLegacyIndexGet( KernelStatement statement, String indexName, String key, Object value, long startNode, long endNode ) throws LegacyIndexNotFoundKernelException
     {
         LegacyIndex index = statement.legacyIndexTxState().relationshipChanges( indexName );
         if ( startNode != -1 || endNode != -1 )
@@ -1618,8 +1706,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public LegacyIndexHits relationshipLegacyIndexQuery( KernelStatement statement, String indexName, String key, Object queryOrQueryObject, long startNode, long endNode ) throws
-            LegacyIndexNotFoundKernelException
+    public LegacyIndexHits relationshipLegacyIndexQuery( KernelStatement statement, String indexName, String key, Object queryOrQueryObject, long startNode, long endNode ) throws LegacyIndexNotFoundKernelException
     {
         LegacyIndex index = statement.legacyIndexTxState().relationshipChanges( indexName );
         if ( startNode != -1 || endNode != -1 )
@@ -1630,8 +1717,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public LegacyIndexHits relationshipLegacyIndexQuery( KernelStatement statement, String indexName, Object queryOrQueryObject, long startNode, long endNode ) throws
-            LegacyIndexNotFoundKernelException
+    public LegacyIndexHits relationshipLegacyIndexQuery( KernelStatement statement, String indexName, Object queryOrQueryObject, long startNode, long endNode ) throws LegacyIndexNotFoundKernelException
     {
         LegacyIndex index = statement.legacyIndexTxState().relationshipChanges( indexName );
         if ( startNode != -1 || endNode != -1 )
@@ -1666,15 +1752,13 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public void nodeAddToLegacyIndex( KernelStatement statement, String indexName, long node, String key, Object value ) throws
-            LegacyIndexNotFoundKernelException
+    public void nodeAddToLegacyIndex( KernelStatement statement, String indexName, long node, String key, Object value ) throws LegacyIndexNotFoundKernelException
     {
         statement.legacyIndexTxState().nodeChanges( indexName ).addNode( node, key, value );
     }
 
     @Override
-    public void nodeRemoveFromLegacyIndex( KernelStatement statement, String indexName, long node, String key, Object value ) throws
-            LegacyIndexNotFoundKernelException
+    public void nodeRemoveFromLegacyIndex( KernelStatement statement, String indexName, long node, String key, Object value ) throws LegacyIndexNotFoundKernelException
     {
         statement.legacyIndexTxState().nodeChanges( indexName ).remove( node, key, value );
     }
@@ -1692,8 +1776,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public void relationshipAddToLegacyIndex( final KernelStatement statement, final String indexName, final long relationship, final String key, final Object value ) throws
-            EntityNotFoundException, LegacyIndexNotFoundKernelException
+    public void relationshipAddToLegacyIndex( final KernelStatement statement, final String indexName, final long relationship, final String key, final Object value ) throws EntityNotFoundException, LegacyIndexNotFoundKernelException
     {
         relationshipVisit( statement, relationship, new RelationshipVisitor<LegacyIndexNotFoundKernelException>()
         {
@@ -1706,8 +1789,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public void relationshipRemoveFromLegacyIndex( final KernelStatement statement, final String indexName, long relationship, final String key, final Object value ) throws
-            LegacyIndexNotFoundKernelException, EntityNotFoundException
+    public void relationshipRemoveFromLegacyIndex( final KernelStatement statement, final String indexName, long relationship, final String key, final Object value ) throws LegacyIndexNotFoundKernelException, EntityNotFoundException
     {
         try
         {
@@ -1726,8 +1808,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public void relationshipRemoveFromLegacyIndex( final KernelStatement statement, final String indexName, long relationship, final String key ) throws
-            EntityNotFoundException, LegacyIndexNotFoundKernelException
+    public void relationshipRemoveFromLegacyIndex( final KernelStatement statement, final String indexName, long relationship, final String key ) throws EntityNotFoundException, LegacyIndexNotFoundKernelException
     {
         try
         {
@@ -1746,8 +1827,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public void relationshipRemoveFromLegacyIndex( final KernelStatement statement, final String indexName, long relationship ) throws
-            LegacyIndexNotFoundKernelException, EntityNotFoundException
+    public void relationshipRemoveFromLegacyIndex( final KernelStatement statement, final String indexName, long relationship ) throws LegacyIndexNotFoundKernelException, EntityNotFoundException
     {
         try
         {
@@ -1786,15 +1866,13 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public String nodeLegacyIndexSetConfiguration( KernelStatement statement, String indexName, String key, String value ) throws
-            LegacyIndexNotFoundKernelException
+    public String nodeLegacyIndexSetConfiguration( KernelStatement statement, String indexName, String key, String value ) throws LegacyIndexNotFoundKernelException
     {
         return legacyIndexStore.setNodeIndexConfiguration( indexName, key, value );
     }
 
     @Override
-    public String relationshipLegacyIndexSetConfiguration( KernelStatement statement, String indexName, String key, String value ) throws
-            LegacyIndexNotFoundKernelException
+    public String relationshipLegacyIndexSetConfiguration( KernelStatement statement, String indexName, String key, String value ) throws LegacyIndexNotFoundKernelException
     {
         return legacyIndexStore.setRelationshipIndexConfiguration( indexName, key, value );
     }
@@ -1806,8 +1884,7 @@ public class StateHandlingStatementOperations
     }
 
     @Override
-    public String relationshipLegacyIndexRemoveConfiguration( KernelStatement statement, String indexName, String key ) throws
-            LegacyIndexNotFoundKernelException
+    public String relationshipLegacyIndexRemoveConfiguration( KernelStatement statement, String indexName, String key ) throws LegacyIndexNotFoundKernelException
     {
         return legacyIndexStore.removeRelationshipIndexConfiguration( indexName, key );
     }

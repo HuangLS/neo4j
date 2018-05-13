@@ -19,6 +19,8 @@
  */
 package examples;
 
+import org.act.temporalProperty.query.aggr.ValueGroupingMap;
+
 import java.io.File;
 
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -49,8 +51,10 @@ public class TakeItForASpin
         {
             TemporalIndexManager ti = db.temporalIndex();
             ti.nodeCreateValueIndex(10, 20, "hehe");
-            ti.nodeCreateAggregationDurationIndex(10, 20, "haha", 2, SECOND);
-
+            ValueGroupingMap vMap = new ValueGroupingMap.IntValueGroupMap();
+            // fixme: should add group here.
+            ti.nodeCreateDurationIndex( 10, 20, "haha", 2, SECOND, vMap );
+            ti.nodeQueryValueIndex( 10, 20 ).propertyValRange( "hehe", 2, 20 ).propertyValRange( "haha", 4, 30 ).query();
             Node node = db.getNodeById(i);
             node.setProperty("hehe", "haha");
             node.getProperty("hehe");
@@ -65,7 +69,7 @@ public class TakeItForASpin
             System.out.println(s);
 
             int t = time();
-            node.getTemporalPropertyWithIndex("haha", t, 4, "hehe");
+            node.getTemporalPropertyWithIndex("haha", t, t+4, 1 );
             node.setTemporalProperty("haha", t, "hehe");
             Object v = node.getTemporalProperty("haha", t);
             if(v instanceof String){

@@ -20,6 +20,7 @@
 package org.neo4j.kernel.impl.api;
 
 import java.util.Iterator;
+import java.util.List;
 
 import org.act.temporalProperty.query.range.TimeRangeQuery;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
@@ -65,6 +66,8 @@ import org.neo4j.kernel.impl.api.operations.SchemaWriteOperations;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
 import org.neo4j.kernel.impl.constraints.ConstraintSemantics;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.temporal.IntervalEntry;
+import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
@@ -274,6 +277,12 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
     public Property graphRemoveProperty( KernelStatement state, int propertyKeyId )
     {
         return entityWriteOperations.graphRemoveProperty( state, propertyKeyId );
+    }
+
+    @Override
+    public List<IntervalEntry> getTemporalPropertyByIndex( KernelStatement statement, TemporalIndexManager.PropertyValueIntervalBuilder builder )
+    {
+        return entityReadOperations.getTemporalPropertyByIndex( statement, builder );
     }
 
     @Override

@@ -108,7 +108,7 @@ public class TemporalPropertyStoreAdapter extends LifecycleAdapter
 
     public Object getAggrIndex( TemporalPropertyStore store, TemporalPropertyReadOperation query, MemTable oneEntityData )
     {
-        return store.aggrWithIndex( query.getIndexId(), query.getEntityId(), query.getProId(), query.getStart(), query.getEnd(), oneEntityData );
+        return store.getByIndex( query.getIndexId(), query.getEntityId(), query.getProId(), query.getStart(), query.getEnd(), oneEntityData );
     }
 
     public void setValue( TemporalPropertyStore store, TimeIntervalKey intervalKey, Slice value )

@@ -1,6 +1,5 @@
 package org.neo4j.temporal;
 
-import org.act.temporalProperty.query.aggr.IndexAggregationQuery;
 import org.act.temporalProperty.query.range.InternalEntryRangeQueryCallBack;
 import org.act.temporalProperty.query.range.TimeRangeQuery;
 

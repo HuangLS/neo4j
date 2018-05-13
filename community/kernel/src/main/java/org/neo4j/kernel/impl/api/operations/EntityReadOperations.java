@@ -19,7 +19,8 @@
  */
 package org.neo4j.kernel.impl.api.operations;
 
-import org.act.temporalProperty.query.range.TimeRangeQuery;
+import java.util.List;
+
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
@@ -34,11 +35,13 @@ import org.neo4j.kernel.api.txstate.TxStateHolder;
 import org.neo4j.kernel.impl.api.KernelStatement;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
+import org.neo4j.temporal.IntervalEntry;
+import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 
 public interface EntityReadOperations
 {
-
+    List<IntervalEntry> getTemporalPropertyByIndex( KernelStatement statement, TemporalIndexManager.PropertyValueIntervalBuilder builder );
     Object nodeGetTemporalProperty( KernelStatement statement, TemporalPropertyReadOperation query) throws PropertyNotFoundException, EntityNotFoundException;
     Object relationshipGetTemporalProperty( KernelStatement statement, TemporalPropertyReadOperation query ) throws PropertyNotFoundException, EntityNotFoundException;
 

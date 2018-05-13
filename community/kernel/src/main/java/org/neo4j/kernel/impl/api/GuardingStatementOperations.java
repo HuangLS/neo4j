@@ -20,6 +20,9 @@
 package org.neo4j.kernel.impl.api;
 
 import org.act.temporalProperty.query.range.TimeRangeQuery;
+
+import java.util.List;
+
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
@@ -39,6 +42,8 @@ import org.neo4j.kernel.impl.api.operations.EntityReadOperations;
 import org.neo4j.kernel.impl.api.operations.EntityWriteOperations;
 import org.neo4j.kernel.impl.api.store.RelationshipIterator;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
+import org.neo4j.temporal.IntervalEntry;
+import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
@@ -58,6 +63,13 @@ public class GuardingStatementOperations implements
         this.entityWriteDelegate = entityWriteDelegate;
         this.entityReadDelegate = entityReadDelegate;
         this.guard = guard;
+    }
+
+    @Override
+    public List<IntervalEntry> getTemporalPropertyByIndex( KernelStatement statement, TemporalIndexManager.PropertyValueIntervalBuilder builder )
+    {
+        guard.check();
+        return entityReadDelegate.getTemporalPropertyByIndex( statement, builder );
     }
 
     @Override

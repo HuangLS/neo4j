@@ -19,7 +19,8 @@
  */
 package org.neo4j.kernel.api;
 
-import org.act.temporalProperty.query.range.TimeRangeQuery;
+import java.util.List;
+
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.graphdb.Direction;
@@ -30,6 +31,8 @@ import org.neo4j.kernel.api.exceptions.schema.IndexBrokenKernelException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.api.store.RelationshipIterator;
+import org.neo4j.temporal.IntervalEntry;
+import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 
 interface DataRead
@@ -162,4 +165,6 @@ interface DataRead
     Object nodeGetTemporalProperty(TemporalPropertyReadOperation query) throws EntityNotFoundException, PropertyNotFoundException;
 
     Object relationshipGetTemporalProperty(TemporalPropertyReadOperation query) throws EntityNotFoundException, PropertyNotFoundException;
+
+    List<IntervalEntry> getTemporalPropertyByValueIndex( TemporalIndexManager.PropertyValueIntervalBuilder builder ) throws PropertyNotFoundException;
 }

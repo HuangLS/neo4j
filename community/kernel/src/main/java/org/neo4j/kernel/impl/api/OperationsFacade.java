@@ -20,9 +20,12 @@
 package org.neo4j.kernel.impl.api;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
-import org.act.temporalProperty.query.range.TimeRangeQuery;
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.apache.commons.lang3.tuple.Pair;
+
 import org.neo4j.collection.primitive.PrimitiveIntCollection;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
@@ -31,6 +34,7 @@ import org.neo4j.cursor.Cursor;
 import org.neo4j.function.Function;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.kernel.api.DataWriteOperations;
+import org.neo4j.kernel.api.EntityType;
 import org.neo4j.kernel.api.LegacyIndexHits;
 import org.neo4j.kernel.api.ReadOperations;
 import org.neo4j.kernel.api.SchemaWriteOperations;
@@ -79,6 +83,8 @@ import org.neo4j.kernel.impl.api.operations.SchemaStateOperations;
 import org.neo4j.kernel.impl.api.store.RelationshipIterator;
 import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.temporal.IntervalEntry;
+import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
@@ -493,7 +499,19 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
         }
     }
 
-
+    @Override
+    public List<IntervalEntry> getTemporalPropertyByValueIndex( TemporalIndexManager.PropertyValueIntervalBuilder builder ) throws PropertyNotFoundException
+    {
+        statement.assertOpen();
+        for(Integer proId : builder.getPropertyValues().keySet())
+        {
+            if ( proId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+            {
+                throw new PropertyNotFoundException( proId, EntityType.NODE, 0 );
+            }
+        }
+        return dataRead().getTemporalPropertyByIndex(statement, builder);
+    }
 
     @Override
     public Object relationshipGetTemporalProperty(TemporalPropertyReadOperation query) throws EntityNotFoundException, PropertyNotFoundException
