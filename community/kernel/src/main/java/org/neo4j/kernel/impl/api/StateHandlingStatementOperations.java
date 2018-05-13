@@ -593,7 +593,7 @@ public class StateHandlingStatementOperations
 
     private String buildTemporalPropertyMeta( ValueContentType valueType )
     {
-        return valueType + CLASS_NAME_LENGTH_SEPERATOR + TemporalPropertyMarker;
+        return valueType.getId() + CLASS_NAME_LENGTH_SEPERATOR + TemporalPropertyMarker;
     }
 
     private ValueContentType decodeTemporalPropertyMeta( Object meta )

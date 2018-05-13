@@ -36,7 +36,7 @@ public class TakeItForASpin
 {
     public static void main( String[] args )
     {
-        File dir = new File( getProperty( "java.io.tmpdir" ), "graph-db");
+        File dir = new File( getProperty( "java.io.tmpdir" ), "TGRAPH-db");
         GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase( dir );
         long i;
         try ( Transaction tx = db.beginTx() )

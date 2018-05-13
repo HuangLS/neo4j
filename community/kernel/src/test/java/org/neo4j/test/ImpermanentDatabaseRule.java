@@ -26,6 +26,7 @@ import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.logging.LogProvider;
+import org.neo4j.temporal.TemporalIndexManager;
 
 /**
  * JUnit @Rule for configuring, creating and managing an ImpermanentGraphDatabase instance.
@@ -75,14 +76,8 @@ public class ImpermanentDatabaseRule extends DatabaseRule
     }
 
     @Override
-    public ResourceIterator<Node> findNodesByTemporalProperty(String key, int time, Object value) {
-        //FIXME TGraph: Not Implement.
-        throw new TGraphNoImplementationException();
-    }
-
-    @Override
-    public ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value) {
-        //FIXME TGraph: Not Implement.
+    public TemporalIndexManager temporalIndex()
+    {
         throw new TGraphNoImplementationException();
     }
 }
