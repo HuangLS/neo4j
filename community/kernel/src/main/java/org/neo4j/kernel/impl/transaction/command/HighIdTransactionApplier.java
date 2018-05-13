@@ -69,12 +69,12 @@ public class HighIdTransactionApplier implements CommandHandler
 
     @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
-        throw new UnsupportedOperationException( "TGraph: not implement." );
+        return delegate.visitNodeTemporalPropertyCommand( command );
     }
 
     @Override
     public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
-        throw new UnsupportedOperationException( "TGraph: Not Implement." );
+        return delegate.visitRelationshipTemporalPropertyCommand( command );
     }
 
     @Override
