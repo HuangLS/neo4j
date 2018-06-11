@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,6 +33,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactoryState;
 import org.neo4j.helpers.collection.IteratorUtil;
+import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.api.impl.index.DirectoryFactory;
 import org.neo4j.kernel.api.impl.index.LuceneSchemaIndexProvider;
 import org.neo4j.kernel.api.index.IndexAccessor;
@@ -48,7 +49,9 @@ import org.neo4j.kernel.impl.logging.LogService;
 import org.neo4j.kernel.impl.logging.NullLogService;
 import org.neo4j.kernel.impl.util.Neo4jJobScheduler;
 import org.neo4j.logging.LogProvider;
+import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.TargetDirectory;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 import static java.util.Collections.singletonList;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -93,9 +96,11 @@ public class NonUniqueIndexTests
         return new CommunityFacadeFactory()
         {
             @Override
-            protected PlatformModule createPlatform( File storeDir, Map<String, String> params, Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade )
+            protected PlatformModule createPlatform( File storeDir, Map<String, String> params,
+                    Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade,
+                    OperationalMode operationalMode)
             {
-                return new PlatformModule( storeDir, params, dependencies, graphDatabaseFacade )
+                return new PlatformModule( storeDir, params, dependencies, graphDatabaseFacade, operationalMode )
                 {
                     @Override
                     protected Neo4jJobScheduler createJobScheduler()
@@ -148,7 +153,9 @@ public class NonUniqueIndexTests
     private List<Long> nodeIdsInIndex( int indexId, String value ) throws IOException
     {
         Config config = new Config();
-        SchemaIndexProvider indexProvider = new LuceneSchemaIndexProvider( DirectoryFactory.PERSISTENT, directory.graphDbDir() );
+        SchemaIndexProvider indexProvider = new LuceneSchemaIndexProvider( new DefaultFileSystemAbstraction(),
+                DirectoryFactory.PERSISTENT, directory.graphDbDir(), NullLogProvider.getInstance(),
+                new Config(), OperationalMode.single );
         IndexConfiguration indexConfig = new IndexConfiguration( false );
         IndexSamplingConfig samplingConfig = new IndexSamplingConfig( config );
         try ( IndexAccessor accessor = indexProvider.getOnlineAccessor( indexId, indexConfig, samplingConfig );

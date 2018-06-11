@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.kernel.configuration;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -328,5 +329,20 @@ public class Config implements DiagnosticsProvider
         Map<String, String> newParams = getParams(); // copy is returned
         newParams.putAll( additionalConfig );
         return new Config( newParams );
+    }
+
+    /**
+     * Looks at configured file {@code absoluteOrRelativeFile} and just returns it if absolute, otherwise
+     * returns a {@link File} with {@code baseDirectoryIfRelative} as parent.
+     *
+     * @param baseDirectoryIfRelative base directory to use as parent if {@code absoluteOrRelativeFile}
+     * is relative, otherwise unused.
+     * @param absoluteOrRelativeFile file to return as absolute or relative to {@code baseDirectoryIfRelative}.
+     */
+    public static File absoluteFileOrRelativeTo( File baseDirectoryIfRelative, File absoluteOrRelativeFile )
+    {
+        return absoluteOrRelativeFile.isAbsolute()
+                ? absoluteOrRelativeFile
+                : new File( baseDirectoryIfRelative, absoluteOrRelativeFile.getPath() );
     }
 }

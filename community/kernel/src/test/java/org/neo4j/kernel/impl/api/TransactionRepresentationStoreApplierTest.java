@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,7 +23,6 @@ import org.junit.Test;
 import org.mockito.Matchers;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -39,8 +38,9 @@ import org.neo4j.kernel.impl.index.IndexDefineCommand;
 import org.neo4j.kernel.impl.locking.LockGroup;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.locking.ReentrantLockService;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeStore;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.store.counts.CountsTracker;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
@@ -59,6 +59,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
 import static org.neo4j.kernel.impl.api.TransactionApplicationMode.INTERNAL;
 import static org.neo4j.kernel.impl.util.function.Optionals.some;
 
@@ -67,7 +68,7 @@ public class TransactionRepresentationStoreApplierTest
     private final IndexingService indexService = mock( IndexingService.class );
     @SuppressWarnings( "unchecked" )
     private final Provider<LabelScanWriter> labelScanStore = mock( Provider.class );
-    private final NeoStore neoStore = mock( NeoStore.class );
+    private final NeoStores neoStores = mock( NeoStores.class );
     private final CacheAccessBackDoor cacheAccess = mock( CacheAccessBackDoor.class );
     private final LockService lockService = new ReentrantLockService();
     private final LegacyIndexApplierLookup legacyIndexProviderLookup =
@@ -79,7 +80,7 @@ public class TransactionRepresentationStoreApplierTest
 
     {
         final CountsTracker tracker = mock( CountsTracker.class );
-        when( neoStore.getCounts() ).thenReturn( tracker );
+        when( neoStores.getCounts() ).thenReturn( tracker );
         when( tracker.apply( anyLong() ) ).thenReturn( some( mock( CountsAccessor.Updater.class ) ) );
     }
 
@@ -87,8 +88,8 @@ public class TransactionRepresentationStoreApplierTest
     public void transactionRepresentationShouldAcceptApplierVisitor() throws IOException
     {
         TransactionRepresentationStoreApplier applier =
-                new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStore, cacheAccess,
-                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue );
+                new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStores, cacheAccess,
+                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue, null );
 
         TransactionRepresentation transaction = mock( TransactionRepresentation.class );
 
@@ -105,10 +106,10 @@ public class TransactionRepresentationStoreApplierTest
     {
         // GIVEN
         NodeStore nodeStore = mock( NodeStore.class );
-        when( neoStore.getNodeStore() ).thenReturn( nodeStore );
+        when( neoStores.getNodeStore() ).thenReturn( nodeStore );
         TransactionRepresentationStoreApplier applier =
-                new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStore, cacheAccess,
-                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue );
+                new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStores, cacheAccess,
+                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue, null );
         long nodeId = 5L;
         TransactionRepresentation transaction = createNodeTransaction( nodeId );
 
@@ -127,8 +128,8 @@ public class TransactionRepresentationStoreApplierTest
         // GIVEN
         IdOrderingQueue queue = mock( IdOrderingQueue.class );
         TransactionRepresentationStoreApplier applier =
-                new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStore, cacheAccess,
-                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue );
+                new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStores, cacheAccess,
+                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue, null );
         TransactionRepresentation transaction = new PhysicalTransactionRepresentation( indexTransaction() );
 
         // WHEN
@@ -147,8 +148,8 @@ public class TransactionRepresentationStoreApplierTest
         // GIVEN
         IdOrderingQueue queue = mock( IdOrderingQueue.class );
         TransactionRepresentationStoreApplier applier =
-                new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStore, cacheAccess,
-                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue );
+                new TransactionRepresentationStoreApplier( indexService, labelScanStore, neoStores, cacheAccess,
+                        lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth, queue, null );
         TransactionRepresentation transaction = mock( TransactionRepresentation.class );
         IOException ioex = new IOException();
         //noinspection unchecked
@@ -174,7 +175,7 @@ public class TransactionRepresentationStoreApplierTest
         definitions.init(
                 MapUtil.<String,Integer>genericMap( "one", 1 ),
                 MapUtil.<String,Integer>genericMap( "two", 2 ) );
-        return Arrays.<Command>asList( definitions );
+        return Collections.<Command>singletonList( definitions );
     }
 
     private TransactionRepresentation createNodeTransaction( long nodeId )

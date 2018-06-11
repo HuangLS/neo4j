@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,13 +35,13 @@ public class DummyPageSwapper implements PageSwapper
     }
 
     @Override
-    public int read( long filePageId, Page page ) throws IOException
+    public long read( long filePageId, Page page ) throws IOException
     {
         return 0;
     }
 
     @Override
-    public int write( long filePageId, Page page ) throws IOException
+    public long write( long filePageId, Page page ) throws IOException
     {
         return 0;
     }
@@ -49,7 +49,6 @@ public class DummyPageSwapper implements PageSwapper
     @Override
     public void evicted( long pageId, Page page )
     {
-
     }
 
     @Override
@@ -77,5 +76,17 @@ public class DummyPageSwapper implements PageSwapper
     @Override
     public void truncate() throws IOException
     {
+    }
+
+    @Override
+    public long read( long startFilePageId, Page[] pages, int arrayOffset, int length ) throws IOException
+    {
+        return 0;
+    }
+
+    @Override
+    public long write( long startFilePageId, Page[] pages, int arrayOffset, int length ) throws IOException
+    {
+        return 0;
     }
 }

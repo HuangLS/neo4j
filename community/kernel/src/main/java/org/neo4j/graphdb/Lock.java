@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,7 +26,7 @@ package org.neo4j.graphdb;
  * can be released manually using {@link #release()}. If not released
  * manually it will be automatically released when the transaction owning
  * it finishes.
- * 
+ *
  * @author Mattias Persson
  */
 public interface Lock
@@ -35,7 +35,7 @@ public interface Lock
      * Releases this lock before the transaction finishes. It is an optional
      * operation and if not called, this lock will be released when the owning
      * transaction finishes.
-     * 
+     *
      * @throws IllegalStateException if this lock has already been released.
      */
     void release();

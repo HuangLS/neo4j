@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,9 +30,12 @@ import org.neo4j.kernel.impl.store.id.IdGenerator;
 @Deprecated
 public interface IdGeneratorFactory
 {
+    IdGenerator open( File filename, IdType idType, long highId );
+
     IdGenerator open( File filename, int grabSize, IdType idType, long highId );
 
     void create( File filename, long highId, boolean throwIfFileExists );
 
     IdGenerator get( IdType idType );
+
 }

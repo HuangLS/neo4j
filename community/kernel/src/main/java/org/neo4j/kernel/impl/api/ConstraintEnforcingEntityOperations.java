@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,9 @@
 package org.neo4j.kernel.impl.api;
 
 import java.util.Iterator;
+import java.util.List;
 
+import org.act.temporalProperty.query.range.TimeRangeQuery;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
@@ -28,16 +30,18 @@ import org.neo4j.function.Predicate;
 import org.neo4j.function.Predicates;
 import org.neo4j.helpers.ObjectUtil;
 import org.neo4j.helpers.collection.FilteringIterator;
-import org.neo4j.kernel.api.constraints.MandatoryNodePropertyConstraint;
-import org.neo4j.kernel.api.constraints.MandatoryRelationshipPropertyConstraint;
 import org.neo4j.kernel.api.constraints.NodePropertyConstraint;
+import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.PropertyConstraint;
 import org.neo4j.kernel.api.constraints.RelationshipPropertyConstraint;
+import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.cursor.LabelItem;
 import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.cursor.RelationshipItem;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
+import org.neo4j.kernel.api.exceptions.ProcedureException;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException;
 import org.neo4j.kernel.api.exceptions.schema.AlreadyIndexedException;
@@ -46,11 +50,11 @@ import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 import org.neo4j.kernel.api.exceptions.schema.DropConstraintFailureException;
 import org.neo4j.kernel.api.exceptions.schema.DropIndexFailureException;
 import org.neo4j.kernel.api.exceptions.schema.IndexBrokenKernelException;
-import org.neo4j.kernel.api.exceptions.schema.MandatoryNodePropertyConstraintVerificationFailedKernelException;
-import org.neo4j.kernel.api.exceptions.schema.MandatoryRelationshipPropertyConstraintVerificationFailedKernelException;
+import org.neo4j.kernel.api.exceptions.schema.ProcedureConstraintViolation;
 import org.neo4j.kernel.api.exceptions.schema.UnableToValidateConstraintKernelException;
 import org.neo4j.kernel.api.exceptions.schema.UniquePropertyConstraintViolationKernelException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureSignature;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.api.txstate.TxStateHolder;
@@ -60,7 +64,12 @@ import org.neo4j.kernel.impl.api.operations.EntityWriteOperations;
 import org.neo4j.kernel.impl.api.operations.SchemaReadOperations;
 import org.neo4j.kernel.impl.api.operations.SchemaWriteOperations;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
+import org.neo4j.kernel.impl.constraints.ConstraintSemantics;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.temporal.IntervalEntry;
+import org.neo4j.temporal.TemporalIndexManager;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 import static org.neo4j.kernel.api.StatementConstants.NO_SUCH_NODE;
 import static org.neo4j.kernel.impl.locking.ResourceTypes.INDEX_ENTRY;
@@ -75,13 +84,15 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
     private final EntityReadOperations entityReadOperations;
     private final SchemaWriteOperations schemaWriteOperations;
     private final SchemaReadOperations schemaReadOperations;
+    private final ConstraintSemantics constraintSemantics;
 
     public ConstraintEnforcingEntityOperations(
-            EntityWriteOperations entityWriteOperations,
+            ConstraintSemantics constraintSemantics, EntityWriteOperations entityWriteOperations,
             EntityReadOperations entityReadOperations,
             SchemaWriteOperations schemaWriteOperations,
             SchemaReadOperations schemaReadOperations )
     {
+        this.constraintSemantics = constraintSemantics;
         this.entityWriteOperations = entityWriteOperations;
         this.entityReadOperations = entityReadOperations;
         this.schemaWriteOperations = schemaWriteOperations;
@@ -152,7 +163,7 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
         {
             IndexDescriptor indexDescriptor = new IndexDescriptor( labelId, propertyKeyId );
             assertIndexOnline( state, indexDescriptor );
-            state.locks().acquireExclusive( INDEX_ENTRY,
+            state.locks().optimistic().acquireExclusive( INDEX_ENTRY,
                     indexEntryResourceId( labelId, propertyKeyId, ObjectUtil.toString( value ) ) );
 
             long existing = entityReadOperations.nodeGetFromUniqueIndexSeek( state, indexDescriptor, value );
@@ -191,6 +202,25 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
     {
         entityWriteOperations.nodeDelete( state, nodeId );
     }
+
+    @Override
+    public int nodeDetachDelete( KernelStatement state, long nodeId ) throws EntityNotFoundException
+    {
+        return entityWriteOperations.nodeDetachDelete( state, nodeId );
+    }
+
+    @Override
+    public void nodeSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException
+    {
+        entityWriteOperations.nodeSetTemporalProperty(statement, operation);
+    }
+
+    @Override
+    public void relationshipSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException
+    {
+        entityWriteOperations.relationshipSetTemporalProperty(statement, operation);
+    }
+
 
     @Override
     public long relationshipCreate( KernelStatement statement,
@@ -247,6 +277,24 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
     public Property graphRemoveProperty( KernelStatement state, int propertyKeyId )
     {
         return entityWriteOperations.graphRemoveProperty( state, propertyKeyId );
+    }
+
+    @Override
+    public List<IntervalEntry> getTemporalPropertyByIndex( KernelStatement statement, TemporalIndexManager.PropertyValueIntervalBuilder builder )
+    {
+        return entityReadOperations.getTemporalPropertyByIndex( statement, builder );
+    }
+
+    @Override
+    public Object nodeGetTemporalProperty(KernelStatement statement, TemporalPropertyReadOperation query) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        return entityReadOperations.nodeGetTemporalProperty(statement, query);
+    }
+
+    @Override
+    public Object relationshipGetTemporalProperty(KernelStatement statement, TemporalPropertyReadOperation query) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        return entityReadOperations.relationshipGetTemporalProperty(statement, query);
     }
 
     @Override
@@ -318,7 +366,7 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
         }
 
         // If we find the node - hold a shared lock. If we don't find a node - hold an exclusive lock.
-        Locks.Client locks = state.locks();
+        Locks.Client locks = state.locks().optimistic();
         long indexEntryId = indexEntryResourceId( labelId, propertyKeyId, stringVal );
 
         locks.acquireShared( INDEX_ENTRY, indexEntryId );
@@ -529,61 +577,25 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
     }
 
     @Override
-    public MandatoryNodePropertyConstraint mandatoryNodePropertyConstraintCreate( KernelStatement state, int labelId,
+    public NodePropertyExistenceConstraint nodePropertyExistenceConstraintCreate( KernelStatement state, int labelId,
             int propertyKeyId ) throws AlreadyConstrainedException, CreateConstraintFailureException
     {
-        PrimitiveLongIterator nodes = nodesGetForLabel( state, labelId );
-        while ( nodes.hasNext() )
+        try ( Cursor<NodeItem> cursor = nodeCursorGetForLabel( state, labelId ) )
         {
-            long nodeId = nodes.next();
-            try ( Cursor<NodeItem> node = nodeCursor( state, nodeId ) )
-            {
-                if ( node.next() )
-                {
-                    if ( !node.get().hasProperty( propertyKeyId ) )
-                    {
-                        MandatoryNodePropertyConstraint constraint = new MandatoryNodePropertyConstraint( labelId,
-                                propertyKeyId );
-                        throw new CreateConstraintFailureException( constraint,
-                                new MandatoryNodePropertyConstraintVerificationFailedKernelException( constraint,
-                                        nodeId ) );
-                    }
-                }
-            }
+            constraintSemantics.validateNodePropertyExistenceConstraint( cursor, labelId, propertyKeyId );
         }
-
-        return schemaWriteOperations.mandatoryNodePropertyConstraintCreate( state, labelId, propertyKeyId );
+        return schemaWriteOperations.nodePropertyExistenceConstraintCreate( state, labelId, propertyKeyId );
     }
 
     @Override
-    public MandatoryRelationshipPropertyConstraint mandatoryRelationshipPropertyConstraintCreate( KernelStatement state,
+    public RelationshipPropertyExistenceConstraint relationshipPropertyExistenceConstraintCreate( KernelStatement state,
             int relTypeId, int propertyKeyId ) throws AlreadyConstrainedException, CreateConstraintFailureException
     {
-        PrimitiveLongIterator relationships = relationshipsGetAll( state );
-        while ( relationships.hasNext() )
+        try ( Cursor<RelationshipItem> cursor = relationshipCursorGetAll( state ) )
         {
-            long relationshipId = relationships.next();
-            try ( Cursor<RelationshipItem> relationship = relationshipCursor( state, relationshipId ) )
-            {
-                if ( relationship.next() )
-                {
-                    if ( relationship.get().type() == relTypeId && !relationship.get().hasProperty( propertyKeyId ) )
-                    {
-                        MandatoryRelationshipPropertyConstraint constraint = new
-                                MandatoryRelationshipPropertyConstraint(
-
-                                relTypeId,
-                                propertyKeyId );
-                        throw new CreateConstraintFailureException( constraint,
-                                new MandatoryRelationshipPropertyConstraintVerificationFailedKernelException(
-                                        constraint,
-                                        relationshipId ) );
-                    }
-                }
-            }
+            constraintSemantics.validateRelationshipPropertyExistenceConstraint( cursor, relTypeId, propertyKeyId );
         }
-
-        return schemaWriteOperations.mandatoryRelationshipPropertyConstraintCreate( state, relTypeId, propertyKeyId );
+        return schemaWriteOperations.relationshipPropertyExistenceConstraintCreate( state, relTypeId, propertyKeyId );
     }
 
     @Override
@@ -598,5 +610,18 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
             throws DropConstraintFailureException
     {
         schemaWriteOperations.constraintDrop( state, constraint );
+    }
+
+    @Override
+    public void procedureCreate( KernelStatement state, ProcedureSignature signature, String language, String code )
+            throws ProcedureException, ProcedureConstraintViolation
+    {
+        schemaWriteOperations.procedureCreate( state, signature, language, code );
+    }
+
+    @Override
+    public void procedureDrop( KernelStatement statement, ProcedureSignature.ProcedureName name ) throws ProcedureConstraintViolation, ProcedureException
+    {
+        schemaWriteOperations.procedureDrop( statement, name );
     }
 }

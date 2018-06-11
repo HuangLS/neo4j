@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -53,7 +53,7 @@ import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.io.fs.FileUtils;
 import org.neo4j.kernel.GraphDatabaseAPI;
-import org.neo4j.kernel.ha.UpdatePullerClient;
+import org.neo4j.kernel.ha.UpdatePuller;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
@@ -448,7 +448,7 @@ public class RollingUpgradeIT
 
     public void verifyComplexLoad( GraphDatabaseAPI db, long centralNode ) throws InterruptedException
     {
-        db.getDependencyResolver().resolveDependency( UpdatePullerClient.class ).pullUpdates();
+        db.getDependencyResolver().resolveDependency( UpdatePuller.class ).pullUpdates();
         try( Transaction tx = db.beginTx() )
         {
             Node center = db.getNodeById( centralNode );

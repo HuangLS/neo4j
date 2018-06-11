@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,9 +20,10 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
 import org.neo4j.cypher.internal.compiler.v2_3.ExecutionContext
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, ReadsNodes}
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ReadsAllNodes, Effects}
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.{NoChildren, PlanDescriptionImpl}
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
 case class AllNodesScanPipe(ident: String)(val estimatedCardinality: Option[Double] = None)
                            (implicit pipeMonitor: PipeMonitor) extends Pipe with RonjaPipe {
@@ -36,11 +37,11 @@ case class AllNodesScanPipe(ident: String)(val estimatedCardinality: Option[Doub
 
   def planDescriptionWithoutCardinality = PlanDescriptionImpl(this.id, "AllNodesScan", NoChildren, Seq(), identifiers)
 
-  def symbols: SymbolTable = new SymbolTable(Map(ident -> CTNode))
+  def symbols = new SymbolTable(Map(ident -> CTNode))
 
   override def monitor = pipeMonitor
 
-  override def localEffects: Effects = Effects(ReadsNodes)
+  override def localEffects: Effects = Effects(ReadsAllNodes)
 
   def dup(sources: List[Pipe]): Pipe = {
     require(sources.isEmpty)

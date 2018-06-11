@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,33 +22,38 @@ package org.neo4j.kernel.impl.transaction.log.rotation;
 import org.neo4j.graphdb.index.IndexImplementation;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.impl.api.index.IndexingService;
-import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
+import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 
 public class StoreFlusher
 {
-    private final TransactionIdStore transactionIdStore;
+    private final NeoStores neoStores;
     private final IndexingService indexingService;
     private final LabelScanStore labelScanStore;
     private final Iterable<IndexImplementation> indexProviders;
+    private final TemporalPropertyStoreAdapter temporalPropStore;
 
-    public StoreFlusher( TransactionIdStore transactionIdStore, IndexingService indexingService,
-            LabelScanStore labelScanStore,
-            Iterable<IndexImplementation> indexProviders )
+    public StoreFlusher(NeoStores neoStores, IndexingService indexingService,
+                        LabelScanStore labelScanStore,
+                        Iterable<IndexImplementation> indexProviders,
+                        TemporalPropertyStoreAdapter temporalPropertyStoreAdapter)
     {
-        this.transactionIdStore = transactionIdStore;
+        this.neoStores = neoStores;
         this.indexingService = indexingService;
         this.labelScanStore = labelScanStore;
         this.indexProviders = indexProviders;
+        this.temporalPropStore = temporalPropertyStoreAdapter;
     }
 
     public void forceEverything()
     {
-        indexingService.flushAll();
+        indexingService.forceAll();
         labelScanStore.force();
         for ( IndexImplementation index : indexProviders )
         {
             index.force();
         }
-        transactionIdStore.flush();
+        neoStores.flush();
+        temporalPropStore.flushAll();
     }
 }

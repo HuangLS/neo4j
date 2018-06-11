@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,9 @@
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.ast.AstConstructionTestSupport
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.ast.AstConstructionTestSupport
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.{Rewriter, SemanticState, SyntaxException}
 
 class NormalizeWithClausesTest extends CypherFunSuite with RewriteTest with AstConstructionTestSupport {
   val mkException = new SyntaxExceptionCreator("<Query>", Some(pos))
@@ -567,6 +568,22 @@ class NormalizeWithClausesTest extends CypherFunSuite with RewriteTest with AstC
         |RETURN *
       """.stripMargin
     )
+  }
+
+  test("match (n) with n, 0 as foo with n as n order by foo, n.bar return n") {
+    assertRewrite(
+      """MATCH (n)
+        |WITH n, 0 AS foo
+        |WITH n AS n ORDER BY foo, n.bar
+        |RETURN n
+      """.stripMargin,
+    """MATCH (n)
+      |WITH n AS n, 0 AS foo
+      |WITH foo AS foo, n AS n
+      |WITH n AS n, foo AS foo, n.bar AS `  FRESHID55` ORDER BY foo, `  FRESHID55`
+      |_PRAGMA WITHOUT `  FRESHID55`
+      |RETURN n
+    """.stripMargin)
   }
 
   test("match n with n as n order by max(n) return n") {

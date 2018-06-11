@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,6 +40,8 @@ public interface TraversalBranch extends Path
      * Returns the next expansion source from the expanded relationships
      * from the current node.
      *
+     * @param expander an expander to decide which relationships to follow
+     * @param metadata the context of the traversal
      * @return the next expansion source from this expansion source.
      */
     TraversalBranch next( PathExpander expander, TraversalContext metadata );

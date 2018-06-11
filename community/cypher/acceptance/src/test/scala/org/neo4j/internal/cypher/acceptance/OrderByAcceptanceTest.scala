@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,8 @@
  */
 package org.neo4j.internal.cypher.acceptance
 
-import org.neo4j.cypher.{NewPlannerTestSupport, ExecutionEngineFunSuite}
 import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CustomMatchers
+import org.neo4j.cypher.{ExecutionEngineFunSuite, IncomparableValuesException, NewPlannerTestSupport, SyntaxException}
 
 class OrderByAcceptanceTest extends ExecutionEngineFunSuite with CustomMatchers with NewPlannerTestSupport {
 
@@ -64,5 +64,80 @@ class OrderByAcceptanceTest extends ExecutionEngineFunSuite with CustomMatchers 
         Map("n" -> 1),
         Map("n" -> 3)
       ))
+  }
+
+  test("Properly handle projections and ORDER BY (GH#4937)") {
+    val crew1 = createLabeledNode(Map("name" -> "Neo", "rank" -> 1), "Crew")
+    val crew2 = createLabeledNode(Map("name" -> "Neo", "rank" -> 2), "Crew")
+    val crew3 = createLabeledNode(Map("name" -> "Neo", "rank" -> 3), "Crew")
+    val crew4 = createLabeledNode(Map("name" -> "Neo", "rank" -> 4), "Crew")
+    val crew5 = createLabeledNode(Map("name" -> "Neo", "rank" -> 5), "Crew")
+
+    val query = """MATCH (crew:Crew {name: 'Neo'})
+                  |WITH crew, 0 AS relevance RETURN crew
+                  |ORDER BY relevance, crew.rank""".stripMargin
+
+    executeWithAllPlanners(query).toList should equal(List(
+      Map("crew" -> crew1),
+      Map("crew"-> crew2),
+      Map("crew" -> crew3),
+      Map("crew" -> crew4),
+      Map("crew" -> crew5)
+    ))
+  }
+
+  test("Order by with limit zero or negative should not generate errors") {
+    createLabeledNode(Map("name" -> "Steven"), "Person")
+    createLabeledNode(Map("name" -> "Craig"), "Person")
+    executeWithAllPlanners("MATCH (p:Person) RETURN p ORDER BY p.name LIMIT 1").length should equal(1)
+    executeWithAllPlanners("MATCH (p:Person) RETURN p ORDER BY p.name LIMIT 0").length should equal(0)
+    executeWithAllPlanners("MATCH (p:Person) RETURN p ORDER BY p.name LIMIT {limit}", "limit" -> -1).length should equal(0)
+    a [SyntaxException] should be thrownBy executeWithAllPlanners("MATCH (p:Person) RETURN p ORDER BY p.name LIMIT -1")
+  }
+
+  test("should be able to order booleans") {
+    val query = "UNWIND [true, false] AS bools RETURN bools ORDER BY bools"
+
+    val expected = List(Map("bools" -> false), Map("bools" -> true))
+    executeWithAllPlanners(query).toList should equal(expected)
+    executeWithAllPlanners(s"$query DESC").toList should equal(expected.reverse)
+  }
+
+  test("should be able to order strings") {
+    val query = "UNWIND ['.*', '', ' ', 'one'] AS strings RETURN strings ORDER BY strings"
+
+    val expected = List(Map("strings" -> ""), Map("strings" -> " "), Map("strings" -> ".*"), Map("strings" -> "one"))
+    executeWithAllPlanners(query).toList should equal(expected)
+    executeWithAllPlanners(s"$query DESC").toList should equal(expected.reverse)
+  }
+
+  test("should be able to order ints") {
+    val query = "UNWIND [1,3,2] as ints return ints order by ints"
+
+    val expected = List(Map("ints" -> 1), Map("ints" -> 2), Map("ints" -> 3))
+    executeWithAllPlanners(query).toList should equal(expected)
+    executeWithAllPlanners(s"$query DESC").toList should equal(expected.reverse)
+  }
+
+  test("should be able to order floats") {
+    val query = "UNWIND [1.5,1.3,999.99] as floats return floats order by floats"
+
+    val expected = List(Map("floats" -> 1.3), Map("floats" -> 1.5), Map("floats" -> 999.99))
+    executeWithAllPlanners(query).toList should equal(expected)
+    executeWithAllPlanners(s"$query DESC").toList should equal(expected.reverse)
+  }
+
+  test("should provide sensible error message when ordering by mixed types") {
+    withEachPlanner { execute =>
+      val exception = intercept[IncomparableValuesException](execute("UNWIND {things} AS thing RETURN thing ORDER BY thing", Seq("things" -> List("1", 2))))
+      exception.getMessage should startWith("Cannot perform ORDER BY on mixed types.")
+    }
+  }
+
+  test("should provide sensible error message when ordering by list values") {
+    withEachPlanner { execute =>
+      val exception = intercept[IncomparableValuesException](execute("UNWIND {things} AS thing RETURN thing ORDER BY thing", Seq("things" -> List(List("a"),List("b")))))
+      exception.getMessage should startWith("Cannot perform ORDER BY on lists, consider using UNWIND.")
+    }
   }
 }

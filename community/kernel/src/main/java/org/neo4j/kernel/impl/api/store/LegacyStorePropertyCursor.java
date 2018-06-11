@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,8 +18,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.kernel.impl.api.store;
-
-import java.nio.channels.WritableByteChannel;
 
 import org.neo4j.cursor.Cursor;
 import org.neo4j.kernel.api.cursor.PropertyItem;
@@ -99,36 +97,6 @@ public class LegacyStorePropertyCursor implements Cursor<PropertyItem>, Property
     public Object value()
     {
         return propertyBlockCursor.getProperty().value();
-    }
-
-    @Override
-    public boolean booleanValue()
-    {
-        return (Boolean) value();
-    }
-
-    @Override
-    public long longValue()
-    {
-        return ((Number) value()).longValue();
-    }
-
-    @Override
-    public double doubleValue()
-    {
-        return ((Number) value()).doubleValue();
-    }
-
-    @Override
-    public String stringValue()
-    {
-        return value().toString();
-    }
-
-    @Override
-    public void byteArray( WritableByteChannel channel )
-    {
-        throw new UnsupportedOperationException();
     }
 
     @Override

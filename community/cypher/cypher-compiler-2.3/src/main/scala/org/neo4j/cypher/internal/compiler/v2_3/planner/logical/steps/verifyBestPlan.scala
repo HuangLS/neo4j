@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,13 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.steps
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{Identifier, LabelName, UsingIndexHint, UsingJoinHint}
-import org.neo4j.cypher.internal.compiler.v2_3.notification.{IndexHintUnfulfillableNotification, JoinHintUnfulfillableNotification}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.LogicalPlan
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{LogicalPlanningContext, PlanTransformer}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{CantHandleQueryException, PlannerQuery}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
-import org.neo4j.cypher.internal.compiler.v2_3.{IndexHintException, JoinHintException}
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.notification.{IndexHintUnfulfillableNotification, JoinHintUnfulfillableNotification}
+import org.neo4j.cypher.internal.frontend.v2_3.{IndexHintException, JoinHintException}
 
 object verifyBestPlan extends PlanTransformer[PlannerQuery] {
   def apply(plan: LogicalPlan, expected: PlannerQuery)(implicit context: LogicalPlanningContext): LogicalPlan = {
@@ -69,10 +69,10 @@ object verifyBestPlan extends PlanTransformer[PlannerQuery] {
       // we were unable to plan hash join on some requested nodes
       if (context.useErrorsOverWarnings) {
         val firstJoinHint = hints.head
-        throw new JoinHintException(firstJoinHint.identifier.name, "Unable to plan hash join")
+        throw new JoinHintException(firstJoinHint.identifiers.map(_.name).reduceLeft(_ + ", " + _), "Unable to plan hash join")
       } else {
         hints.foreach { hint =>
-          context.notificationLogger.log(JoinHintUnfulfillableNotification(hint.identifier.name))
+          context.notificationLogger.log(JoinHintUnfulfillableNotification(hint.identifiers.map(_.name).toSeq))
         }
       }
     }
@@ -81,11 +81,11 @@ object verifyBestPlan extends PlanTransformer[PlannerQuery] {
   private def findUnfulfillableIndexHints(query: PlannerQuery, planContext: PlanContext): Set[UsingIndexHint] = {
     query.allHints.flatMap {
       // using index name:label(property)
-      case hint@UsingIndexHint(Identifier(name), LabelName(label), Identifier(property))
+      case hint@UsingIndexHint(Identifier(name), LabelName(label), PropertyKeyName(property))
         if planContext.getIndexRule( label, property ).isDefined ||
           planContext.getUniqueIndexRule( label, property ).isDefined => None
       // no such index exists
-      case hint@UsingIndexHint(Identifier(name), LabelName(label), Identifier(property)) => Option(hint)
+      case hint@UsingIndexHint(Identifier(name), LabelName(label), PropertyKeyName(property)) => Option(hint)
       // don't care about other hints
       case hint => None
     }

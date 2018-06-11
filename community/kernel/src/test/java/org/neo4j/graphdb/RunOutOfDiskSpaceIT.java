@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,10 +26,11 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 
-import org.neo4j.graphdb.mockfs.LimitedFileSystemGraphDatabase;
+import org.neo4j.test.LimitedFileSystemGraphDatabase;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.io.pagecache.PageCache;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.MetaDataStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.test.CleanupRule;
 import org.neo4j.test.PageCacheRule;
 import org.neo4j.test.TargetDirectory;
@@ -57,7 +58,8 @@ public class RunOutOfDiskSpaceIT
             tx.success();
         }
 
-        long logVersion = db.getDependencyResolver().resolveDependency( NeoStore.class ).getCurrentLogVersion();
+        long logVersion = db.getDependencyResolver().resolveDependency( NeoStores.class ).getMetaDataStore()
+                            .getCurrentLogVersion();
 
         db.runOutOfDiskSpaceNao();
 
@@ -82,8 +84,8 @@ public class RunOutOfDiskSpaceIT
         db.shutdown();
 
         PageCache pageCache = pageCacheRule.getPageCache( db.getFileSystem() );
-        File neoStore = new File( storeDir, NeoStore.DEFAULT_NAME );
-        assertEquals( logVersion, NeoStore.getRecord( pageCache, neoStore, NeoStore.Position.LOG_VERSION ) );
+        File neoStore = new File( storeDir, MetaDataStore.DEFAULT_NAME );
+        assertEquals( logVersion, MetaDataStore.getRecord( pageCache, neoStore, MetaDataStore.Position.LOG_VERSION ) );
     }
 
     @Test
@@ -102,7 +104,8 @@ public class RunOutOfDiskSpaceIT
             tx.success();
         }
 
-        long logVersion = db.getDependencyResolver().resolveDependency( NeoStore.class ).getCurrentLogVersion();
+        long logVersion = db.getDependencyResolver().resolveDependency( NeoStores.class ).getMetaDataStore()
+                            .getCurrentLogVersion();
 
         db.runOutOfDiskSpaceNao();
 
@@ -141,8 +144,8 @@ public class RunOutOfDiskSpaceIT
         db.shutdown();
 
         PageCache pageCache = pageCacheRule.getPageCache( db.getFileSystem() );
-        File neoStore = new File( storeDir, NeoStore.DEFAULT_NAME );
-        assertEquals( logVersion, NeoStore.getRecord( pageCache, neoStore, NeoStore.Position.LOG_VERSION ) );
+        File neoStore = new File( storeDir, MetaDataStore.DEFAULT_NAME );
+        assertEquals( logVersion, MetaDataStore.getRecord( pageCache, neoStore, MetaDataStore.Position.LOG_VERSION ) );
     }
 
     @Rule

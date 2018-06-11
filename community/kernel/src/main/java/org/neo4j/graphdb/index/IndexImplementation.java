@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,8 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.neo4j.graphdb.ResourceIterator;
-import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
+import org.neo4j.kernel.impl.transaction.command.CommandHandler;
+import org.neo4j.kernel.lifecycle.Lifecycle;
 
 /**
  * An index provider which can create and give access to index transaction state and means of applying
@@ -32,22 +33,23 @@ import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
  * An {@link IndexImplementation} is typically tied to one implementation, f.ex.
  * lucene, http://lucene.apache.org/java.
  */
-public interface IndexImplementation
+public interface IndexImplementation extends Lifecycle
 {
     /**
      * Returns a {@link LegacyIndexProviderTransaction} that keeps transaction state for all
      * indexes for a given provider in a transaction.
      *
-     * @param configuration that return a legacy index SPI for.
-     * @return a {@link LegacyIndexSPI} which represents a type of index suitable for the
+     * @param commandFactory index command factory to use
+     * @return a {@link LegacyIndexProviderTransaction} which represents a type of index suitable for the
      * given configuration.
      */
     LegacyIndexProviderTransaction newTransaction( IndexCommandFactory commandFactory );
 
     /**
+     * @param recovery indicate recovery
      * @return an index applier that will get notifications about commands to apply.
      */
-    NeoCommandHandler newApplier( boolean recovery );
+    CommandHandler newApplier( boolean recovery );
 
     /**
      * Fills in default configuration parameters for indexes provided from this
@@ -68,7 +70,32 @@ public interface IndexImplementation
      * the returned {@link ResourceIterator} has been {@link ResourceIterator#close() closed} this
      * index provider must guarantee that the list of files stay intact. The files in the list can
      * change, but no files may be deleted or added during this period.
-     * @throws IOException
+     * @return list of store files managed by this index provider
+     * @throws IOException depends on the implementation
      */
     ResourceIterator<File> listStoreFiles() throws IOException;
+
+    /**
+     * Makes available index resource for recovery.
+     */
+    @Override
+    void init() throws Throwable;
+
+    /**
+     * Makes available index resource for online transaction processing.
+     */
+    @Override
+    void start() throws Throwable;
+
+    /**
+     * Makes unavailable index resource from online transaction processing.
+     */
+    @Override
+    void stop() throws Throwable;
+
+    /**
+     * Makes unavailable the index resource as a whole.
+     */
+    @Override
+    void shutdown() throws Throwable;
 }

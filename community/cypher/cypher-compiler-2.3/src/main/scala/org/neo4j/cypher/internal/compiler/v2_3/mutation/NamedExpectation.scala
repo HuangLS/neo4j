@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,8 +22,10 @@ package org.neo4j.cypher.internal.compiler.v2_3.mutation
 import org.neo4j.cypher.internal.compiler.v2_3._
 import commands.expressions._
 import commands.values.KeyToken
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.TypeSafe
+import org.neo4j.cypher.internal.frontend.v2_3.helpers.Eagerly
 import pipes.QueryState
-import symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 import org.neo4j.cypher.internal.compiler.v2_3.spi.Operations
 import org.neo4j.graphdb.{Relationship, Node, PropertyContainer}
 import collection.Map

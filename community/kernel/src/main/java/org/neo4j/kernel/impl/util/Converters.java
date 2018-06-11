@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -133,23 +133,6 @@ public class Converters
                     }
                 }
                 return files.toArray( new File[files.size()] );
-            }
-        };
-    }
-
-    public static Function<String,Character> toCharacter()
-    {
-        return new Function<String,Character>()
-        {
-            @Override
-            public Character apply( String value )
-            {
-                if ( value.length() > 1 )
-                {
-                    throw new IllegalArgumentException( "Invalid delimiter '" +
-                            value + "', expected one character" );
-                }
-                return value.charAt( 0 );
             }
         };
     }

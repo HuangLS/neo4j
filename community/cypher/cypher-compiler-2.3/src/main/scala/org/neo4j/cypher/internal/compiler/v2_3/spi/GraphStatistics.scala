@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,17 +20,19 @@
 package org.neo4j.cypher.internal.compiler.v2_3.spi
 
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, Selectivity}
-import org.neo4j.cypher.internal.compiler.v2_3.{LabelId, PropertyKeyId, RelTypeId}
+import org.neo4j.cypher.internal.frontend.v2_3.{LabelId, PropertyKeyId, RelTypeId}
 
 object GraphStatistics {
-  val DEFAULT_RANGE_SELECTIVITY          = Selectivity(0.3)
-  val DEFAULT_PREDICATE_SELECTIVITY      = Selectivity(0.75)
-  val DEFAULT_PROPERTY_SELECTIVITY       = Selectivity(0.5)
-  val DEFAULT_EQUALITY_SELECTIVITY       = Selectivity(0.1)
+  val DEFAULT_RANGE_SELECTIVITY          = Selectivity.of(0.3).get
+  val DEFAULT_PREDICATE_SELECTIVITY      = Selectivity.of(0.75).get
+  val DEFAULT_PROPERTY_SELECTIVITY       = Selectivity.of(0.5).get
+  val DEFAULT_EQUALITY_SELECTIVITY       = Selectivity.of(0.1).get
   val DEFAULT_NUMBER_OF_ID_LOOKUPS       = Cardinality(25)
   val DEFAULT_NUMBER_OF_INDEX_LOOKUPS    = Cardinality(25)
-  val DEFAULT_REL_UNIQUENESS_SELECTIVITY = Selectivity(1.0 - 1 / 100 /*rel-cardinality*/)
+  val DEFAULT_LIMIT_CARDINALITY          = Cardinality(75)
+  val DEFAULT_REL_UNIQUENESS_SELECTIVITY = Selectivity.of(1.0 - 1 / 100 /*rel-cardinality*/).get
   val DEFAULT_RANGE_SEEK_FACTOR          = 0.03
+  val DEFAULT_PREFIX_LENGTH              = 6
 }
 
 trait GraphStatistics {

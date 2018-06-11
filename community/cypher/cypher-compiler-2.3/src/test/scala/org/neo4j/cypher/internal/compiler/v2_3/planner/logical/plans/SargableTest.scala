@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,8 +21,8 @@ package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans
 
 import org.mockito.Mockito
 import org.neo4j.cypher.internal.compiler.v2_3.PrefixRange
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class SargableTest extends CypherFunSuite with AstConstructionTestSupport {
 
@@ -31,28 +31,14 @@ class SargableTest extends CypherFunSuite with AstConstructionTestSupport {
 
   val nodeA = ident("a")
 
-  test("StringRangeSeekable finds n.prop LIKE 'prefix%'") {
+  test("StringRangeSeekable finds n.prop STARTS WITH 'prefix'") {
     val propKey: PropertyKeyName = PropertyKeyName("prop") _
     val leftExpr: Property = Property(nodeA, propKey) _
-    val like: Like = Like(leftExpr, LikePattern(StringLiteral("prefix%") _)) _
-    assertMatches(like) {
+    val startsWith: StartsWith = StartsWith(leftExpr, StringLiteral("prefix") _) _
+    assertMatches(startsWith) {
       case AsStringRangeSeekable(PrefixRangeSeekable(range, expr, ident, propertyKey)) =>
-        range should equal(PrefixRange("prefix"))
-        expr should equal(like)
-        ident should equal(nodeA)
-        propertyKey should equal(propKey)
-    }
-  }
-
-  test("StringRangeSeekable finds n.prop LIKE 'prefix%suffix'") {
-    val propKey: PropertyKeyName = PropertyKeyName("prop") _
-    val leftExpr: Property = Property(nodeA, propKey) _
-    val originalLike: Like = Like(leftExpr, LikePattern(StringLiteral("prefix%suffix") _)) _
-    val prefixLike: Like = Like(leftExpr, LikePattern(StringLiteral("prefix%") _)) _
-    assertMatches(originalLike) {
-      case AsStringRangeSeekable(PrefixRangeSeekable(range, expr, ident, propertyKey)) =>
-        range should equal(PrefixRange("prefix"))
-        expr should equal(prefixLike)
+        range should equal(PrefixRange(StringLiteral("prefix")(pos)))
+        expr should equal(startsWith)
         ident should equal(nodeA)
         propertyKey should equal(propKey)
     }
@@ -157,7 +143,7 @@ class SargableTest extends CypherFunSuite with AstConstructionTestSupport {
 
   test("PropertyScannable works") {
     val propertyExpr: Property = Property(nodeA, PropertyKeyName("name")_)_
-    val expr: FunctionInvocation = FunctionInvocation(FunctionName("has") _, propertyExpr)_
+    val expr: FunctionInvocation = FunctionInvocation(FunctionName("exists") _, propertyExpr)_
 
     assertMatches(expr) {
       case AsPropertyScannable(scannable) =>

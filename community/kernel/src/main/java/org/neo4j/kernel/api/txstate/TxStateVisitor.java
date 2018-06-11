@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,16 +19,22 @@
  */
 package org.neo4j.kernel.api.txstate;
 
+import org.act.temporalProperty.impl.MemTable;
+
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import org.neo4j.kernel.api.constraints.MandatoryNodePropertyConstraint;
-import org.neo4j.kernel.api.constraints.MandatoryRelationshipPropertyConstraint;
+import org.neo4j.graphdb.TGraphNoImplementationException;
+import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
+import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
+import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.TemporalProperty;
 import org.neo4j.kernel.impl.api.state.RelationshipChangesForNode;
 
 /**
@@ -68,13 +74,15 @@ public interface TxStateVisitor
 
     void visitRemovedUniquePropertyConstraint( UniquenessConstraint element );
 
-    void visitAddedNodeMandatoryPropertyConstraint( MandatoryNodePropertyConstraint element );
+    void visitAddedNodePropertyExistenceConstraint( NodePropertyExistenceConstraint element )
+            throws CreateConstraintFailureException;
 
-    void visitRemovedNodeMandatoryPropertyConstraint( MandatoryNodePropertyConstraint element );
+    void visitRemovedNodePropertyExistenceConstraint( NodePropertyExistenceConstraint element );
 
-    void visitAddedRelationshipMandatoryPropertyConstraint( MandatoryRelationshipPropertyConstraint element );
+    void visitAddedRelationshipPropertyExistenceConstraint( RelationshipPropertyExistenceConstraint element )
+            throws CreateConstraintFailureException;
 
-    void visitRemovedRelationshipMandatoryPropertyConstraint( MandatoryRelationshipPropertyConstraint element );
+    void visitRemovedRelationshipPropertyExistenceConstraint( RelationshipPropertyExistenceConstraint element );
 
     void visitCreatedLabelToken( String name, int id );
 
@@ -85,6 +93,14 @@ public interface TxStateVisitor
     void visitCreatedNodeLegacyIndex( String name, Map<String,String> config );
 
     void visitCreatedRelationshipLegacyIndex( String name, Map<String,String> config );
+
+    void visitCreatedProcedure( ProcedureDescriptor procedureDescriptor );
+
+    void visitDroppedProcedure( ProcedureDescriptor procedureDescriptor );
+
+    void visitNodeTemporalPropertyChanges( MemTable changes );
+
+    void visitRelationshipTemporalPropertyChanges( MemTable changes );
 
     class Adapter implements TxStateVisitor
     {
@@ -226,38 +242,41 @@ public interface TxStateVisitor
         }
 
         @Override
-        public void visitAddedNodeMandatoryPropertyConstraint( MandatoryNodePropertyConstraint element )
+        public void visitAddedNodePropertyExistenceConstraint( NodePropertyExistenceConstraint element )
+                throws CreateConstraintFailureException
         {
             if ( next != null )
             {
-                next.visitAddedNodeMandatoryPropertyConstraint( element );
+                next.visitAddedNodePropertyExistenceConstraint( element );
             }
         }
 
         @Override
-        public void visitRemovedNodeMandatoryPropertyConstraint( MandatoryNodePropertyConstraint element )
+        public void visitRemovedNodePropertyExistenceConstraint( NodePropertyExistenceConstraint element )
         {
             if ( next != null )
             {
-                next.visitRemovedNodeMandatoryPropertyConstraint( element );
+                next.visitRemovedNodePropertyExistenceConstraint( element );
             }
         }
 
         @Override
-        public void visitAddedRelationshipMandatoryPropertyConstraint( MandatoryRelationshipPropertyConstraint element )
+        public void visitAddedRelationshipPropertyExistenceConstraint( RelationshipPropertyExistenceConstraint element )
+                throws CreateConstraintFailureException
         {
             if ( next != null )
             {
-                next.visitAddedRelationshipMandatoryPropertyConstraint( element );
+                next.visitAddedRelationshipPropertyExistenceConstraint( element );
             }
         }
 
         @Override
-        public void visitRemovedRelationshipMandatoryPropertyConstraint( MandatoryRelationshipPropertyConstraint element )
+        public void visitRemovedRelationshipPropertyExistenceConstraint(
+                RelationshipPropertyExistenceConstraint element )
         {
             if ( next != null )
             {
-                next.visitRemovedRelationshipMandatoryPropertyConstraint( element );
+                next.visitRemovedRelationshipPropertyExistenceConstraint( element );
             }
         }
 
@@ -305,5 +324,41 @@ public interface TxStateVisitor
                 next.visitCreatedRelationshipLegacyIndex( name, config );
             }
         }
+
+        @Override
+        public void visitCreatedProcedure( ProcedureDescriptor procedureDescriptor )
+        {
+            if( next != null )
+            {
+                next.visitCreatedProcedure( procedureDescriptor );
+            }
+        }
+
+        @Override
+        public void visitDroppedProcedure( ProcedureDescriptor procedureDescriptor )
+        {
+            if( next != null )
+            {
+                next.visitDroppedProcedure( procedureDescriptor );
+            }
+        }
+
+        @Override
+        public void visitNodeTemporalPropertyChanges( MemTable changes ) {
+            if( next != null )
+            {
+                next.visitNodeTemporalPropertyChanges( changes );
+            }
+        }
+
+        @Override
+        public void visitRelationshipTemporalPropertyChanges( MemTable changes ) {
+            if( next != null )
+            {
+                next.visitRelationshipTemporalPropertyChanges( changes );
+            }
+        }
+
+
     }
 }

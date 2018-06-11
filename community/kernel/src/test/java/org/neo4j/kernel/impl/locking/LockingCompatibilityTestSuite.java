@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,13 +31,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.neo4j.kernel.api.index.ParameterizedSuiteRunner;
+import org.neo4j.test.OtherThreadExecutor.WorkerCommand;
 import org.neo4j.test.OtherThreadRule;
 import org.neo4j.test.TargetDirectory;
 
 import static junit.framework.TestCase.assertFalse;
 import static junit.framework.TestCase.fail;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.neo4j.test.OtherThreadExecutor.WorkerCommand;
 import static org.neo4j.test.OtherThreadRule.isWaiting;
 
 /** Base for locking tests. */
@@ -47,6 +47,7 @@ import static org.neo4j.test.OtherThreadRule.isWaiting;
         DeadlockCompatibility.class,
         LockReentrancyCompatibility.class,
         RWLockCompatibility.class,
+        StopCompatibility.class,
         CloseCompatibility.class
 })
 public abstract class LockingCompatibilityTestSuite

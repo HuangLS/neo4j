@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -129,6 +129,20 @@ public class FlippableIndexProxy implements IndexProxy
         try
         {
             delegate.force();
+        }
+        finally
+        {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public void flush() throws IOException
+    {
+        barge( lock.readLock() ); // see javadoc of this method (above) for rationale on why we use barge(...) here
+        try
+        {
+            delegate.flush();
         }
         finally
         {

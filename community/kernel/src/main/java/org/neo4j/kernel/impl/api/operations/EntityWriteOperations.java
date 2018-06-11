@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,13 +20,37 @@
 package org.neo4j.kernel.impl.api.operations;
 
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.KernelStatement;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 public interface EntityWriteOperations
 {
+    void nodeSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation op) throws ConstraintValidationKernelException, EntityNotFoundException;
+    void relationshipSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation op) throws ConstraintValidationKernelException, EntityNotFoundException;
+//    void nodeCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException;
+//
+//    void nodeSetTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId, int time, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void nodeInvalidTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void nodeDeleteTemporalPropertyPoint( KernelStatement statement, long nodeId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void nodeDeleteTemporalProperty( KernelStatement statement, long nodeId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void relationshipCreateTemporalProperty(KernelStatement statement, long nodeId, int propertyKeyId, int time, int maxValueLength, Object value) throws EntityNotFoundException;
+//
+//    void relationshipSetTemporalProperty( KernelStatement statement, long relId, int propertyKeyId, int time, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void relationshipInvalidTemporalProperty( KernelStatement statement, long relId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void relationshipDeleteTemporalProperty( KernelStatement statement, long relId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
+//
+//    void relationshipDeleteTemporalPropertyRecord( KernelStatement statement, long relId, int propertyKeyId, int time ) throws EntityNotFoundException, PropertyNotFoundException;
+
     // Currently, of course, most relevant operations here are still in the old core API implementation.
 
     long relationshipCreate( KernelStatement statement,
@@ -37,6 +61,8 @@ public interface EntityWriteOperations
     long nodeCreate( KernelStatement statement );
 
     void nodeDelete( KernelStatement state, long nodeId ) throws EntityNotFoundException;
+
+    int nodeDetachDelete( KernelStatement state, long nodeId ) throws EntityNotFoundException;
 
     void relationshipDelete( KernelStatement state, long relationshipId ) throws EntityNotFoundException;
 

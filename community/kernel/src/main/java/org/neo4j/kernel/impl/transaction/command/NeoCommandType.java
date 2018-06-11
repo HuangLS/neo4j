@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -44,4 +44,9 @@ public interface NeoCommandType
 
     byte UPDATE_RELATIONSHIP_COUNTS_COMMAND = (byte) 16;
     byte UPDATE_NODE_COUNTS_COMMAND = (byte) 17;
+
+//    byte NODE_TEMPORAL_PRO_DELETE = (byte) 48;
+//    byte REL_TEMPORAL_PRO_DELETE =  (byte) 49;
+    byte NODE_TEMPORAL_PROPERTY_COMMAND = (byte) 50;
+    byte REL_TEMPORAL_PROPERTY_COMMAND =  (byte) 51;
 }

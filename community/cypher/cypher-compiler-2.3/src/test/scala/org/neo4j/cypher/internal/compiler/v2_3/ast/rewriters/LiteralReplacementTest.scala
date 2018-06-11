@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,25 +19,14 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
-import org.neo4j.cypher.internal.compiler.v2_3.{bottomUp, parser}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class LiteralReplacementTest extends CypherFunSuite  {
 
-  import parser.ParserFixture.parser
+  import org.neo4j.cypher.internal.compiler.v2_3.parser.ParserFixture.parser
 
-  test("should not extract literal like patterns") {
-    assertDoesNotRewrite("RETURN x LIKE \"Pattern%\"")
-    assertDoesNotRewrite("RETURN x NOT LIKE \"Pattern%\"")
-    assertDoesNotRewrite("RETURN x ILIKE \"Pattern%\"")
-    assertDoesNotRewrite("RETURN x NOT ILIKE \"Pattern%\"")
-  }
-
-  test("should extract non-literal like patterns") {
-    assertRewrite("RETURN (x LIKE (\"P_ttern\" + x.name)) AS result", "RETURN (x LIKE ({`  AUTOSTRING0`} + x.name)) AS result", Map("  AUTOSTRING0" -> "P_ttern"))
-    assertRewrite("RETURN (x NOT LIKE (\"P_ttern\" + x.name)) AS result", "RETURN (x NOT LIKE ({`  AUTOSTRING0`} + x.name)) AS result", Map("  AUTOSTRING0" -> "P_ttern"))
-    assertRewrite("RETURN (x ILIKE (\"P_ttern\" + x.name)) AS result", "RETURN (x ILIKE ({`  AUTOSTRING0`} + x.name)) AS result", Map("  AUTOSTRING0" -> "P_ttern"))
-    assertRewrite("RETURN (x NOT ILIKE (\"P_ttern\" + x.name)) AS result", "RETURN (x NOT ILIKE ({`  AUTOSTRING0`} + x.name)) AS result", Map("  AUTOSTRING0" -> "P_ttern"))
+  test("should extract starts with patterns") {
+    assertRewrite("RETURN x STARTS WITH 'Pattern' as X", "RETURN x STARTS WITH {`  AUTOSTRING0`} as X", Map("  AUTOSTRING0" -> "Pattern"))
   }
 
   test("should not extract literal dynamic property lookups") {
@@ -62,11 +51,11 @@ class LiteralReplacementTest extends CypherFunSuite  {
     assertRewrite("MATCH ({a:\"apa\"})", "MATCH ({a:{`  AUTOSTRING0`}})", Map("  AUTOSTRING0" -> "apa"))
   }
 
-  test("should extract literals in skip limit clause") {
+  test("should extract literals in skip clause") {
     assertRewrite(
       s"RETURN 0 as x SKIP 1 limit 2",
-      s"RETURN {`  AUTOINT0`} as x SKIP {`  AUTOINT1`} LIMIT {`  AUTOINT2`}",
-      Map("  AUTOINT0" -> 0, "  AUTOINT1" -> 1, "  AUTOINT2" -> 2)
+      s"RETURN {`  AUTOINT0`} as x SKIP {`  AUTOINT1`} LIMIT 2",
+      Map("  AUTOINT0" -> 0, "  AUTOINT1" -> 1)
     )
   }
 

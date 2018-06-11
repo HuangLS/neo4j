@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.kernel.NeoStoreDataSource;
-import org.neo4j.kernel.impl.store.AbstractDynamicStore;
+import org.neo4j.kernel.impl.AbstractNeo4jTestCase;
 import org.neo4j.kernel.impl.store.PropertyStore;
 import org.neo4j.kernel.impl.store.TestShortString;
 import org.neo4j.test.DatabaseRule;
@@ -228,23 +228,16 @@ public class TestShortStringProperties extends TestShortString
 
     private long propertyRecordsInUse()
     {
-        return propertyStore().getNumberOfIdsInUse();
+        return AbstractNeo4jTestCase.numberOfRecordsInUse( propertyStore() );
     }
 
     private long dynamicRecordsInUse()
     {
-        try
-        {
-            return ( (AbstractDynamicStore) storeField.get( propertyStore() ) ).getNumberOfIdsInUse();
-        }
-        catch ( Exception e )
-        {
-            throw new RuntimeException( e );
-        }
+        return AbstractNeo4jTestCase.numberOfRecordsInUse( propertyStore().getStringStore() );
     }
 
     private PropertyStore propertyStore()
     {
-        return graphdb.getGraphDatabaseAPI().getDependencyResolver().resolveDependency( NeoStoreDataSource.class).getNeoStore().getPropertyStore();
+        return graphdb.getGraphDatabaseAPI().getDependencyResolver().resolveDependency( NeoStoreDataSource.class).getNeoStores().getPropertyStore();
     }
 }

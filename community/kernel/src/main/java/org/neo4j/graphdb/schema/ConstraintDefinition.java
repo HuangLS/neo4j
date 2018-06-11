@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,7 +32,7 @@ public interface ConstraintDefinition
 {
     /**
      * This accessor method returns a label which this constraint is associated with if this constraint has type
-     * {@link ConstraintType#UNIQUENESS} or {@link ConstraintType#MANDATORY_NODE_PROPERTY}.
+     * {@link ConstraintType#UNIQUENESS} or {@link ConstraintType#NODE_PROPERTY_EXISTENCE}.
      * Type of the constraint can be examined by calling {@link #getConstraintType()} or
      * {@link #isConstraintType(ConstraintType)} methods.
      *
@@ -43,7 +43,7 @@ public interface ConstraintDefinition
 
     /**
      * This accessor method returns a relationship type which this constraint is associated with if this constraint
-     * has type {@link ConstraintType#UNIQUENESS} or {@link ConstraintType#MANDATORY_NODE_PROPERTY}.
+     * has type {@link ConstraintType#UNIQUENESS} or {@link ConstraintType#NODE_PROPERTY_EXISTENCE}.
      * Type of the constraint can be examined by calling {@link #getConstraintType()} or
      * {@link #isConstraintType(ConstraintType)} methods.
      *

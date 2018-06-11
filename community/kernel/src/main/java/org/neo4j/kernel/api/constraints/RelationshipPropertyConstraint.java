@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,9 @@
  */
 package org.neo4j.kernel.api.constraints;
 
-import org.neo4j.kernel.api.TokenNameLookup;
-
 public abstract class RelationshipPropertyConstraint extends PropertyConstraint
 {
-    private final int relationshipTypeId;
+    protected final int relationshipTypeId;
 
     public RelationshipPropertyConstraint( int relationshipTypeId, int propertyKeyId )
     {
@@ -31,18 +29,9 @@ public abstract class RelationshipPropertyConstraint extends PropertyConstraint
         this.relationshipTypeId = relationshipTypeId;
     }
 
-    public int relationshipType()
+    public final int relationshipType()
     {
         return relationshipTypeId;
-    }
-
-    @Override
-    public String userDescription( TokenNameLookup tokenNameLookup )
-    {
-        String typeName = tokenNameLookup.relationshipTypeGetName( relationshipTypeId );
-        String boundIdentifier = typeName.toLowerCase();
-        return String.format( "CONSTRAINT ON ()-[ %s:%s ]-() ASSERT %s.%s IS %s", boundIdentifier, typeName,
-                boundIdentifier, tokenNameLookup.propertyKeyGetName( propertyKeyId ), constraintString() );
     }
 
     @Override
@@ -65,12 +54,5 @@ public abstract class RelationshipPropertyConstraint extends PropertyConstraint
     public int hashCode()
     {
         return 31 * propertyKeyId + relationshipTypeId;
-    }
-
-    @Override
-    public String toString()
-    {
-        return String.format( "CONSTRAINT ON ()-[ n:relationshipType[%s] ]-() ASSERT n.property[%s] IS %s",
-                relationshipTypeId, propertyKeyId, constraintString() );
     }
 }

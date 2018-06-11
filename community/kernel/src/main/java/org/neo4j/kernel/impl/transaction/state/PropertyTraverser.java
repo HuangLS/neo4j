@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.neo4j.kernel.impl.store.PropertyType;
 import org.neo4j.kernel.impl.store.record.PrimitiveRecord;
 import org.neo4j.kernel.impl.store.record.PropertyBlock;
 import org.neo4j.kernel.impl.store.record.PropertyRecord;
@@ -81,6 +82,7 @@ public class PropertyTraverser
             toCheck.add( propRecord );
             assert propRecord.inUse() : primitive + "->"
                                         + Arrays.toString( toCheck.toArray() );
+            assert propRecord.size() <= PropertyType.getPayloadSize() : propRecord + " size " + propRecord.size();
             nextIdToFetch = propRecord.getNextProp();
         }
         if ( toCheck.isEmpty() )

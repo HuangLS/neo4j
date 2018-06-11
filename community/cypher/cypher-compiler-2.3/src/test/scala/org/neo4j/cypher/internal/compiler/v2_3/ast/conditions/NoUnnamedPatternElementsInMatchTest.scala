@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,9 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.conditions
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class NoUnnamedPatternElementsInMatchTest extends CypherFunSuite with AstConstructionTestSupport {
 
@@ -82,7 +82,7 @@ class NoUnnamedPatternElementsInMatchTest extends CypherFunSuite with AstConstru
   }
 
   private def relationship(id: Option[Identifier]): RelationshipPattern = {
-    RelationshipPattern(id, optional = false, Seq.empty, None, None, Direction.OUTGOING)_
+    RelationshipPattern(id, optional = false, Seq.empty, None, None, SemanticDirection.OUTGOING)_
   }
 
   private def node(id: Option[Identifier]): NodePattern = {

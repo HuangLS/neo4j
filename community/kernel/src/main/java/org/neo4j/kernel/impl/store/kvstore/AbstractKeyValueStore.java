@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -41,22 +41,21 @@ import static org.neo4j.kernel.impl.locking.LockWrapper.writeLock;
  *
  * @param <Key> a base type for the keys stored in this store.
  */
-@Rotation(/*default strategy:*/Rotation.Strategy.LEFT_RIGHT/*(subclasses can override)*/)
-@State(/*default strategy:*/State.Strategy.CONCURRENT_HASH_MAP/*(subclasses can override)*/)
+@Rotation(/*default strategy:*/Rotation.Strategy.LEFT_RIGHT/*(subclasses can override)*/ )
+@State(/*default strategy:*/State.Strategy.CONCURRENT_HASH_MAP/*(subclasses can override)*/ )
 public abstract class AbstractKeyValueStore<Key> extends LifecycleAdapter
 {
     private final ReadWriteLock updateLock = new ReentrantReadWriteLock( /*fair=*/true );
     private final Format format;
     final RotationStrategy rotationStrategy;
     private RotationTimerFactory rotationTimerFactory;
-    private volatile ProgressiveState<Key> state;
+    volatile ProgressiveState<Key> state;
     private DataInitializer<EntryUpdater<Key>> stateInitializer;
     final int keySize;
     final int valueSize;
 
     public AbstractKeyValueStore( FileSystemAbstraction fs, PageCache pages, File base, RotationMonitor monitor,
-                                  RotationTimerFactory timerFactory, int keySize, int valueSize, HeaderField<?>...
-            headerFields )
+            RotationTimerFactory timerFactory, int keySize, int valueSize, HeaderField<?>... headerFields )
     {
         this.keySize = keySize;
         this.valueSize = valueSize;
@@ -85,7 +84,21 @@ public abstract class AbstractKeyValueStore<Key> extends LifecycleAdapter
     protected final <Value> Value lookup( Key key, Reader<Value> reader ) throws IOException
     {
         ValueLookup<Value> lookup = new ValueLookup<>( reader );
-        return lookup.value( !state.lookup( key, lookup ) );
+        while ( true )
+        {
+            ProgressiveState<Key> originalState = this.state;
+            try
+            {
+                return lookup.value( !originalState.lookup( key, lookup ) );
+            }
+            catch ( IllegalStateException e )
+            {
+                if ( originalState == this.state )
+                {
+                    throw e;
+                }
+            }
+        }
     }
 
     /** Introspective feature, not thread safe. */
@@ -126,8 +139,6 @@ public abstract class AbstractKeyValueStore<Key> extends LifecycleAdapter
     protected abstract Headers initialHeaders( long version );
 
     protected abstract int compareHeaders( Headers lhs, Headers rhs );
-
-    protected abstract String fileTrailer();
 
     protected boolean include( Key key, ReadableBuffer value )
     {
@@ -201,8 +212,8 @@ public abstract class AbstractKeyValueStore<Key> extends LifecycleAdapter
      * not block updates, it just sorts them into updates that apply before rotation and updates that apply after.
      *
      * @param version the smallest version to include in the rotation. Note that the actual rotated version might be a
-     *                later version than this version. The actual rotated version is returned by
-     *                {@link PreparedRotation#rotate()}.
+     * later version than this version. The actual rotated version is returned by
+     * {@link PreparedRotation#rotate()}.
      */
     protected final PreparedRotation prepareRotation( final long version )
     {
@@ -350,12 +361,6 @@ public abstract class AbstractKeyValueStore<Key> extends LifecycleAdapter
         protected void writeFormatSpecifier( WritableBuffer formatSpecifier )
         {
             AbstractKeyValueStore.this.writeFormatSpecifier( formatSpecifier );
-        }
-
-        @Override
-        protected String fileTrailer()
-        {
-            return AbstractKeyValueStore.this.fileTrailer();
         }
 
         @Override

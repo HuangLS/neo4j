@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,8 @@ package org.neo4j.kernel.impl.api.store;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.function.Consumer;
 import org.neo4j.graphdb.Resource;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.locking.LockService;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 
 /**
@@ -32,14 +33,15 @@ import org.neo4j.kernel.impl.store.record.NodeRecord;
 public class StoreIteratorNodeCursor extends StoreAbstractNodeCursor
 {
     private PrimitiveLongIterator iterator;
-    private Consumer<StoreIteratorNodeCursor> instanceCache;
+    private final Consumer<StoreIteratorNodeCursor> instanceCache;
 
     public StoreIteratorNodeCursor( NodeRecord nodeRecord,
-            NeoStore neoStore,
+            NeoStores neoStores,
             StoreStatement storeStatement,
-            Consumer<StoreIteratorNodeCursor> instanceCache )
+            Consumer<StoreIteratorNodeCursor> instanceCache,
+            LockService lockService )
     {
-        super( nodeRecord, neoStore, storeStatement );
+        super( nodeRecord, neoStores, storeStatement, lockService );
         this.instanceCache = instanceCache;
     }
 
@@ -54,7 +56,7 @@ public class StoreIteratorNodeCursor extends StoreAbstractNodeCursor
     {
         while ( iterator != null && iterator.hasNext() )
         {
-            NodeRecord record = neoStore.getNodeStore().loadRecord( iterator.next(), nodeRecord );
+            NodeRecord record = nodeStore.loadRecord( iterator.next(), nodeRecord );
             if ( record != null && record.inUse() )
             {
                 return true;

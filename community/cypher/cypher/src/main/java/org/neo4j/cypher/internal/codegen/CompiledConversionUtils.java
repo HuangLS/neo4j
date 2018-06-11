@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,16 +19,16 @@
  */
 package org.neo4j.cypher.internal.codegen;
 
+import org.neo4j.cypher.internal.frontend.v2_3.CypherTypeException;
+import org.neo4j.cypher.internal.frontend.v2_3.IncomparableValuesException;
+import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Relationship;
+import org.neo4j.helpers.MathUtil;
+
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-
-import org.neo4j.cypher.internal.compiler.v2_3.CypherTypeException;
-import org.neo4j.cypher.internal.compiler.v2_3.IncomparableValuesException;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.Relationship;
-import org.neo4j.helpers.MathUtil;
 
 // Class with static methods used by compiled execution plans
 public abstract class CompiledConversionUtils

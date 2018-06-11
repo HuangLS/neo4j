@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,8 @@
  */
 package org.neo4j.tooling;
 
-import org.apache.commons.lang3.StringUtils;
-import org.junit.Rule;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -41,21 +40,24 @@ import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
+import org.neo4j.kernel.impl.util.Charsets;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.TargetDirectory.TestDirectory;
 import org.neo4j.test.TestGraphDatabaseFactory;
 import org.neo4j.tooling.ImportTool.Options;
 import org.neo4j.unsafe.impl.batchimport.Configuration;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import static org.neo4j.helpers.ArrayUtil.join;
 import static org.neo4j.helpers.collection.IteratorUtil.asSet;
 import static org.neo4j.helpers.collection.IteratorUtil.count;
-import static org.neo4j.io.fs.FileUtils.copyFile;
+import static org.neo4j.io.fs.FileUtils.readTextFile;
+import static org.neo4j.io.fs.FileUtils.writeToFile;
 import static org.neo4j.tooling.GlobalGraphOperations.at;
 import static org.neo4j.tooling.ImportTool.MULTI_FILE_DELIMITER;
+
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Rule;
+import org.junit.Test;
 
 public class ImportToolDocIT
 {
@@ -434,7 +436,7 @@ public class ImportToolDocIT
     public void idSpaces() throws Exception
     {
         // GIVEN
-        File movies = file( "ops", "movies7.csv" );
+        File movies = file( "ops", "movies8.csv" );
         try (PrintStream out = new PrintStream( movies ))
         {
             out.println( "movieId:ID(Movie),title,year:int,:LABEL" );
@@ -443,7 +445,7 @@ public class ImportToolDocIT
             out.println( "3,\"The Matrix Revolutions\",2003,Movie;Sequel" );
         }
 
-        File actors = file( "ops", "actors7.csv" );
+        File actors = file( "ops", "actors8.csv" );
         try (PrintStream out = new PrintStream( actors ))
         {
             out.println( "personId:ID(Actor),name,:LABEL" );
@@ -452,7 +454,7 @@ public class ImportToolDocIT
             out.println( "3,\"Carrie-Anne Moss\",Actor" );
         }
 
-        File roles = file( "ops", "roles7.csv" );
+        File roles = file( "ops", "roles8.csv" );
         try ( PrintStream out = new PrintStream( roles ) )
         {
             out.println( ":START_ID(Actor),role,:END_ID(Movie)" );
@@ -529,11 +531,10 @@ public class ImportToolDocIT
                 "--relationships", roles.getAbsolutePath() );
         importTool( arguments );
         assertTrue( badFile.exists() );
-        // There's a reference in the manual to this file
-        copyFile( badFile, file( "ops", "bad-relationships-default-not-imported.bad.adoc" ) );
 
         // DOCS
         String realDir = movies.getParentFile().getAbsolutePath();
+        printFileWithPathsRemoved( badFile, realDir, "bad-relationships-default-not-imported.bad.adoc" );
         printCommandToFile( arguments, realDir, "bad-relationships-default.adoc" );
 
         // THEN
@@ -562,10 +563,10 @@ public class ImportToolDocIT
                 "--skip-duplicate-nodes" );
         importTool( arguments );
         assertTrue( badFile.exists() );
-        copyFile( badFile, file( "ops", "bad-duplicate-nodes-default-not-imported.bad.adoc" ) );
 
         // DOCS
         String realDir = actors.getParentFile().getAbsolutePath();
+        printFileWithPathsRemoved( badFile, realDir, "bad-duplicate-nodes-default-not-imported.bad.adoc" );
         printCommandToFile( arguments, realDir, "bad-duplicate-nodes-default.adoc" );
 
         // THEN
@@ -582,21 +583,21 @@ public class ImportToolDocIT
     public void propertyTypes() throws IOException
     {
         // GIVEN
-        File movies = file( "ops", "movies10.csv" );
+        File movies = file( "ops", "movies7.csv" );
         try (PrintStream out = new PrintStream( movies ))
         {
             out.println( "movieId:ID,title,year:int,:LABEL" );
             out.println( "tt0099892,\"Joe Versus the Volcano\",1990,Movie" );
         }
 
-        File actors = file( "ops", "actors10.csv" );
+        File actors = file( "ops", "actors7.csv" );
         try (PrintStream out = new PrintStream( actors ))
         {
             out.println( "personId:ID,name,:LABEL" );
             out.println( "meg,\"Meg Ryan\",Actor" );
         }
 
-        File roles = file( "ops", "roles10.csv" );
+        File roles = file( "ops", "roles7.csv" );
         try (PrintStream out = new PrintStream( roles ))
         {
             out.println( ":START_ID,roles:string[],:END_ID,:TYPE" );
@@ -687,7 +688,8 @@ public class ImportToolDocIT
         List<String> cleanedArguments = new ArrayList<>();
         for ( String argument : arguments )
         {
-            if ( argument.contains( " " ) || Arrays.asList( new String[] { ";", "|", "'" } ).contains( argument ) )
+            if ( argument.contains( " " ) || argument.contains( "," )
+                    || Arrays.asList( new String[] { ";", "|", "'" } ).contains( argument ) )
             {
                 cleanedArguments.add( '"' + argument + '"' );
             }
@@ -717,6 +719,26 @@ public class ImportToolDocIT
                 out.print( option.manPageEntry() );
             }
         }
+    }
+
+    @Test
+    public void printOptionsForManual() throws Exception
+    {
+        try ( PrintStream out = new PrintStream( file( "ops", "options.adoc" ) ) )
+        {
+            for ( Options option : Options.values() )
+            {
+                out.print( option.manualEntry() );
+            }
+        }
+    }
+
+    private void printFileWithPathsRemoved( File badFile, String realDir, String destinationFileName )
+            throws IOException
+    {
+        String contents = readTextFile( badFile, Charsets.UTF_8 );
+        String cleanedContents = contents.replace( realDir + File.separator, "" );
+        writeToFile( file( "ops", destinationFileName ), cleanedContents, false );
     }
 
     private File file( String section, String name )

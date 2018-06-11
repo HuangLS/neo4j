@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -63,7 +63,7 @@ public class AdversarialFileSystemAbstraction implements FileSystemAbstraction
     public StoreChannel open( File fileName, String mode ) throws IOException
     {
         adversary.injectFailure( FileNotFoundException.class, IOException.class, SecurityException.class );
-        return new AdversarialFileChannel( delegate.open( fileName, mode ), adversary );
+        return AdversarialFileChannel.wrap( delegate.open( fileName, mode ), adversary );
     }
 
     public boolean renameFile( File from, File to ) throws IOException
@@ -81,7 +81,7 @@ public class AdversarialFileSystemAbstraction implements FileSystemAbstraction
     public StoreChannel create( File fileName ) throws IOException
     {
         adversary.injectFailure( FileNotFoundException.class, IOException.class, SecurityException.class );
-        return new AdversarialFileChannel( delegate.create( fileName ), adversary );
+        return AdversarialFileChannel.wrap( delegate.create( fileName ), adversary );
     }
 
     public boolean mkdir( File fileName )
@@ -194,6 +194,14 @@ public class AdversarialFileSystemAbstraction implements FileSystemAbstraction
             thirdPartyFileSystems.put( clazz, fileSystem );
         }
         return (K) fileSystem;
+    }
+
+    @Override
+    public void truncate( File path, long size ) throws IOException
+    {
+        adversary.injectFailure( FileNotFoundException.class, IOException.class, IllegalArgumentException.class,
+                SecurityException.class, NullPointerException.class );
+        delegate.truncate( path, size );
     }
 
     private <K extends ThirdPartyFileSystem> ThirdPartyFileSystem adversarialProxy(

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,19 +21,19 @@ package org.neo4j.kernel.impl.storemigration;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import org.neo4j.function.Predicate;
 import org.neo4j.helpers.UTF8;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.io.fs.FileSystemAbstraction;
-import org.neo4j.io.pagecache.PageCache;
-import org.neo4j.io.pagecache.PagedFile;
-import org.neo4j.kernel.impl.store.AbstractStore;
+import org.neo4j.io.fs.StoreChannel;
+import org.neo4j.kernel.impl.store.CommonAbstractStore;
 import org.neo4j.kernel.impl.store.DynamicArrayStore;
 import org.neo4j.kernel.impl.store.DynamicStringStore;
 import org.neo4j.kernel.impl.store.LabelTokenStore;
-import org.neo4j.kernel.impl.store.NeoStore;
-import org.neo4j.kernel.impl.store.NeoStore.Position;
+import org.neo4j.kernel.impl.store.MetaDataStore;
 import org.neo4j.kernel.impl.store.NodeStore;
 import org.neo4j.kernel.impl.store.PropertyKeyTokenStore;
 import org.neo4j.kernel.impl.store.PropertyStore;
@@ -46,14 +46,10 @@ import org.neo4j.kernel.impl.store.counts.CountsTracker;
 import org.neo4j.kernel.impl.storemigration.legacystore.v19.Legacy19Store;
 import org.neo4j.kernel.impl.storemigration.legacystore.v20.Legacy20Store;
 import org.neo4j.kernel.impl.storemigration.legacystore.v21.Legacy21Store;
+import org.neo4j.kernel.impl.storemigration.legacystore.v22.Legacy22Store;
 
-import static org.neo4j.kernel.impl.store.CommonAbstractStore.ALL_STORES_VERSION;
-import static org.neo4j.kernel.impl.store.CommonAbstractStore.buildTypeDescriptorAndVersion;
-import static org.neo4j.kernel.impl.store.NeoStore.DEFAULT_NAME;
-import static org.neo4j.kernel.impl.store.NeoStore.setRecord;
-import static org.neo4j.kernel.impl.store.NeoStore.versionStringToLong;
-import static org.neo4j.kernel.impl.store.StoreVersionTrailerUtil.getTrailerOffset;
-import static org.neo4j.kernel.impl.store.StoreVersionTrailerUtil.writeTrailer;
+import static org.neo4j.helpers.collection.Iterables.iterable;
+
 
 public enum StoreFile
 {
@@ -145,7 +141,8 @@ public enum StoreFile
     COUNTS_STORE_LEFT(
             CountsTracker.TYPE_DESCRIPTOR,
             StoreFactory.COUNTS_STORE + CountsTracker.LEFT,
-            AbstractStore.ALL_STORES_VERSION
+            Legacy22Store.LEGACY_VERSION,
+            false
     )
             {
                 @Override
@@ -157,7 +154,8 @@ public enum StoreFile
     COUNTS_STORE_RIGHT(
             CountsTracker.TYPE_DESCRIPTOR,
             StoreFactory.COUNTS_STORE + CountsTracker.RIGHT,
-            AbstractStore.ALL_STORES_VERSION
+            Legacy22Store.LEGACY_VERSION,
+            false
     )
             {
                 @Override
@@ -168,7 +166,7 @@ public enum StoreFile
             },
 
     NEO_STORE(
-            NeoStore.TYPE_DESCRIPTOR,
+            MetaDataStore.TYPE_DESCRIPTOR,
             "",
             Legacy19Store.LEGACY_VERSION
     );
@@ -176,12 +174,19 @@ public enum StoreFile
     private final String typeDescriptor;
     private final String storeFileNamePart;
     private final String sinceVersion;
+    private final boolean recordStore;
 
-    private StoreFile( String typeDescriptor, String storeFileNamePart, String sinceVersion )
+    StoreFile( String typeDescriptor, String storeFileNamePart, String sinceVersion )
+    {
+        this( typeDescriptor, storeFileNamePart, sinceVersion, true );
+    }
+
+    private StoreFile( String typeDescriptor, String storeFileNamePart, String sinceVersion, boolean recordStore )
     {
         this.typeDescriptor = typeDescriptor;
         this.storeFileNamePart = storeFileNamePart;
         this.sinceVersion = sinceVersion;
+        this.recordStore = recordStore;
     }
 
     public String forVersion( String version )
@@ -189,17 +194,9 @@ public enum StoreFile
         return typeDescriptor + " " + version;
     }
 
-    /**
-     * The first part of the version String.
-     */
-    public String typeDescriptor()
-    {
-        return typeDescriptor;
-    }
-
     public String fileName( StoreFileType type )
     {
-        return type.augment( NeoStore.DEFAULT_NAME + storeFileNamePart );
+        return type.augment( MetaDataStore.DEFAULT_NAME + storeFileNamePart );
     }
 
     public String storeFileName()
@@ -207,9 +204,9 @@ public enum StoreFile
         return fileName( StoreFileType.STORE );
     }
 
-    public String idFileName()
+    public boolean isRecordStore()
     {
-        return fileName( StoreFileType.ID );
+        return recordStore;
     }
 
     public static Iterable<StoreFile> legacyStoreFilesForVersion( final String version )
@@ -231,6 +228,20 @@ public enum StoreFile
     public static Iterable<StoreFile> currentStoreFiles()
     {
         return Iterables.iterable( values() );
+    }
+
+    public static void fileOperation( FileOperation operation, FileSystemAbstraction fs, File fromDirectory,
+            File toDirectory, StoreFile... files ) throws IOException
+    {
+        fileOperation( operation, fs, fromDirectory, toDirectory, storeFiles( files ), false, false );
+    }
+
+    public static void fileOperation( FileOperation operation, FileSystemAbstraction fs, File fromDirectory,
+            File toDirectory, Iterable<StoreFile> files,
+            boolean allowSkipNonExistentFiles, boolean allowOverwriteTarget ) throws IOException
+    {
+        fileOperation( operation, fs, fromDirectory, toDirectory, files, allowSkipNonExistentFiles,
+                allowOverwriteTarget, StoreFileType.values() );
     }
 
     /**
@@ -259,22 +270,64 @@ public enum StoreFile
         }
     }
 
-    public static void ensureStoreVersion( PageCache pageCache, File storeDir, Iterable<StoreFile> files )
+    public static void removeTrailers( String version, FileSystemAbstraction fs, File storeDir, int pageSize )
             throws IOException
     {
-        ensureStoreVersion( pageCache, storeDir, files, ALL_STORES_VERSION );
+        for ( StoreFile storeFile : legacyStoreFilesForVersion( CommonAbstractStore.ALL_STORES_VERSION ) )
+        {
+            String trailer = storeFile.forVersion( version );
+            byte[] encodedTrailer = UTF8.encode( trailer );
+            File file = new File( storeDir, storeFile.storeFileName() );
+            long fileSize = fs.getFileSize( file );
+            long truncationPosition = containsTrailer( fs, file, fileSize, pageSize, encodedTrailer );
+            if ( truncationPosition != -1 )
+            {
+                fs.truncate( file, truncationPosition );
+            }
+        }
     }
 
-    public static void ensureStoreVersion( PageCache pageCache, File storeDir, Iterable<StoreFile> files,
-            String version ) throws IOException
+    private static long containsTrailer( FileSystemAbstraction fs, File file, long fileSize, int pageSize,
+            byte[] encodedTrailer ) throws IOException
     {
-        for ( StoreFile file : files )
+        if ( !fs.fileExists( file ) )
         {
-            setStoreVersionTrailer( pageCache, new File( storeDir, file.storeFileName() ), file.isOptional(),
-                    buildTypeDescriptorAndVersion( file.typeDescriptor(), version ) );
+            return -1l;
         }
-        setRecord( pageCache, new File( storeDir, DEFAULT_NAME ), Position.STORE_VERSION,
-                versionStringToLong( version ) );
+
+        try ( StoreChannel channel = fs.open( file, "rw" ) )
+        {
+            ByteBuffer buffer = ByteBuffer.allocate( encodedTrailer.length );
+            long newPosition = Math.max( 0, fileSize - encodedTrailer.length );
+            long stopPosition = Math.max( 0, fileSize - encodedTrailer.length - pageSize );
+            while ( newPosition >= stopPosition )
+            {
+                channel.position( newPosition );
+                int totalRead = 0;
+                do
+                {
+                    int read = channel.read( buffer );
+                    if ( read == -1 )
+                    {
+                        return -1l;
+                    }
+                    totalRead += read;
+                }
+                while ( totalRead < encodedTrailer.length );
+
+                if ( Arrays.equals( buffer.array(), encodedTrailer ) )
+                {
+                    return newPosition;
+                }
+                else
+                {
+                    newPosition -= 1;
+                    buffer.clear();
+                }
+            }
+
+            return -1;
+        }
     }
 
     boolean isOptional()
@@ -282,41 +335,12 @@ public enum StoreFile
         return false;
     }
 
-    private static void setStoreVersionTrailer( PageCache pageCache, File targetStoreFileName, boolean optional,
-            String versionTrailer ) throws IOException
+    /**
+     * Merely here as convenience since java generics is acting up in many cases, so this is nicer for
+     * inlining such a call into {@link #fileOperation(FileOperation, FileSystemAbstraction, File, File, Iterable, boolean, boolean, StoreFileType...)}
+     */
+    public static Iterable<StoreFile> storeFiles( StoreFile... files )
     {
-        byte[] trailer = UTF8.encode( versionTrailer );
-        if ( !storeExists( pageCache, targetStoreFileName ) )
-        {
-            if ( optional )
-            {
-                return;
-            }
-            else
-            {
-                throw new IllegalStateException( "Required file missing: " + targetStoreFileName );
-            }
-        }
-        try ( PagedFile pagedFile = pageCache.map( targetStoreFileName, pageCache.pageSize() ) )
-        {
-            long trailerOffset =
-                    getTrailerOffset( pagedFile, versionTrailer.split( " " )[0] );
-            if ( trailerOffset != -1 )
-            {
-                writeTrailer( pagedFile, trailer, trailerOffset );
-            }
-        }
-    }
-
-    private static boolean storeExists( PageCache pageCache, File targetStoreFileName )
-    {
-        try ( PagedFile file = pageCache.map( targetStoreFileName, pageCache.pageSize() ) )
-        {
-        }
-        catch ( IOException e )
-        {
-            return false;
-        }
-        return true;
+        return iterable( files );
     }
 }

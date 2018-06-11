@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Identifier
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.Equals
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ExecutionPlanInProgress, PlanBuilder}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes._
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
@@ -54,7 +55,7 @@ class StartPointBuilder extends PlanBuilder {
   private def genNodeStart(entityFactory: EntityProducerFactory): PartialFunction[(PlanContext, StartItem), EntityProducer[Node]] =
     entityFactory.nodeByIndex orElse
       entityFactory.nodeByIndexQuery orElse
-      entityFactory.nodeByIndexHint orElse
+      entityFactory.nodeByIndexHint(readOnly = true) orElse
       entityFactory.nodeById orElse
       entityFactory.nodesAll orElse
       entityFactory.nodeByLabel

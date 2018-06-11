@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,12 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.conditions
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.ASTNode
+import org.neo4j.cypher.internal.frontend.v2_3.Foldable._
+import org.neo4j.cypher.internal.frontend.v2_3.ast.ASTNode
 
 import scala.reflect.ClassTag
 
 case class collectNodesOfType[T <: ASTNode](implicit tag: ClassTag[T]) extends (Any => Seq[T]) {
-  import org.neo4j.cypher.internal.compiler.v2_3.Foldable._
   def apply(that: Any): Seq[T] = that.fold(Seq.empty[T]) {
     case node: ASTNode if node.getClass == tag.runtimeClass =>
       (acc) => acc :+ node.asInstanceOf[T]

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,31 +20,65 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
 class NiceHasher(val original: Seq[Any]) {
-  override def equals(p1: Any): Boolean = {
-    if(p1 == null || !p1.isInstanceOf[NiceHasher])
-      return false
-
-    val other = p1.asInstanceOf[NiceHasher]
-
-    hash == other.hash && comperableValues.equals(other.comperableValues)
+  override def equals(p1: Any): Boolean = p1 match {
+    case null => false
+    case other: NiceHasher =>
+      hash == other.hash && NiceHasherValue.nullSafeEquals(comparableValues, other.comparableValues)
+    case _ => false
   }
 
-  lazy val comperableValues = original.map {
-    case x:Array[_] => x.deep
-    case x => x
+  lazy val comparableValues = if (original == null) null else original.map(NiceHasherValue.comparableValuesFun)
+
+  override def toString = hashCode() + " : " + original
+
+  lazy val hash = NiceHasherValue.seqHashFun(original)
+
+  override def hashCode() = hash
+}
+
+class NiceHasherValue(val original: Any) {
+  override def equals(p1: Any): Boolean = p1 match {
+    case null => false
+    case other: NiceHasherValue =>
+      hash == other.hash && NiceHasherValue.nullSafeEquals(comparableValue, other.comparableValue)
+    case _ => false
   }
 
-  override def toString = hashCode() + " : " + original.toString
+  lazy val comparableValue = NiceHasherValue.comparableValuesFun(original)
 
-  lazy val hash = original.foldLeft(0) ((hashValue,element) => { element match {
+  override def toString = hashCode() + " : " + original
+
+  lazy val hash = NiceHasherValue.hashFun(original)
+
+  override def hashCode() = hash
+}
+
+object NiceHasherValue {
+  def seqHashFun(seq: Seq[Any]): Int = if (seq == null) 0
+  else seq.foldLeft(0) ((hashValue, element) => hashFun(element) + hashValue * 31 )
+
+  def hashFun(y: Any): Int = y match {
     case x: Array[Int] => java.util.Arrays.hashCode(x)
     case x: Array[Long] => java.util.Arrays.hashCode(x)
     case x: Array[Byte] => java.util.Arrays.hashCode(x)
     case x: Array[AnyRef] => java.util.Arrays.deepHashCode(x)
     case null => 0
+    case x: List[_] => seqHashFun(x)
+    case x: Map[String, _] => x.keySet.hashCode() * 31 + seqHashFun(x.values.toSeq)
     case x => x.hashCode()
   }
-  } + hashValue * 31 )
 
-  override def hashCode() = hash
+  def comparableValuesFun(y: Any): Any = y match {
+    case x: Array[_] => x.deep
+    case x: List[_] => x.map(comparableValuesFun)
+    case x: Map[String, _] => x.keys.toSeq ++ x.values.map(comparableValuesFun)
+    case x => x
+  }
+
+  def nullSafeEquals(me: Any, other: Any): Boolean =
+    if ( me == null ) {
+      other == null
+    } else {
+      me equals other
+    }
 }

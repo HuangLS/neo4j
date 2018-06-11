@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,11 +31,12 @@ class SumFunction(val value: Expression)
 
   def name = "SUM"
 
-  var result: Any = 0
+  private var sum: OverflowAwareSum[_] = OverflowAwareSum(0L)
+  def result = sum.value
 
   def apply(data: ExecutionContext)(implicit state: QueryState) {
     actOnNumber(value(data), (number) => {
-      result = plus(result, number)
+      sum = sum.add(number)
     })
   }
 }

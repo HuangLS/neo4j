@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 ### BEGIN INIT INFO
 # Provides:          neo4j
@@ -13,7 +13,7 @@
 
 # Author: Julian Simpson <julian.simpson@neotechnology.com>
 #
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
@@ -54,6 +54,7 @@ SCRIPTNAME=/etc/init.d/$NAME-service
 
 do_start()
 {
+	do_ulimit
 	# Return
 	#   0 if daemon has been started
 	#   1 if daemon was already running
@@ -72,15 +73,27 @@ do_stop()
 	#   1 if daemon was already stopped
 	#   2 if daemon could not be stopped
 	#   other if a failure occurred
-	start-stop-daemon --chuid ${NEO_USER} --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE
+	: ${NEO4J_SHUTDOWN_TIMEOUT:=30}
+	: ${NEO4J_SHUTDOWN_KILL:="true"}
+	shutdown_verb="KILL"
+	[ "$NEO4J_SHUTDOWN_KILL" != "true" ] && shutdown_verb="TERM"
+
+	start-stop-daemon --chuid ${NEO_USER} --stop --quiet --retry=TERM/${NEO4J_SHUTDOWN_TIMEOUT}/${shutdown_verb}/5 --pidfile $PIDFILE
 	RETVAL="$?"
 	[ "$RETVAL" = 2 ] && return 2
 
-	start-stop-daemon --chuid ${NEO_USER} --stop --quiet --oknodo --retry=0/30/KILL/5 --exec $DAEMON
+	start-stop-daemon --chuid ${NEO_USER} --stop --quiet --oknodo --retry=0/${NEO4J_SHUTDOWN_TIMEOUT}/${shutdown_verb}/5 --exec $DAEMON
 	[ "$?" = 2 ] && return 2
 	# Many daemons don't delete their pidfiles when they exit.
 	rm -f $PIDFILE
 	return "$RETVAL"
+}
+
+do_ulimit()
+{
+  if [ -n "${NEO4J_ULIMIT_NOFILE}" ]; then
+    ulimit -n "${NEO4J_ULIMIT_NOFILE}"
+  fi
 }
 
 # Ensure that the NEO_USER is set to a useful default.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,6 @@
 package org.neo4j.consistency.checking;
 
 import org.neo4j.consistency.report.ConsistencyReport;
-import org.neo4j.consistency.store.DiffRecordAccess;
 import org.neo4j.consistency.store.RecordAccess;
 import org.neo4j.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
@@ -30,13 +29,6 @@ import org.neo4j.kernel.impl.store.record.TokenRecord;
 abstract class TokenRecordCheck<RECORD extends TokenRecord, REPORT extends ConsistencyReport>
         implements RecordCheck<RECORD, REPORT>, ComparativeRecordChecker<RECORD, DynamicRecord, REPORT>
 {
-    @Override
-    public void checkChange( RECORD oldRecord, RECORD newRecord, CheckerEngine<RECORD, REPORT> engine,
-                             DiffRecordAccess records )
-    {
-        check( newRecord, engine, records );
-    }
-
     @Override
     public void check( RECORD record, CheckerEngine<RECORD, REPORT> engine, RecordAccess records )
     {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,11 +26,17 @@ import org.junit.runners.model.Statement;
 import java.io.File;
 import java.util.Collection;
 
+import org.neo4j.consistency.statistics.AccessStatistics;
+import org.neo4j.consistency.statistics.AccessStatsKeepingStoreAccess;
+import org.neo4j.consistency.statistics.DefaultCounts;
+import org.neo4j.consistency.statistics.Statistics;
+import org.neo4j.consistency.statistics.VerboseStatistics;
 import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.index.lucene.LuceneLabelScanStoreBuilder;
 import org.neo4j.io.fs.DefaultFileSystemAbstraction;
+import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.api.ReadOperations;
@@ -39,15 +45,17 @@ import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.api.impl.index.DirectoryFactory;
 import org.neo4j.kernel.api.impl.index.LuceneSchemaIndexProvider;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
+import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.api.TransactionApplicationMode;
 import org.neo4j.kernel.impl.api.TransactionRepresentationCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionRepresentationStoreApplier;
 import org.neo4j.kernel.impl.api.index.IndexUpdatesValidator;
 import org.neo4j.kernel.impl.locking.LockGroup;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeLabelsField;
 import org.neo4j.kernel.impl.store.NodeStore;
 import org.neo4j.kernel.impl.store.StoreAccess;
+import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.NeoStoreRecord;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
@@ -60,15 +68,32 @@ import org.neo4j.kernel.impl.transaction.log.TransactionAppender;
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
 import org.neo4j.kernel.impl.transaction.tracing.CommitEvent;
 import org.neo4j.logging.FormattedLogProvider;
+import org.neo4j.logging.NullLog;
+import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.PageCacheRule;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.TestGraphDatabaseFactory;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 import static java.lang.System.currentTimeMillis;
+import static org.neo4j.consistency.ConsistencyCheckService.defaultConsistencyCheckThreadsNumber;
 
 public abstract class GraphStoreFixture extends PageCacheRule implements TestRule
 {
     private DirectStoreAccess directStoreAccess;
+    private Statistics statistics;
+    private final boolean keepStatistics;
+    private NeoStores neoStore;
+
+    public GraphStoreFixture( boolean keepStatistics )
+    {
+        this.keepStatistics = keepStatistics;
+    }
+
+    public GraphStoreFixture()
+    {
+        this( false );
+    }
 
     public void apply( Transaction transaction ) throws TransactionFailureException
     {
@@ -81,29 +106,54 @@ public abstract class GraphStoreFixture extends PageCacheRule implements TestRul
         {
             DefaultFileSystemAbstraction fileSystem = new DefaultFileSystemAbstraction();
             PageCache pageCache = getPageCache( fileSystem );
-            StoreAccess nativeStores = new StoreAccess( fileSystem, pageCache, directory );
+            neoStore = new StoreFactory( fileSystem, directory, pageCache, NullLogProvider.getInstance() ).openAllNeoStores();
+            StoreAccess nativeStores;
+            if ( keepStatistics )
+            {
+                AccessStatistics accessStatistics = new AccessStatistics();
+                statistics = new VerboseStatistics( accessStatistics,
+                        new DefaultCounts( defaultConsistencyCheckThreadsNumber() ), NullLog.getInstance() );
+                nativeStores = new AccessStatsKeepingStoreAccess( neoStore, accessStatistics );
+            }
+            else
+            {
+                statistics = Statistics.NONE;
+                nativeStores = new StoreAccess( neoStore );
+            }
+            nativeStores.initialize();
+            Config config = new Config();
+            OperationalMode operationalMode = OperationalMode.single;
             directStoreAccess = new DirectStoreAccess(
                     nativeStores,
                     new LuceneLabelScanStoreBuilder(
                             directory,
-                            nativeStores.getRawNeoStore(),
+                            nativeStores.getRawNeoStores(),
                             fileSystem,
+                            config,
+                            operationalMode,
                             FormattedLogProvider.toOutputStream( System.out )
                     ).build(),
-                    createIndexes()
+                    createIndexes( fileSystem, config, operationalMode )
             );
         }
         return directStoreAccess;
     }
 
-    private SchemaIndexProvider createIndexes()
+    private SchemaIndexProvider createIndexes( FileSystemAbstraction fileSystem, Config config,
+            OperationalMode operationalMode )
     {
-        return new LuceneSchemaIndexProvider( DirectoryFactory.PERSISTENT, directory );
+        return new LuceneSchemaIndexProvider( fileSystem, DirectoryFactory.PERSISTENT, directory,
+                FormattedLogProvider.toOutputStream( System.out ), config, operationalMode );
     }
 
     public File directory()
     {
         return directory;
+    }
+
+    public Statistics getAccessStatistics()
+    {
+        return statistics;
     }
 
     public abstract static class Transaction
@@ -320,6 +370,7 @@ public abstract class GraphStoreFixture extends PageCacheRule implements TestRul
     {
         if ( directStoreAccess != null )
         {
+            neoStore.close();
             directStoreAccess.close();
             directStoreAccess = null;
         }
@@ -355,7 +406,7 @@ public abstract class GraphStoreFixture extends PageCacheRule implements TestRul
                             dependencyResolver.resolveDependency( IndexUpdatesValidator.class ) );
             TransactionIdStore transactionIdStore = database.getDependencyResolver().resolveDependency(
                     TransactionIdStore.class );
-            NodeStore nodes = database.getDependencyResolver().resolveDependency( NeoStore.class ).getNodeStore();
+            NodeStore nodes = database.getDependencyResolver().resolveDependency( NeoStores.class ).getNodeStore();
             commitProcess.commit( transaction.representation( idGenerator(), masterId(), myId(),
                     transactionIdStore.getLastCommittedTransactionId(), nodes ), locks, CommitEvent.NULL,
                     TransactionApplicationMode.EXTERNAL );
@@ -386,7 +437,7 @@ public abstract class GraphStoreFixture extends PageCacheRule implements TestRul
         try
         {
             generateInitialData( graphDb );
-            StoreAccess stores = new StoreAccess( graphDb );
+            StoreAccess stores = new StoreAccess( graphDb ).initialize();
             schemaId = stores.getSchemaStore().getHighId();
             nodeId = stores.getNodeStore().getHighId();
             labelId = (int) stores.getLabelTokenStore().getHighId();

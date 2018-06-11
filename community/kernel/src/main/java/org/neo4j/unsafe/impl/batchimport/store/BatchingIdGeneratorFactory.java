@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,12 +37,18 @@ import static org.neo4j.kernel.impl.store.id.IdGeneratorImpl.createGenerator;
  */
 public class BatchingIdGeneratorFactory implements IdGeneratorFactory
 {
-    private final Map<IdType, IdGenerator> idGenerators = new EnumMap<>( IdType.class );
+    private final Map<IdType,IdGenerator> idGenerators = new EnumMap<>( IdType.class );
     private final FileSystemAbstraction fs;
 
     public BatchingIdGeneratorFactory( FileSystemAbstraction fs )
     {
         this.fs = fs;
+    }
+
+    @Override
+    public IdGenerator open( File filename, IdType idType, long highId )
+    {
+        return open( filename, 0, idType, highId );
     }
 
     @Override
@@ -69,7 +75,7 @@ public class BatchingIdGeneratorFactory implements IdGeneratorFactory
 
     private static class BatchingIdGenerator implements IdGenerator
     {
-        private long highId;
+        private final BatchingIdSequence idSequence;
         private final FileSystemAbstraction fs;
         private final File fileName;
 
@@ -77,20 +83,14 @@ public class BatchingIdGeneratorFactory implements IdGeneratorFactory
         {
             this.fs = fs;
             this.fileName = fileName;
-            this.highId = highId;
+            this.idSequence = new BatchingIdSequence();
+            this.idSequence.set( highId );
         }
 
         @Override
         public long nextId()
         {
-            try
-            {
-                return highId;
-            }
-            finally
-            {
-                highId++;
-            }
+            return idSequence.nextId();
         }
 
         @Override
@@ -102,13 +102,13 @@ public class BatchingIdGeneratorFactory implements IdGeneratorFactory
         @Override
         public void setHighId( long id )
         {
-            highId = id;
+            idSequence.set( id );
         }
 
         @Override
         public long getHighId()
         {
-            return highId;
+            return idSequence.peek();
         }
 
         @Override
@@ -119,13 +119,13 @@ public class BatchingIdGeneratorFactory implements IdGeneratorFactory
         @Override
         public void close()
         {
-            createGenerator( fs, fileName, highId, false );
+            createGenerator( fs, fileName, idSequence.peek(), false );
         }
 
         @Override
         public long getNumberOfIdsInUse()
         {
-            return highId;
+            return idSequence.peek();
         }
 
         @Override

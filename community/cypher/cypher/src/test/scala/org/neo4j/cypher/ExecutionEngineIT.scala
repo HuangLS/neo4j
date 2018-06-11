@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,9 +20,8 @@
 package org.neo4j.cypher
 
 import org.neo4j.cypher.internal.compiler.v2_3.CostBasedPlannerName
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.graphdb.GraphDatabaseService
-import org.neo4j.graphdb.Result.{ResultRow, ResultVisitor}
 import org.neo4j.graphdb.factory.GraphDatabaseSettings
 import org.neo4j.kernel.GraphDatabaseAPI
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge
@@ -121,16 +120,16 @@ class ExecutionEngineIT extends CypherFunSuite {
     plan.getArguments.get("planner-impl") should equal("IDP")
   }
 
-  test("should throw error if using COST for older versions") {
+  test("should work if query cache size is set to zero") {
     //given
-    intercept[Exception] {
-      val db = new TestGraphDatabaseFactory()
-        .newImpermanentDatabaseBuilder()
-        .setConfig(GraphDatabaseSettings.cypher_planner, "COST")
-        .setConfig(GraphDatabaseSettings.cypher_parser_version, "2.0").newGraphDatabase()
+    val db = new TestGraphDatabaseFactory()
+      .newImpermanentDatabaseBuilder()
+      .setConfig(GraphDatabaseSettings.query_cache_size, "0").newGraphDatabase()
 
-      db.planDescriptionForQuery("PROFILE MATCH (a)-[:T*]-(a) RETURN a")
-    }
+    // when
+    db.execute("RETURN 42").close()
+
+    // then no exception is thrown
   }
 
   test("should not leak transaction when closing the result for a query") {
@@ -204,22 +203,6 @@ class ExecutionEngineIT extends CypherFunSuite {
     engine.execute("explain return 1").javaIterator.close()
     // then
     txBridge(db).hasTransaction shouldBe false
-  }
-
-  test("should be possible to close compiled result after it is consumed") {
-    // given
-    val db = new TestGraphDatabaseFactory().newImpermanentDatabase()
-
-    // when
-    val result = db.execute("CYPHER runtime=compiled MATCH (n) RETURN n")
-    result.accept(new ResultVisitor[RuntimeException] {
-      def visit(row: ResultRow) = true
-    })
-
-    result.close()
-
-    // then
-    // call to close actually worked
   }
 
   private implicit class RichDb(db: GraphDatabaseService) {

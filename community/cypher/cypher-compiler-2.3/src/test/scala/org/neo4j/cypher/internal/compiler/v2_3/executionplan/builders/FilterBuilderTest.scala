@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,8 +22,9 @@ package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 import org.mockito.Matchers._
 import org.mockito.Mockito._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Identifier, Literal, Property}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.{Equals, Predicate}
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.TokenType._
-import org.neo4j.cypher.internal.compiler.v2_3.commands.{Equals, Predicate, SingleNode}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.SingleNode
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.PartiallySolvedQuery
 
 class FilterBuilderTest extends BuilderTest {

@@ -1,4 +1,4 @@
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -17,7 +17,33 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+<#
+.SYNOPSIS
+Confirms a file path is a valid Neo4j installation
 
+.DESCRIPTION
+Confirms a file path is a valid Neo4j installation
+
+.PARAMETER Neo4jHome
+Full path to confirm
+
+.EXAMPLE
+'C:\Neo4j\neo4j-community' | Confirm-Neo4jHome 
+
+Confirm the path 'C:\Neo4j\neo4j-community' is a valid Neo4j installation
+
+.EXAMPLE
+Confirm-Neo4jHome 'C:\Neo4j\neo4j-community'
+
+Confirm the path 'C:\Neo4j\neo4j-community' is a valid Neo4j installation
+
+.OUTPUTS
+System.Boolean
+
+.NOTES
+This function is private to the powershell module
+
+#>
 Function Confirm-Neo4jHome 
 {
   [cmdletBinding(SupportsShouldProcess=$false,ConfirmImpact='Low')]

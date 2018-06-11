@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,12 +27,8 @@ import org.apache.lucene.analysis.WhitespaceTokenizer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.index.IndexCommit;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.SnapshotDeletionPolicy;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Similarity;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopFieldCollector;
@@ -59,24 +55,20 @@ import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.graphdb.index.IndexManager;
 import org.neo4j.helpers.collection.PrefetchingResourceIterator;
 import org.neo4j.io.fs.FileSystemAbstraction;
+import org.neo4j.io.fs.FileUtils;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.cache.LruCache;
 import org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory;
 import org.neo4j.kernel.impl.index.IndexConfigStore;
 import org.neo4j.kernel.impl.index.IndexEntityType;
-import org.neo4j.kernel.lifecycle.Lifecycle;
+import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
 import static org.neo4j.index.impl.lucene.MultipleBackupDeletionPolicy.SNAPSHOT_ID;
 
 /**
  * An DataSource optimized for the {@link LuceneIndexImplementation}.
  */
-public class LuceneDataSource implements Lifecycle
+public class LuceneDataSource extends LifecycleAdapter
 {
-    private final File storeDir;
-    private final Config config;
-    private final FileSystemAbstraction fileSystemAbstraction;
-
     public static abstract class Configuration
     {
         public static final Setting<Integer> lucene_searcher_cache_size = GraphDatabaseSettings.lucene_searcher_cache_size;
@@ -116,15 +108,20 @@ public class LuceneDataSource implements Lifecycle
             return "WHITESPACE_ANALYZER";
         }
     };
+
     public static final Analyzer KEYWORD_ANALYZER = new KeywordAnalyzer();
+    private final File storeDir;
+    private final Config config;
+    private final FileSystemAbstraction fileSystemAbstraction;
     private IndexClockCache indexSearchers;
     private File baseStorePath;
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     final IndexConfigStore indexStore;
     private IndexTypeCache typeCache;
+    private boolean readOnly;
     private boolean closed;
-    private Cache caching;
     private LuceneFilesystemFacade filesystemFacade;
+    private IndexReferenceFactory indexReferenceFactory;
 
     /**
      * Constructs this data source.
@@ -141,19 +138,17 @@ public class LuceneDataSource implements Lifecycle
     @Override
     public void init()
     {
-    }
-
-    @Override
-    public void start()
-    {
         this.filesystemFacade = config.get( Configuration.ephemeral ) ? LuceneFilesystemFacade.MEMORY
                 : LuceneFilesystemFacade.FS;
+        readOnly = config.get( GraphDatabaseSettings.read_only );
         indexSearchers = new IndexClockCache( config.get( Configuration.lucene_searcher_cache_size ) );
-        caching = new Cache();
         this.baseStorePath = this.filesystemFacade.ensureDirectoryExists( fileSystemAbstraction,
                 baseDirectory( storeDir ) );
         this.filesystemFacade.cleanWriteLocks( baseStorePath );
         this.typeCache = new IndexTypeCache( indexStore );
+        this.indexReferenceFactory = readOnly ?
+                                     new ReadOnlyIndexReferenceFactory( filesystemFacade, baseStorePath, typeCache ) :
+                                     new WritableIndexReferenceFactory( filesystemFacade, baseStorePath, typeCache );
         closed = false;
     }
 
@@ -168,7 +163,7 @@ public class LuceneDataSource implements Lifecycle
     }
 
     @Override
-    public void stop() throws IOException
+    public void shutdown() throws IOException
     {
         synchronized ( this )
         {
@@ -179,15 +174,10 @@ public class LuceneDataSource implements Lifecycle
             closed = true;
             for ( IndexReference searcher : indexSearchers.values() )
             {
-                searcher.dispose( true );
+                searcher.dispose();
             }
             indexSearchers.clear();
         }
-    }
-
-    @Override
-    public void shutdown()
-    {
     }
 
     private synchronized IndexReference[] getAllIndexes()
@@ -198,6 +188,10 @@ public class LuceneDataSource implements Lifecycle
 
     void force()
     {
+        if ( readOnly )
+        {
+            return;
+        }
         for ( IndexReference index : getAllIndexes() )
         {
             try
@@ -206,7 +200,8 @@ public class LuceneDataSource implements Lifecycle
             }
             catch ( IOException e )
             {
-                throw new RuntimeException( "unable to commit changes to " + index.getIdentifier(), e );
+                throw new RuntimeException( "Unable to commit changes to " + index.getIdentifier() + " in " +
+                        config.get( GraphDatabaseSettings.store_dir ).getAbsolutePath(), e );
             }
         }
     }
@@ -229,39 +224,6 @@ public class LuceneDataSource implements Lifecycle
     void releaseWriteLock()
     {
         lock.writeLock().unlock();
-    }
-
-    /**
-     * If nothing has changed underneath (since the searcher was last created
-     * or refreshed) {@code searcher} is returned. But if something has changed a
-     * refreshed searcher is returned. It makes use if the
-     * {@link IndexReader#openIfChanged(IndexReader, IndexWriter, boolean)} which faster than opening an index from
-     * scratch.
-     *
-     * @param searcher the {@link IndexSearcher} to refresh.
-     * @return a refreshed version of the searcher or, if nothing has changed,
-     *         {@code null}.
-     * @throws RuntimeException if there's a problem with the index.
-     */
-    private IndexReference refreshSearcher( IndexReference searcher )
-    {
-        try
-        {
-            IndexReader reader = searcher.getSearcher().getIndexReader();
-            IndexWriter writer = searcher.getWriter();
-            IndexReader reopened = IndexReader.openIfChanged( reader, writer, true );
-            if ( reopened != null )
-            {
-                IndexSearcher newSearcher = newIndexSearcher( searcher.getIdentifier(), reopened );
-                searcher.detachOrClose();
-                return new IndexReference( searcher.getIdentifier(), newSearcher, writer );
-            }
-            return searcher;
-        }
-        catch ( IOException e )
-        {
-            throw new RuntimeException( e );
-        }
     }
 
     static File getFileDirectory( File storeDir, IndexEntityType type )
@@ -324,24 +286,24 @@ public class LuceneDataSource implements Lifecycle
     {
         try
         {
-            IndexReference searcher = indexSearchers.get( identifier );
-            if ( searcher == null )
+            IndexReference indexReference = indexSearchers.get( identifier );
+            if ( indexReference == null )
             {
-                IndexWriter writer = newIndexWriter( identifier );
-                IndexReader reader = IndexReader.open( writer, true );
-                IndexSearcher indexSearcher = newIndexSearcher( identifier, reader );
-                searcher = new IndexReference( identifier, indexSearcher, writer );
-                indexSearchers.put( identifier, searcher );
+                indexReference = indexReferenceFactory.createIndexReference( identifier );
+                indexSearchers.put( identifier, indexReference );
             }
             else
             {
-                synchronized ( searcher )
+                if ( !readOnly )
                 {
-                    searcher = refreshSearcherIfNeeded( searcher );
+                    synchronized ( indexReference )
+                    {
+                        indexReference = refreshSearcherIfNeeded( indexReference );
+                    }
                 }
             }
-            searcher.incRef();
-            return searcher;
+            indexReference.incRef();
+            return indexReference;
         }
         catch ( IOException e )
         {
@@ -349,22 +311,11 @@ public class LuceneDataSource implements Lifecycle
         }
     }
 
-    private IndexSearcher newIndexSearcher( IndexIdentifier identifier, IndexReader reader )
-    {
-        IndexSearcher searcher = new IndexSearcher( reader );
-        IndexType type = getType( identifier, false );
-        if ( type.getSimilarity() != null )
-        {
-            searcher.setSimilarity( type.getSimilarity() );
-        }
-        return searcher;
-    }
-
     private IndexReference refreshSearcherIfNeeded( IndexReference searcher )
     {
         if ( searcher.checkAndClearStale() )
         {
-            searcher = refreshSearcher( searcher );
+            searcher = indexReferenceFactory.refresh( searcher );
             if ( searcher != null )
             {
                 indexSearchers.put( searcher.getIdentifier(), searcher );
@@ -382,11 +333,14 @@ public class LuceneDataSource implements Lifecycle
         }
     }
 
-    void deleteIndex( IndexIdentifier identifier, boolean recovery )
+    void deleteIndex( IndexIdentifier identifier, boolean recovery ) throws IOException
     {
+        if ( readOnly )
+        {
+            throw new IllegalStateException( "Index deletion in read only mode is not supported." );
+        }
         closeIndex( identifier );
-        deleteFileOrDirectory( getFileDirectory( baseStorePath, identifier ) );
-        invalidateCache( identifier );
+        FileUtils.deleteRecursively( getFileDirectory( baseStorePath, identifier ) );
         boolean removeFromIndexStore =
                 !recovery || (indexStore.has( identifier.entityType.entityClass(), identifier.indexName ));
         if ( removeFromIndexStore )
@@ -394,63 +348,6 @@ public class LuceneDataSource implements Lifecycle
             indexStore.remove( identifier.entityType.entityClass(), identifier.indexName );
         }
         typeCache.invalidate( identifier );
-    }
-
-    private static void deleteFileOrDirectory( File file )
-    {
-        if ( file.exists() )
-        {
-            if ( file.isDirectory() )
-            {
-                for ( File child : file.listFiles() )
-                {
-                    deleteFileOrDirectory( child );
-                }
-            }
-            file.delete();
-        }
-    }
-
-    private/*synchronized elsewhere*/IndexWriter newIndexWriter( IndexIdentifier identifier )
-    {
-        assertNotClosed();
-        try
-        {
-            Directory dir = filesystemFacade.getDirectory( baseStorePath, identifier ); //getDirectory(
-            // baseStorePath, identifier );
-            directoryExists( dir );
-            IndexType type = getType( identifier, false );
-            IndexWriterConfig writerConfig = new IndexWriterConfig( LUCENE_VERSION, type.analyzer );
-            writerConfig.setIndexDeletionPolicy( new MultipleBackupDeletionPolicy() );
-            Similarity similarity = type.getSimilarity();
-            if ( similarity != null )
-            {
-                writerConfig.setSimilarity( similarity );
-            }
-            IndexWriter indexWriter = new IndexWriter( dir, writerConfig );
-            // TODO We should tamper with this value and see how it affects the
-            // general performance. Lucene docs says rather <10 for mixed
-            // reads/writes
-            //            writer.setMergeFactor( 8 );
-            return indexWriter;
-        }
-        catch ( IOException e )
-        {
-            throw new RuntimeException( e );
-        }
-    }
-
-    private boolean directoryExists( Directory dir )
-    {
-        try
-        {
-            String[] files = dir.listAll();
-            return files != null && files.length > 0;
-        }
-        catch ( IOException e )
-        {
-            return false;
-        }
     }
 
     static Document findDocument( IndexType type, IndexSearcher searcher, long entityId )
@@ -491,32 +388,13 @@ public class LuceneDataSource implements Lifecycle
             IndexReference searcher = indexSearchers.remove( identifier );
             if ( searcher != null )
             {
-                searcher.dispose( true );
+                searcher.dispose();
             }
         }
         catch ( IOException e )
         {
             throw new RuntimeException( "Unable to close lucene writer " + identifier, e );
         }
-    }
-
-    LruCache<String, Collection<EntityId>> getFromCache( IndexIdentifier identifier, String key )
-    {
-        return caching.get( identifier, key );
-    }
-
-    void invalidateCache( IndexIdentifier identifier, String key, Object value )
-    {
-        LruCache<String, Collection<EntityId>> cache = caching.get( identifier, key );
-        if ( cache != null )
-        {
-            cache.remove( value.toString() );
-        }
-    }
-
-    void invalidateCache( IndexIdentifier identifier )
-    {
-        this.caching.disable( identifier );
     }
 
     public ResourceIterator<File> listStoreFiles( boolean includeLogicalLogs ) throws IOException
@@ -529,25 +407,30 @@ public class LuceneDataSource implements Lifecycle
             SnapshotDeletionPolicy deletionPolicy = (SnapshotDeletionPolicy) writer.getWriter().getConfig()
                     .getIndexDeletionPolicy();
             File indexDirectory = getFileDirectory( baseStorePath, writer.getIdentifier() );
+            IndexCommit commit;
             try
             {
                 // Throws IllegalStateException if no commits yet
-                IndexCommit commit = deletionPolicy.snapshot( SNAPSHOT_ID );
-                for ( String fileName : commit.getFileNames() )
-                {
-                    files.add( new File( indexDirectory, fileName ) );
-                }
-                snapshots.add( deletionPolicy );
+                commit = deletionPolicy.snapshot( SNAPSHOT_ID );
             }
             catch ( IllegalStateException e )
             {
-                // TODO Review this
                 /*
                  * This is insane but happens if we try to snapshot an existing index
                  * that has no commits. This is a bad API design - it should return null
                  * or something. This is not exceptional.
+                 *
+                 * For the time being we just do a commit and try again.
                  */
+                writer.getWriter().commit();
+                commit = deletionPolicy.snapshot( SNAPSHOT_ID );
             }
+
+            for ( String fileName : commit.getFileNames() )
+            {
+                files.add( new File( indexDirectory, fileName ) );
+            }
+            snapshots.add( deletionPolicy );
         }
         return new PrefetchingResourceIterator<File>()
         {
@@ -605,7 +488,7 @@ public class LuceneDataSource implements Lifecycle
         }
     }
 
-    private static enum LuceneFilesystemFacade
+    enum LuceneFilesystemFacade
     {
         FS
         {

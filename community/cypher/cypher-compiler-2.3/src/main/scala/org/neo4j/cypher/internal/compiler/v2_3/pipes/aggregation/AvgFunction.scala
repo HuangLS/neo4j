@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,10 @@ import commands.expressions.Expression
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.TypeSafeMathSupport
 import pipes.QueryState
 
+/**
+ * AVG computation is calculated using cumulative moving average approach:
+ * https://en.wikipedia.org/wiki/Moving_average#Cumulative_moving_average
+ */
 class AvgFunction(val value: Expression)
   extends AggregationFunction
   with TypeSafeMathSupport
@@ -31,19 +35,21 @@ class AvgFunction(val value: Expression)
 
   def name = "AVG"
 
-  private var count: Int = 0
-  private var sofar: Any = 0
+  private var count: Long = 0L
+  private var sum: OverflowAwareSum[_] = OverflowAwareSum(0L)
 
   def result =
-    if (count > 0)
-      divide(sofar, count.toDouble)
-    else
+    if (count > 0) {
+      sum.value
+    } else {
       null
+    }
 
   def apply(data: ExecutionContext)(implicit state: QueryState) {
     actOnNumber(value(data), (number) => {
       count += 1
-      sofar = plus(sofar, number)
+      val next = divide(minus(number, sum.value), count.toDouble)
+      sum = sum.add(next)
     })
   }
 }

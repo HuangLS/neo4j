@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.kernel.impl.store;
 
 import org.neo4j.kernel.impl.api.CountsAccessor;
+import org.neo4j.kernel.impl.store.counts.CountsTracker;
 import org.neo4j.kernel.impl.store.kvstore.DataInitializer;
 import org.neo4j.unsafe.impl.batchimport.Configuration;
 import org.neo4j.unsafe.impl.batchimport.NodeCountsStage;
@@ -32,9 +33,11 @@ import static org.neo4j.unsafe.impl.batchimport.staging.ExecutionSupervisors.sup
 
 public class CountsComputer implements DataInitializer<CountsAccessor.Updater>
 {
-    public static void recomputeCounts( NeoStore stores )
+    public static void recomputeCounts( NeoStores stores )
     {
-        try ( CountsAccessor.Updater updater = stores.getCounts().reset( stores.getLastCommittedTransactionId() ) )
+        MetaDataStore metaDataStore = stores.getMetaDataStore();
+        CountsTracker counts = stores.getCounts();
+        try ( CountsAccessor.Updater updater = counts.reset( metaDataStore.getLastCommittedTransactionId() ) )
         {
             new CountsComputer( stores ).initialize( updater );
         }
@@ -46,17 +49,17 @@ public class CountsComputer implements DataInitializer<CountsAccessor.Updater>
     private final int highRelationshipTypeId;
     private final long lastCommittedTransactionId;
 
-    public CountsComputer( NeoStore stores )
+    public CountsComputer( NeoStores stores )
     {
-        this( stores.getLastCommittedTransactionId(),
+        this( stores.getMetaDataStore().getLastCommittedTransactionId(),
               stores.getNodeStore(), stores.getRelationshipStore(),
               (int) stores.getLabelTokenStore().getHighId(),
               (int) stores.getRelationshipTypeTokenStore().getHighId() );
     }
 
     public CountsComputer( long lastCommittedTransactionId, NodeStore nodes, RelationshipStore relationships,
-                           int highLabelId,
-                           int highRelationshipTypeId )
+            int highLabelId,
+            int highRelationshipTypeId )
     {
         this.lastCommittedTransactionId = lastCommittedTransactionId;
         this.nodes = nodes;
@@ -72,12 +75,12 @@ public class CountsComputer implements DataInitializer<CountsAccessor.Updater>
         try
         {
             // Count nodes
-            superviseDynamicExecution( new NodeCountsStage( Configuration.DEFAULT, cache, nodes,
-                                                            highLabelId, countsUpdater ) );
+            superviseDynamicExecution(
+                    new NodeCountsStage( Configuration.DEFAULT, cache, nodes, highLabelId, countsUpdater ) );
             // Count relationships
-            superviseDynamicExecution( new RelationshipCountsStage( Configuration.DEFAULT, cache, relationships,
-                                                                    highLabelId, highRelationshipTypeId,
-                                                                    countsUpdater, AUTO ) );
+            superviseDynamicExecution(
+                    new RelationshipCountsStage( Configuration.DEFAULT, cache, relationships, highLabelId,
+                            highRelationshipTypeId, countsUpdater, AUTO ) );
         }
         finally
         {

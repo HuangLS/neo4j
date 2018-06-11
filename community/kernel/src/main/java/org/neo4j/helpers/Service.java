@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,6 +35,8 @@ import java.util.Set;
 
 import org.neo4j.helpers.collection.PrefetchingIterator;
 
+import static org.neo4j.unsafe.impl.internal.dragons.FeatureToggles.flag;
+
 /**
  * A utility for locating services. This implements the same functionality as <a
  * href="http://java.sun.com/javase/6/docs/api/java/util/ServiceLoader.html">
@@ -45,7 +47,6 @@ import org.neo4j.helpers.collection.PrefetchingIterator;
  * <p>
  * Additionally this class can be used as a base class for implementing services
  * that are differentiated by a String key. An example implementation might be:
- * <p>
  * <pre>
  * <code>
  * public abstract class StringConverter extends org.neo4j.commons.Service
@@ -66,7 +67,6 @@ import org.neo4j.helpers.collection.PrefetchingIterator;
  * </pre>
  * <p>
  * With for example these implementations:
- * <p>
  * <pre>
  * <code>
  * public final class UppercaseConverter extends StringConverter
@@ -92,7 +92,7 @@ import org.neo4j.helpers.collection.PrefetchingIterator;
  *     public String convert( String input )
  *     {
  *         char[] chars = input.toCharArray();
- *         for ( int i = 0; i < chars.length/2; i++ )
+ *         for ( int i = 0; i &lt; chars.length/2; i++ )
  *         {
  *             char intermediate = chars[i];
  *             chars[i] = chars[chars.length-1-i];
@@ -105,7 +105,6 @@ import org.neo4j.helpers.collection.PrefetchingIterator;
  * </pre>
  * <p>
  * This would then be used as:
- * <p>
  * <pre>
  * <code>
  * String atad = StringConverter.load( "reverse" ).convert( "data" );
@@ -120,7 +119,7 @@ public abstract class Service
      * Enabling this is useful for debugging why services aren't loaded where you would expect them to.
      */
     private static final boolean printServiceLoaderStackTraces =
-            Boolean.getBoolean( "org.neo4j.helpers.Service.printServiceLoaderStackTraces" );
+            flag( Service.class, "printServiceLoaderStackTraces", false );
 
     /**
      * Designates that a class implements the specified service and should be

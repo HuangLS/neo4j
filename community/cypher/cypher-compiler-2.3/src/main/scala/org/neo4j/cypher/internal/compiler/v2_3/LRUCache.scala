@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,10 +21,10 @@ package org.neo4j.cypher.internal.compiler.v2_3
 
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap
 
-class LRUCache[K, V](cacheSize: Int) extends ((K, => V) => V) {
+class LRUCache[K, V](val size: Int) extends ((K, => V) => V) {
 
-  val inner = new ConcurrentLinkedHashMap.Builder[K, V]
-    .maximumWeightedCapacity(cacheSize)
+  private val inner = new ConcurrentLinkedHashMap.Builder[K, V]
+    .maximumWeightedCapacity(size)
     .build()
 
   def getOrElseUpdate(key: K, f: => V): V = {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,12 +20,12 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
 import org.mockito.Mockito._
-import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Literal
+import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.kernel.api.index.IndexDescriptor
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class StartPipePlanDescriptionTest extends CypherFunSuite {
 
@@ -40,7 +40,7 @@ class StartPipePlanDescriptionTest extends CypherFunSuite {
     super.beforeEach()
     planContext = mock[PlanContext]
     factory = new EntityProducerFactory
-    when(planContext.getIndexRule(label, prop)).thenReturn(Some(new IndexDescriptor(123,456)))
+    when(planContext.getIndexRule(label, prop)).thenReturn(Some(IndexDescriptor(123,456)))
     when(planContext.getOptLabelId(label)).thenReturn(Some(1))
   }
 
@@ -111,7 +111,7 @@ class StartPipePlanDescriptionTest extends CypherFunSuite {
   }
 
   private def createPlanDescription(startItem: StartItem): InternalPlanDescription = {
-    val producer = factory.nodeStartItems((planContext, startItem))
+    val producer = factory.readNodeStartItems((planContext, startItem))
     val pipe = new NodeStartPipe(SingleRowPipe(), "n", producer)()
     pipe.planDescription
   }

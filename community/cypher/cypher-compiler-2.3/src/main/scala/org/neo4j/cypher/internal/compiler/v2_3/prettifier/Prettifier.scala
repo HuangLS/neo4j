@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.prettifier
 
-import org.neo4j.cypher.internal.compiler.v2_3.SyntaxException
-import org.neo4j.cypher.internal.compiler.v2_3.parser.{Base, Strings}
+import org.neo4j.cypher.internal.frontend.v2_3.SyntaxException
+import org.neo4j.cypher.internal.frontend.v2_3.parser.{Base, Strings}
 import org.parboiled.scala._
+
 import scala.collection.mutable
 
 sealed abstract class SyntaxToken {
@@ -102,7 +103,10 @@ class PrettifierParser extends Parser with Base with Strings {
         keyword("ASC") |
         keyword("DESC") |
         keyword("SCAN") |
-        keyword("FROM")
+        keyword("FROM") |
+        keyword("STARTS WITH") |
+        keyword("ENDS WITH") |
+        keyword("CONTAINS")
     ) ~> NonBreakingKeywords
   }
 
@@ -125,6 +129,7 @@ class PrettifierParser extends Parser with Base with Strings {
       keyword("USING SCAN") |
       keyword("USING JOIN ON") |
       keyword("OPTIONAL MATCH") |
+      keyword("DETACH DELETE") |
       keyword("START") |
       keyword("MATCH") |
       keyword("WHERE") |
@@ -234,7 +239,7 @@ case object Prettifier extends (String => String) {
   }
 
   val space = " "
-  val newline = System.getProperty("line.separator")
+  val newline = System.lineSeparator()
 
   def insertBreak(token: SyntaxToken, tail: Seq[SyntaxToken]): String = {
     if (tail.isEmpty)

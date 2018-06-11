@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -42,6 +42,7 @@ final class MuninnWritePageCursor extends MuninnPageCursor
     @Override
     public boolean next() throws IOException
     {
+        unpinCurrentPage();
         assertPagedFileStillMapped();
         if ( nextPageId > lastPageId )
         {
@@ -54,7 +55,6 @@ final class MuninnWritePageCursor extends MuninnPageCursor
                 pagedFile.increaseLastPageIdTo( nextPageId );
             }
         }
-        unpinCurrentPage();
         pin( nextPageId, true );
         currentPageId = nextPageId;
         nextPageId++;

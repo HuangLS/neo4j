@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -72,19 +72,26 @@ public class Timeouts implements MessageSource
         timeouts.put( key, new Timeout( timeoutAt, timeoutMessage ) );
     }
 
+    public long getTimeoutFor( Message<? extends MessageType> timeoutMessage )
+    {
+        return timeoutStrategy.timeoutFor( timeoutMessage );
+    }
+
     /**
      * Cancel a timeout corresponding to a particular key. Use the same key
      * that was used to set it up.
      *
      * @param key
      */
-    public void cancelTimeout( Object key )
+    public Message<? extends MessageType> cancelTimeout( Object key )
     {
         Timeout timeout = timeouts.remove( key );
         if ( timeout != null )
         {
             timeoutStrategy.timeoutCancelled( timeout.timeoutMessage );
+            return timeout.getTimeoutMessage();
         }
+        return null;
     }
 
     /**

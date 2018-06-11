@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,7 +40,7 @@ public class JLineConsole implements Console
 				Class.forName( "jline.console.ConsoleReader" ).newInstance();
 			consoleReader.getClass().getMethod( "setBellEnabled",
 				Boolean.TYPE ).invoke( consoleReader, false );
-			consoleReader.getClass().getMethod( "setBellEnabled", Boolean.TYPE ).invoke(
+			consoleReader.getClass().getMethod( "setExpandEvents", Boolean.TYPE ).invoke(
 			        consoleReader, false );
             consoleReader.getClass().getMethod( "setHistoryEnabled", Boolean.TYPE ).invoke(
                     consoleReader, true );

@@ -3,7 +3,7 @@
   <parent>
     <groupId>org.neo4j</groupId>
     <artifactId>parent</artifactId>
-    <version>2.3-SNAPSHOT</version>
+    <version>2.3.13-SNAPSHOT</version>
     <relativePath>../..</relativePath>
   </parent>
 
@@ -16,7 +16,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>neo4j-io</artifactId>
-  <version>2.3-SNAPSHOT</version>
+  <version>2.3.13-SNAPSHOT</version>
 
   <packaging>jar</packaging>
   <name>Neo4j - IO</name>
@@ -58,6 +58,10 @@ the relevant Commercial Agreement.
       <artifactId>neo4j-primitive-collections</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
@@ -81,8 +85,10 @@ the relevant Commercial Agreement.
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
+      <groupId>org.neo4j</groupId>
+      <artifactId>neo4j-unsafe</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>

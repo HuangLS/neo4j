@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -80,6 +80,11 @@ public class ServerHelper
     public static NeoServer createNonPersistentServer( LogProvider logProvider ) throws IOException
     {
         return createServer( CommunityServerBuilder.server( logProvider ), false, null );
+    }
+
+    public static NeoServer createNonPersistentServer( CommunityServerBuilder builder ) throws IOException
+    {
+        return createServer( builder, false, null );
     }
 
     public static NeoServer createPersistentServer( File path ) throws IOException

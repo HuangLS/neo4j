@@ -1,4 +1,4 @@
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -17,7 +17,33 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+<#
+.SYNOPSIS
+Confirms a Powershell Object is a valid Neo4j Server object
 
+.DESCRIPTION
+Confirms a Powershell Object is a valid Neo4j Server object
+
+.PARAMETER Neo4jServer
+The object to confirm
+
+.EXAMPLE
+$serverObject | Confirm-Neo4jServerObject 
+
+Confirm that $serverObject is a valid Neo4j Server object
+
+.EXAMPLE
+Confirm-Neo4jServerObject -Neo4jServer $serverObject
+
+Confirm that $serverObject is a valid Neo4j Server object
+
+.OUTPUTS
+System.Boolean
+
+.NOTES
+This function is private to the powershell module
+
+#>
 Function Confirm-Neo4jServerObject
 {
   [cmdletBinding(SupportsShouldProcess=$false,ConfirmImpact='Low')]
@@ -34,9 +60,9 @@ Function Confirm-Neo4jServerObject
   {
     if ($Neo4jServer -eq $null) { return $false }
     
-    if ($Neo4jServer.ServerVersion -eq $null) { return $false }
-    if ($Neo4jServer.Home -eq $null) { return $false }
-    if ($Neo4jServer.ServerType -eq $null) { return $false }
+    if ([string]$Neo4jServer.ServerVersion -eq '') { return $false }
+    if ([string]$Neo4jServer.Home -eq '') { return $false }
+    if ([string]$Neo4jServer.ServerType -eq '') { return $false }
     
     if ( ($Neo4jServer.ServerType -ne 'Community') -and ($Neo4jServer.ServerType -ne 'Enterprise') -and ($Neo4jServer.ServerType -ne 'Advanced') ) { return $false }    
     if (-not (Test-Path -Path ($Neo4jServer.Home))) { return $false }

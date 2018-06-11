@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,9 @@ package org.neo4j.cypher.internal.compiler.v2_3.pipes
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.Effects
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.{InternalPlanDescription, PlanDescriptionImpl, TwoChildren}
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.InternalException
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
 case class UnionPipe(sources: List[Pipe], columns:List[String])(implicit val monitor: PipeMonitor) extends Pipe {
   protected def internalCreateResults(state: QueryState): Iterator[ExecutionContext] = new UnionIterator(sources, state)
@@ -32,7 +34,7 @@ case class UnionPipe(sources: List[Pipe], columns:List[String])(implicit val mon
       case (l, r) => new PlanDescriptionImpl(this.id, "Union", TwoChildren(l, r), Seq.empty, identifiers)
     }
 
-  def symbols: SymbolTable = new SymbolTable(columns.map(k => k -> CTAny).toMap)
+  def symbols = new SymbolTable(columns.map(k => k -> CTAny).toMap)
 
   def exists(pred: Pipe => Boolean) = pred(this) || sources.exists(_.exists(pred))
 

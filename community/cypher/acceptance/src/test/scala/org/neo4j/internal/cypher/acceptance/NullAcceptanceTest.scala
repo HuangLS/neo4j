@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,92 +35,36 @@ class NullAcceptanceTest extends ExecutionEngineFunSuite {
     result.toList
   }
 
-  test("round(null) returns null") {
-    executeScalar[Any]("RETURN round(null)") should equal(anyNull)
-  }
+  val expressions = Seq(
+    "round(null)",
+    "floor(null)",
+    "ceil(null)",
+    "abs(null)",
+    "acos(null)",
+    "asin(null)",
+    "atan(null)",
+    "cos(null)",
+    "cot(null)",
+    "exp(null)",
+    "log(null)",
+    "log10(null)",
+    "sin(null)",
+    "tan(null)",
+    "haversin(null)",
+    "sqrt(null)",
+    "sign(null)",
+    "radians(null)",
+    "atan2(null, 0.3)",
+    "atan2(0.3, null)",
+    "null in [1,2,3]",
+    "2 in null",
+    "null in null",
+    "ANY(x in NULL WHERE x = 42)"
+  )
 
-
-  test("floor(null) returns null") {
-    executeScalar[Any]("RETURN floor(null)") should equal(anyNull)
-  }
-
-  test("ceil(null) returns null") {
-    executeScalar[Any]("RETURN ceil(null)") should equal(anyNull)
-  }
-
-  test("abs(null) returns null") {
-    executeScalar[Any]("RETURN abs(null)") should equal(anyNull)
-  }
-
-  test("acos(null) returns null") {
-    executeScalar[Any]("RETURN acos(null)") should equal(anyNull)
-  }
-
-  test("asin(null) returns null") {
-    executeScalar[Any]("RETURN asin(null)") should equal(anyNull)
-  }
-
-  test("atan(null) returns null") {
-    executeScalar[Any]("RETURN atan(null)") should equal(anyNull)
-  }
-
-  test("cos(null) returns null") {
-    executeScalar[Any]("RETURN cos(null)") should equal(anyNull)
-  }
-
-  test("cot(null) returns null") {
-    executeScalar[Any]("RETURN cot(null)") should equal(anyNull)
-  }
-
-  test("degrees(null) returns null") {
-    executeScalar[Any]("RETURN degrees(null)") should equal(anyNull)
-  }
-
-  test("exp(null) returns null") {
-    executeScalar[Any]("RETURN exp(null)") should equal(anyNull)
-  }
-
-  test("log(null) returns null") {
-    executeScalar[Any]("RETURN log(null)") should equal(anyNull)
-  }
-
-  test("log10(null) returns null") {
-    executeScalar[Any]("RETURN log10(null)") should equal(anyNull)
-  }
-
-  test("sin(null) returns null") {
-    executeScalar[Any]("RETURN sin(null)") should equal(anyNull)
-  }
-
-  test("tan(null) returns null") {
-    executeScalar[Any]("RETURN tan(null)") should equal(anyNull)
-  }
-
-  test("haversin(null) returns null") {
-    executeScalar[Any]("RETURN haversin(null)") should equal(anyNull)
-  }
-
-  test("sqrt(null) returns null") {
-    executeScalar[Any]("RETURN sqrt(null)") should equal(anyNull)
-  }
-
-  test("sign(null) returns null") {
-    executeScalar[Any]("RETURN sign(null)") should equal(anyNull)
-  }
-
-  test("radians(null) returns null") {
-    executeScalar[Any]("RETURN radians(null)") should equal(anyNull)
-  }
-
-  test("atan2(null, 0.3) returns null") {
-    executeScalar[Any]("RETURN atan2(null, 0.3)") should equal(anyNull)
-  }
-
-  test("atan2(0.3, null) returns null") {
-    executeScalar[Any]("RETURN atan2(0.3, null)") should equal(anyNull)
-  }
-
-  test("atan2(null, null) returns null") {
-    executeScalar[Any]("RETURN atan2(null, null)") should equal(anyNull)
+  expressions.foreach { expression =>
+    test(expression) {
+      executeScalar[Any]("RETURN " + expression) should equal(anyNull)
+    }
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.ExpressionConverters._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.{ManyQueryExpression, QueryExpression, SingleQueryExpression}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{ManySeekArgs, SeekArgs}
@@ -51,7 +51,7 @@ case class SingleSeekRhs(expr: Expression) extends SeekRhs {
     SingleQueryExpression(expr)
 
   def asCommandSeekArgs: SeekArgs =
-    ManySeekArgs(Collection(Seq(expr))(expr.position).asCommandExpression)
+    ManySeekArgs(toCommandExpression(Collection(Seq(expr))(expr.position)))
 }
 
 case class MultiSeekRhs(expr: Expression) extends SeekRhs {
@@ -69,5 +69,5 @@ case class MultiSeekRhs(expr: Expression) extends SeekRhs {
     ManyQueryExpression(expr)
 
   def asCommandSeekArgs: SeekArgs =
-    ManySeekArgs(expr.asCommandExpression)
+    ManySeekArgs(toCommandExpression(expr))
 }

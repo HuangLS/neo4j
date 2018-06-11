@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,13 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.SingleQueryExpression
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.LazyLabel
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{LogicalPlanningTestSupport2, PlannerQuery}
-import org.neo4j.cypher.internal.compiler.v2_3.{LabelId, PropertyKeyId}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticDirection, LabelId, PropertyKeyId}
 
 class NodeHashJoinPlanningIntegrationTest extends CypherFunSuite with LogicalPlanningTestSupport2 {
 
@@ -42,7 +41,7 @@ class NodeHashJoinPlanningIntegrationTest extends CypherFunSuite with LogicalPla
         case _                             => Double.MaxValue
       }
 
-    } planFor "MATCH (a:X)<-[r1]-(b)-[r2]->(c:X) RETURN b").innerPlan
+    } planFor "MATCH (a:X)<-[r1]-(b)-[r2]->(c:X) RETURN b").plan
 
     val expected =
       Selection(
@@ -51,10 +50,10 @@ class NodeHashJoinPlanningIntegrationTest extends CypherFunSuite with LogicalPla
           Set(IdName("b")),
           Expand(
             NodeByLabelScan(IdName("a"), LazyLabel("X"), Set.empty)(solved),
-            IdName("a"), Direction.INCOMING, Seq.empty, IdName("b"), IdName("r1"))(solved),
+            IdName("a"), SemanticDirection.INCOMING, Seq.empty, IdName("b"), IdName("r1"))(solved),
           Expand(
             NodeByLabelScan(IdName("c"), LazyLabel("X"), Set.empty)(solved),
-            IdName("c"), Direction.INCOMING, Seq.empty, IdName("b"), IdName("r2"))(solved)
+            IdName("c"), SemanticDirection.INCOMING, Seq.empty, IdName("b"), IdName("r2"))(solved)
         )(solved)
       )(solved)
 
@@ -74,14 +73,14 @@ class NodeHashJoinPlanningIntegrationTest extends CypherFunSuite with LogicalPla
       }
 
       indexOn("Person", "name")
-    } planFor "MATCH (a)-[r]->(b) USING INDEX a:Person(name) USING INDEX b:Person(name) WHERE a:Person AND b:Person AND a.name = 'Jakub' AND b.name = 'Andres' return r").innerPlan should equal(
+    } planFor "MATCH (a)-[r]->(b) USING INDEX a:Person(name) USING INDEX b:Person(name) WHERE a:Person AND b:Person AND a.name = 'Jakub' AND b.name = 'Andres' return r").plan should equal(
       NodeHashJoin(
         Set(IdName("b")),
         Selection(
           Seq(In(Property(ident("b"), PropertyKeyName("name") _) _, Collection(Seq(StringLiteral("Andres") _)) _) _, HasLabels(ident("b"), Seq(LabelName("Person") _)) _),
           Expand(
             NodeIndexSeek("a", LabelToken("Person", LabelId(0)), PropertyKeyToken("name", PropertyKeyId(0)), SingleQueryExpression(StringLiteral("Jakub") _), Set.empty)(solved),
-            "a", Direction.OUTGOING, Seq.empty, "b", "r"
+            "a", SemanticDirection.OUTGOING, Seq.empty, "b", "r"
           )(solved)
         )(solved),
         NodeIndexSeek("b", LabelToken("Person", LabelId(0)), PropertyKeyToken("name", PropertyKeyId(0)), SingleQueryExpression(StringLiteral("Andres") _), Set.empty)(solved)
@@ -104,7 +103,7 @@ class NodeHashJoinPlanningIntegrationTest extends CypherFunSuite with LogicalPla
         case PlannerQuery(queryGraph, _, _) if queryGraph.patternNodes.size == 1 && queryGraph.selections.predicates.isEmpty => 10000.0
         case _ => Double.MaxValue
       }
-    } planFor cypherQuery).innerPlan
+    } planFor cypherQuery).plan
 
     val expected =
       Selection(
@@ -116,10 +115,10 @@ class NodeHashJoinPlanningIntegrationTest extends CypherFunSuite with LogicalPla
           Set(IdName("b")),
           Expand(
             NodeByLabelScan(IdName("a"), LazyLabel("A"), Set.empty)(solved),
-            IdName("a"), Direction.OUTGOING, Seq(RelTypeName("X") _), IdName("b"), IdName("r1"), ExpandAll)(solved),
+            IdName("a"), SemanticDirection.OUTGOING, Seq(RelTypeName("X") _), IdName("b"), IdName("r1"), ExpandAll)(solved),
           Expand(
             NodeByLabelScan(IdName("c"), LazyLabel("C"), Set.empty)(solved),
-            IdName("c"), Direction.INCOMING, Seq(RelTypeName("X") _), IdName("b"), IdName("r2"), ExpandAll)(solved)
+            IdName("c"), SemanticDirection.INCOMING, Seq(RelTypeName("X") _), IdName("b"), IdName("r2"), ExpandAll)(solved)
         )(solved)
       )(solved)
 

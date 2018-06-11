@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.io.fs;
+
+import org.apache.commons.lang3.SystemUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -55,19 +57,7 @@ import static java.nio.file.StandardOpenOption.WRITE;
 
 public class FileUtils
 {
-    public static final boolean OS_IS_WINDOWS;
     private static final int WINDOWS_RETRY_COUNT = 5;
-
-    static {
-        boolean isWindows;
-        try {
-            String osName = System.getProperty( "os.name" );
-            isWindows = osName != null && osName.startsWith( "Windows" );
-        } catch (SecurityException ex) {
-            isWindows = false;
-        }
-        OS_IS_WINDOWS = isWindows;
-    }
 
     public static void deleteRecursively( File directory ) throws IOException
     {
@@ -451,7 +441,7 @@ public class FileUtils
         }
         catch ( IOException e )
         {
-            if ( OS_IS_WINDOWS && mayBeWindowsMemoryMappedFileReleaseProblem( e ) )
+            if ( SystemUtils.IS_OS_WINDOWS && mayBeWindowsMemoryMappedFileReleaseProblem( e ) )
             {
                 if ( tries >= WINDOWS_RETRY_COUNT )
                 {

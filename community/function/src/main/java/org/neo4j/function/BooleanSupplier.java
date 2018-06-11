@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.function;
 /**
  * Represents a supplier of boolean-valued results. This is the boolean-producing primitive specialization of {@link Supplier}.
  * There is no requirement that a new or distinct result be returned each time the supplier is invoked.
+ * @deprecated Usages will be replaced by corresponding {@code java.util.function} interface and classes in 3.0.
  */
 public interface BooleanSupplier
 {

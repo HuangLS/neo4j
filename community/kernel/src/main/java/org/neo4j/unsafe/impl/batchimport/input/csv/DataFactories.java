@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -261,7 +261,7 @@ public class DataFactories
             {
                 headerSeeker = headerCharSeekerFactory.open( dataSeeker, config );
                 Mark mark = new Mark();
-                Extractors extractors = new Extractors( config.arrayDelimiter() );
+                Extractors extractors = new Extractors( config.arrayDelimiter(), config.emptyQuotedStringsAsNull() );
                 Extractor<?> idExtractor = idType.extractor( extractors );
                 int delimiter = config.delimiter();
                 List<Header.Entry> columns = new ArrayList<>();

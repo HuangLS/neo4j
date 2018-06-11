@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,6 @@ package org.neo4j.kernel.impl.store;
 import java.io.File;
 import java.io.IOException;
 
-import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.PageCursor;
 import org.neo4j.kernel.IdGeneratorFactory;
@@ -31,7 +30,6 @@ import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.record.Record;
 import org.neo4j.kernel.impl.store.record.RecordLoad;
 import org.neo4j.kernel.impl.store.record.RelationshipRecord;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.LogProvider;
 
 import static org.neo4j.io.pagecache.PagedFile.PF_EXCLUSIVE_LOCK;
@@ -55,13 +53,9 @@ public class RelationshipStore extends AbstractRecordStore<RelationshipRecord>
             Config configuration,
             IdGeneratorFactory idGeneratorFactory,
             PageCache pageCache,
-            FileSystemAbstraction fileSystemAbstraction,
-            LogProvider logProvider,
-            StoreVersionMismatchHandler versionMismatchHandler,
-            Monitors monitors )
+            LogProvider logProvider )
     {
-        super( fileName, configuration, IdType.RELATIONSHIP, idGeneratorFactory,
-                pageCache, fileSystemAbstraction, logProvider, versionMismatchHandler, monitors );
+        super( fileName, configuration, IdType.RELATIONSHIP, idGeneratorFactory, pageCache, logProvider );
     }
 
     @Override
@@ -112,6 +106,15 @@ public class RelationshipStore extends AbstractRecordStore<RelationshipRecord>
         return fillRecord( id, record, RecordLoad.CHECK ) ? record : null;
     }
 
+    /**
+     * @return {@code true} if record successfully loaded and in use.
+     * If not in use the return value depends on the {@code loadMode}:
+     * <ol>
+     * <li>NORMAL: throws {@link InvalidRecordException}</li>
+     * <li>CHECK: returns {@code false}</li>
+     * <li>FORCE: return {@code true}</li>
+     * </ol>
+     */
     public boolean fillRecord( long id, RelationshipRecord target, RecordLoad loadMode )
     {
         try ( PageCursor cursor = storeFile.io( pageIdForRecord( id ), PF_SHARED_LOCK ) )

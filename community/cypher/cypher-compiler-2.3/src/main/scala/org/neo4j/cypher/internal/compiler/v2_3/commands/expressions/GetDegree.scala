@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,16 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 
+import org.neo4j.cypher.internal.compiler.v2_3.ExecutionContext
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.KeyToken
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
 import org.neo4j.cypher.internal.compiler.v2_3.spi.QueryContext
-import org.neo4j.cypher.internal.compiler.v2_3.symbols.{CypherType, SymbolTable, _}
-import org.neo4j.cypher.internal.compiler.v2_3.{CypherTypeException, ExecutionContext}
-import org.neo4j.graphdb.{Direction, Node}
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticDirection, CypherTypeException}
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.graphdb.Node
 
-case class GetDegree(node: Expression, typ: Option[KeyToken], direction: Direction) extends NullInNullOutExpression(node) {
+case class GetDegree(node: Expression, typ: Option[KeyToken], direction: SemanticDirection) extends NullInNullOutExpression(node) {
 
   val getDegree: (QueryContext, Long) => Int = typ match {
     case None    => (qtx, node) => qtx.nodeGetDegree(node, direction)

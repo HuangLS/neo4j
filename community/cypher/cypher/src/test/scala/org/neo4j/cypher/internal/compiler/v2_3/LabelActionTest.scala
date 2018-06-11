@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,17 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3
 
+import java.net.URL
+
 import org.neo4j.cypher.GraphDatabaseFunSuite
-import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Literal
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expander, KernelPredicate, Literal}
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.{KeyToken, TokenType}
 import org.neo4j.cypher.internal.compiler.v2_3.commands.{LabelAction, LabelSetOp}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.PatternNode
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.{IndexDescriptor, NodePropertyExistenceConstraint, UniquenessConstraint}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.{IdempotentResult, LockingQueryContext, QueryContext}
-import org.neo4j.graphdb.{Direction, Node, Relationship}
-import org.neo4j.kernel.api.constraints.{MandatoryNodePropertyConstraint, UniquenessConstraint}
-import org.neo4j.kernel.api.index.IndexDescriptor
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.graphdb.{Node, Path, PropertyContainer, Relationship}
 
 class LabelActionTest extends GraphDatabaseFunSuite {
   val queryContext = new SnitchingQueryContext
@@ -97,7 +100,7 @@ class SnitchingQueryContext extends QueryContext {
 
   def getLabelsForNode(node: Long) = ???
 
-  def getRelationshipsFor(node: Node, dir: Direction, types: Seq[String]) = ???
+  def getRelationshipsFor(node: Node, dir: SemanticDirection, types: Seq[String]) = ???
 
   def nodeOps = ???
 
@@ -141,13 +144,13 @@ class SnitchingQueryContext extends QueryContext {
 
   def dropUniqueConstraint(labelId: Int, propertyKeyId: Int) = ???
 
-  def createNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int): IdempotentResult[MandatoryNodePropertyConstraint] = ???
+  def createNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int): IdempotentResult[NodePropertyExistenceConstraint] = ???
 
-  def dropNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int) = ???
+  def dropNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int) = ???
 
-  def createRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int) = ???
+  def createRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int) = ???
 
-  def dropRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int) = ???
+  def dropRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int) = ???
 
   def getLabelId(labelName: String): Int = ???
 
@@ -155,7 +158,7 @@ class SnitchingQueryContext extends QueryContext {
 
   def withAnyOpenQueryContext[T](work: (QueryContext) => T): T = ???
 
-  def uniqueIndexSeek(index: IndexDescriptor, value: Any): Option[Node] = ???
+  def lockingExactUniqueIndexSearch(index: IndexDescriptor, value: Any): Option[Node] = ???
 
   def commitAndRestartTx() { ??? }
 
@@ -169,9 +172,25 @@ class SnitchingQueryContext extends QueryContext {
 
   def relationshipEndNode(rel: Relationship) = ???
 
-  def getRelationshipsForIds(node: Node, dir: Direction, types: Option[Seq[Int]]): Iterator[Relationship] = ???
+  def getRelationshipsForIds(node: Node, dir: SemanticDirection, types: Option[Seq[Int]]): Iterator[Relationship] = ???
 
-  def nodeGetDegree(node: Long, dir: Direction): Int = ???
+  def nodeGetDegree(node: Long, dir: SemanticDirection): Int = ???
 
-  def nodeGetDegree(node: Long, dir: Direction, relTypeId: Int): Int = ???
+  def nodeGetDegree(node: Long, dir: SemanticDirection, relTypeId: Int): Int = ???
+
+  def nodeIsDense(node: Long): Boolean = ???
+
+  // Legacy dependency between kernel and compiler
+  override def variableLengthPathExpand(node: PatternNode, realNode: Node, minHops: Option[Int], maxHops: Option[Int], direction: SemanticDirection, relTypes: Seq[String]): Iterator[Path] = ???
+
+  def getImportURL(url: URL): Either[String,URL] = ???
+  override def createRelationship(start: Long, end: Long, relType: Int) = ???
+
+  override def isLabelSetOnNode(label: Int, node: Long): Boolean = ???
+
+  override def singleShortestPath(left: Node, right: Node, depth: Int, expander: Expander, pathPredicate: KernelPredicate[Path], filters: Seq[KernelPredicate[PropertyContainer]]): Option[Path] = ???
+
+  override def allShortestPath(left: Node, right: Node, depth: Int, expander: Expander, pathPredicate: KernelPredicate[Path], filters: Seq[KernelPredicate[PropertyContainer]]): Iterator[Path] = ???
+
+  override def detachDeleteNode(node: Node): Int = ???
 }

@@ -1,4 +1,4 @@
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -17,7 +17,25 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+<#
+.SYNOPSIS
+Determines the default location of a Neo4j installation
 
+.DESCRIPTION
+Determines the default location of a Neo4j installation using the environment variable NEO4J_HOME
+
+.EXAMPLE
+Get-Neo4jHome
+
+Returns the path to the default Neo4j installation
+
+.LINK
+http://neo4j.com/docs/stable/server-installation.html#windows-console
+
+.OUTPUTS
+System.String
+
+#>
 Function Get-Neo4jHome
 {
   [cmdletBinding(SupportsShouldProcess=$false,ConfirmImpact='Low')]

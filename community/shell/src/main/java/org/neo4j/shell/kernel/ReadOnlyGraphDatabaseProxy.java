@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.shell.kernel;
 
 import java.io.Serializable;
+import java.net.URL;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -52,7 +53,6 @@ import org.neo4j.graphdb.schema.ConstraintCreator;
 import org.neo4j.graphdb.schema.ConstraintDefinition;
 import org.neo4j.graphdb.schema.IndexCreator;
 import org.neo4j.graphdb.schema.IndexDefinition;
-import org.neo4j.graphdb.schema.RelationshipConstraintCreator;
 import org.neo4j.graphdb.schema.Schema;
 import org.neo4j.graphdb.traversal.BidirectionalTraversalDescription;
 import org.neo4j.graphdb.traversal.TraversalDescription;
@@ -60,6 +60,7 @@ import org.neo4j.helpers.collection.IterableWrapper;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.impl.store.StoreId;
 import org.neo4j.kernel.impl.traversal.OldTraverserWrapper;
+import org.neo4j.kernel.security.URLAccessValidationError;
 
 public class ReadOnlyGraphDatabaseProxy implements GraphDatabaseService, GraphDatabaseAPI, IndexManager
 {
@@ -387,6 +388,18 @@ public class ReadOnlyGraphDatabaseProxy implements GraphDatabaseService, GraphDa
         }
 
         @Override
+        public Map<String, Object> getProperties( String... names )
+        {
+            return actual.getProperties( names );
+        }
+
+        @Override
+        public Map<String, Object> getAllProperties()
+        {
+            return actual.getAllProperties();
+        }
+
+        @Override
         public boolean hasProperty( String key )
         {
             return actual.hasProperty( key );
@@ -533,6 +546,18 @@ public class ReadOnlyGraphDatabaseProxy implements GraphDatabaseService, GraphDa
         public Iterable<String> getPropertyKeys()
         {
             return actual.getPropertyKeys();
+        }
+
+        @Override
+        public Map<String, Object> getProperties( String... names )
+        {
+            return actual.getProperties( names );
+        }
+
+        @Override
+        public Map<String, Object> getAllProperties()
+        {
+            return actual.getAllProperties();
         }
 
         @Override
@@ -953,12 +978,6 @@ public class ReadOnlyGraphDatabaseProxy implements GraphDatabaseService, GraphDa
         }
 
         @Override
-        public RelationshipConstraintCreator constraintFor( RelationshipType type )
-        {
-            throw readOnlyException();
-        }
-
-        @Override
         public Iterable<ConstraintDefinition> getConstraints()
         {
             return actual.getConstraints();
@@ -993,6 +1012,12 @@ public class ReadOnlyGraphDatabaseProxy implements GraphDatabaseService, GraphDa
     public StoreId storeId()
     {
         return actual.storeId();
+    }
+
+    @Override
+    public URL validateURLAccess( URL url ) throws URLAccessValidationError
+    {
+        return actual.validateURLAccess( url );
     }
 
     @Override

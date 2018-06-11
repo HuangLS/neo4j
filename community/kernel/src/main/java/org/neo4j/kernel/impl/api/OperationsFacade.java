@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,13 @@
 package org.neo4j.kernel.impl.api;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
+import org.act.temporalProperty.index.value.IndexQueryRegion;
+import org.apache.commons.lang3.tuple.Pair;
+
+import org.neo4j.collection.primitive.PrimitiveIntCollection;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
@@ -29,22 +34,20 @@ import org.neo4j.cursor.Cursor;
 import org.neo4j.function.Function;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.kernel.api.DataWriteOperations;
+import org.neo4j.kernel.api.EntityType;
 import org.neo4j.kernel.api.LegacyIndexHits;
 import org.neo4j.kernel.api.ReadOperations;
 import org.neo4j.kernel.api.SchemaWriteOperations;
 import org.neo4j.kernel.api.StatementConstants;
-import org.neo4j.kernel.api.constraints.MandatoryNodePropertyConstraint;
-import org.neo4j.kernel.api.constraints.MandatoryRelationshipPropertyConstraint;
 import org.neo4j.kernel.api.constraints.NodePropertyConstraint;
+import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.PropertyConstraint;
 import org.neo4j.kernel.api.constraints.RelationshipPropertyConstraint;
+import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.cursor.RelationshipItem;
-import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
-import org.neo4j.kernel.api.exceptions.LabelNotFoundKernelException;
-import org.neo4j.kernel.api.exceptions.PropertyKeyIdNotFoundKernelException;
-import org.neo4j.kernel.api.exceptions.RelationshipTypeIdNotFoundKernelException;
+import org.neo4j.kernel.api.exceptions.*;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.legacyindex.LegacyIndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException;
@@ -57,10 +60,14 @@ import org.neo4j.kernel.api.exceptions.schema.DuplicateIndexSchemaRuleException;
 import org.neo4j.kernel.api.exceptions.schema.IllegalTokenNameException;
 import org.neo4j.kernel.api.exceptions.schema.IndexBrokenKernelException;
 import org.neo4j.kernel.api.exceptions.schema.IndexSchemaRuleNotFoundException;
+import org.neo4j.kernel.api.exceptions.schema.ProcedureConstraintViolation;
 import org.neo4j.kernel.api.exceptions.schema.SchemaRuleNotFoundException;
 import org.neo4j.kernel.api.exceptions.schema.TooManyLabelsException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.InternalIndexState;
+import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureSignature;
+import org.neo4j.kernel.api.procedures.ProcedureSignature.ProcedureName;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.operations.CountsOperations;
@@ -76,6 +83,12 @@ import org.neo4j.kernel.impl.api.operations.SchemaStateOperations;
 import org.neo4j.kernel.impl.api.store.RelationshipIterator;
 import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.temporal.IntervalEntry;
+import org.neo4j.temporal.TemporalIndexManager;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
+
+import static org.neo4j.helpers.collection.Iterables.map;
 
 public class OperationsFacade implements ReadOperations, DataWriteOperations, SchemaWriteOperations
 {
@@ -300,6 +313,10 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
         {
             return node.get().getProperty( propertyKeyId );
         }
+        finally
+        {
+            statement.assertOpen();
+        }
     }
 
     @Override
@@ -345,6 +362,16 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
     }
 
     @Override
+    public boolean nodeIsDense( long nodeId ) throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        try ( Cursor<NodeItem> node = dataRead().nodeCursorById( statement, nodeId ) )
+        {
+            return node.get().isDense();
+        }
+    }
+
+    @Override
     public PrimitiveIntIterator nodeGetRelationshipTypes( long nodeId ) throws EntityNotFoundException
     {
         statement.assertOpen();
@@ -380,6 +407,10 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
         {
             return relationship.get().getProperty( propertyKeyId );
         }
+        finally
+        {
+            statement.assertOpen();
+        }
     }
 
     @Override
@@ -410,7 +441,12 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
         statement.assertOpen();
         try ( Cursor<NodeItem> node = dataRead().nodeCursorById( statement, nodeId ) )
         {
-            return node.get().getPropertyKeys();
+            PrimitiveIntCollection propertyKeys = node.get().getPropertyKeys();
+            return propertyKeys.iterator();
+        }
+        finally
+        {
+            statement.assertOpen();
         }
     }
 
@@ -420,7 +456,12 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
         statement.assertOpen();
         try ( Cursor<RelationshipItem> relationship = dataRead().relationshipCursorById( statement, relationshipId ) )
         {
-            return relationship.get().getPropertyKeys();
+            PrimitiveIntCollection propertyKeys = relationship.get().getPropertyKeys();
+            return propertyKeys.iterator();
+        }
+        finally
+        {
+            statement.assertOpen();
         }
     }
 
@@ -437,6 +478,50 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
     {
         statement.assertOpen();
         dataRead().relationshipVisit( statement, relId, visitor );
+    }
+
+    @Override
+    public Object nodeGetTemporalProperty(TemporalPropertyReadOperation query) throws PropertyNotFoundException, EntityNotFoundException
+    {
+        statement.assertOpen();
+        if ( query.getProId() == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        try ( Cursor<NodeItem> node = dataRead().nodeCursorById( statement, query.getEntityId() ) )
+        {
+            Object neo4jProVal = node.get().getProperty( query.getProId() ); // seems we do not need this and open cursor is also unnecessary. maybe we should write like below (the relationship)?
+            return dataRead().nodeGetTemporalProperty(statement, query);
+        }
+        finally
+        {
+            statement.assertOpen();
+        }
+    }
+
+    @Override
+    public List<IntervalEntry> getTemporalPropertyByValueIndex( TemporalIndexManager.PropertyValueIntervalBuilder builder ) throws PropertyNotFoundException
+    {
+        statement.assertOpen();
+        for(Integer proId : builder.getPropertyValues().keySet())
+        {
+            if ( proId == StatementConstants.NO_SUCH_PROPERTY_KEY )
+            {
+                throw new PropertyNotFoundException( proId, EntityType.NODE, 0 );
+            }
+        }
+        return dataRead().getTemporalPropertyByIndex(statement, builder);
+    }
+
+    @Override
+    public Object relationshipGetTemporalProperty(TemporalPropertyReadOperation query) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        statement.assertOpen();
+        if ( query.getProId() == StatementConstants.NO_SUCH_PROPERTY_KEY )
+        {
+            return null;
+        }
+        return dataRead().relationshipGetTemporalProperty(statement, query);
     }
 
     // </DataRead>
@@ -603,6 +688,29 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
     {
         statement.assertOpen();
         return schemaRead().indexGetOwningUniquenessConstraintId( statement, index );
+    }
+
+    @Override
+    public Iterator<ProcedureSignature> proceduresGetAll()
+    {
+        statement.assertOpen();
+        // There is a mapping layer here because "inside" the kernel we use the definition object, rather than the signature,
+        // but we prefer to avoid leaking that outside the kernel.
+        return map( new Function<ProcedureDescriptor,ProcedureSignature>()
+            {
+                @Override
+                public ProcedureSignature apply( ProcedureDescriptor o )
+                {
+                    return o.signature();
+                }
+            }, schemaRead().proceduresGetAll( statement ) );
+    }
+
+    @Override
+    public ProcedureDescriptor procedureGet( ProcedureName signature ) throws ProcedureException
+    {
+        statement.assertOpen();
+        return schemaRead().procedureGet( statement, signature );
     }
 
     @Override
@@ -819,6 +927,13 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
     }
 
     @Override
+    public int nodeDetachDelete( long nodeId ) throws EntityNotFoundException
+    {
+        statement.assertOpen();
+        return dataWrite().nodeDetachDelete( statement, nodeId );
+    }
+
+    @Override
     public long relationshipCreate( int relationshipTypeId, long startNodeId, long endNodeId )
             throws RelationshipTypeIdNotFoundKernelException, EntityNotFoundException
     {
@@ -891,6 +1006,64 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
         statement.assertOpen();
         return dataWrite().graphRemoveProperty( statement, propertyKeyId );
     }
+
+//    @Override
+//    public void nodeSetTemporalProperty(long nodeId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException {
+//        statement.assertOpen();
+//        dataWrite().nodeSetTemporalProperty(statement, nodeId, propertyKeyId, time, value);
+//    }
+
+    @Override
+    public void nodeSetTemporalProperty(TemporalPropertyWriteOperation op) throws EntityNotFoundException, ConstraintValidationKernelException
+    {
+        statement.assertOpen();
+        dataWrite().nodeSetTemporalProperty(statement, op);
+    }
+
+    @Override
+    public void relationshipSetTemporalProperty(TemporalPropertyWriteOperation op) throws EntityNotFoundException, ConstraintValidationKernelException
+    {
+        statement.assertOpen();
+        dataWrite().relationshipSetTemporalProperty(statement, op);
+    }
+
+//    @Override
+//    public void nodeRemoveTemporalProperty(long nodeId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException {
+//        statement.assertOpen();
+//        dataWrite().nodeDeleteTemporalProperty(statement, nodeId, propertyKeyId);
+//    }
+//
+//    @Override
+//    public void relationshipCreateTemporalProperty(long nodeId, int maxValueLength, int propertyKeyId, int time, Object value) throws EntityNotFoundException, ConstraintValidationKernelException {
+//        statement.assertOpen();
+//        dataWrite().relationshipCreateTemporalProperty(statement, nodeId, propertyKeyId, time, maxValueLength, value);
+//    }
+//
+//    @Override
+//    public void relationshipSetTemporalProperty(long relationshipId, int propertyKeyId, int time, Object value) throws EntityNotFoundException, PropertyNotFoundException {
+//        statement.assertOpen();
+//        dataWrite().relationshipSetTemporalProperty(statement, relationshipId, propertyKeyId, time, value);
+//    }
+//
+//    @Override
+//    public void relationshipSetTemporalPropertyInvalid(long nodeId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException {
+//        statement.assertOpen();
+//        dataWrite().relationshipInvalidTemporalProperty(statement, nodeId, propertyKeyId, time);
+//    }
+//
+//    @Override
+//    public void relationshipRemoveTemporalPropertyPoint(long relationshipId, int propertyKeyId, int time) throws EntityNotFoundException, PropertyNotFoundException {
+//        statement.assertOpen();
+//        dataWrite().relationshipDeleteTemporalPropertyRecord(statement, relationshipId, propertyKeyId, time);
+//    }
+//
+//    @Override
+//    public void relationshipRemoveTemporalProperty(long relationshipId, int propertyKeyId) throws EntityNotFoundException, PropertyNotFoundException {
+//        statement.assertOpen();
+//        dataWrite().relationshipDeleteTemporalProperty(statement, relationshipId, propertyKeyId);
+//    }
+
+
     // </DataWrite>
 
     // <SchemaWrite>
@@ -918,20 +1091,20 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
     }
 
     @Override
-    public MandatoryNodePropertyConstraint mandatoryNodePropertyConstraintCreate( int labelId, int propertyKeyId )
+    public NodePropertyExistenceConstraint nodePropertyExistenceConstraintCreate( int labelId, int propertyKeyId )
             throws CreateConstraintFailureException, AlreadyConstrainedException
     {
         statement.assertOpen();
-        return schemaWrite().mandatoryNodePropertyConstraintCreate( statement, labelId, propertyKeyId );
+        return schemaWrite().nodePropertyExistenceConstraintCreate( statement, labelId, propertyKeyId );
     }
 
     @Override
-    public MandatoryRelationshipPropertyConstraint mandatoryRelationshipPropertyConstraintCreate(
+    public RelationshipPropertyExistenceConstraint relationshipPropertyExistenceConstraintCreate(
             int relTypeId, int propertyKeyId )
             throws CreateConstraintFailureException, AlreadyConstrainedException
     {
         statement.assertOpen();
-        return schemaWrite().mandatoryRelationshipPropertyConstraintCreate( statement, relTypeId, propertyKeyId );
+        return schemaWrite().relationshipPropertyExistenceConstraintCreate( statement, relTypeId, propertyKeyId );
     }
 
     @Override
@@ -953,6 +1126,21 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
     {
         statement.assertOpen();
         schemaWrite().uniqueIndexDrop( statement, descriptor );
+    }
+
+    @Override
+    public void procedureCreate( ProcedureSignature signature, String language, String body )
+            throws ProcedureException, ProcedureConstraintViolation
+    {
+        statement.assertOpen();
+        schemaWrite().procedureCreate( statement, signature, language, body );
+    }
+
+    @Override
+    public void procedureDrop( ProcedureName name ) throws ProcedureConstraintViolation, ProcedureException
+    {
+        statement.assertOpen();
+        schemaWrite().procedureDrop( statement, name );
     }
     // </SchemaWrite>
 

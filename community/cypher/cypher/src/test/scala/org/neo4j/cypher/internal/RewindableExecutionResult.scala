@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,7 @@
 package org.neo4j.cypher.internal
 
 import org.neo4j.cypher.internal.compatibility.{ExecutionResultWrapperFor2_3, exceptionHandlerFor2_3}
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{CompiledExecutionResult, InternalExecutionResult}
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.InternalExecutionResult
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments.{Planner, Runtime}
 import org.neo4j.cypher.internal.compiler.v2_3.{PipeExecutionResult, PlannerName, RuntimeName}
@@ -40,11 +40,6 @@ object RewindableExecutionResult {
                                                                                .addArgument(Planner(planner.name)).addArgument(Runtime(runtime.name))
           }
         }
-      case other: CompiledExecutionResult =>
-        exceptionHandlerFor2_3.runSafely {
-          other.toEagerIterableResult(planner, runtime)
-        }
-
       case _ =>
         inner
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,8 +30,8 @@ case class InternalQueryStatistics(nodesCreated: Int = 0,
                            indexesRemoved: Int = 0,
                            uniqueConstraintsAdded: Int = 0,
                            uniqueConstraintsRemoved: Int = 0,
-                           mandatoryConstraintsAdded: Int = 0,
-                           mandatoryConstraintsRemoved: Int = 0) {
+                           existenceConstraintsAdded: Int = 0,
+                           existenceConstraintsRemoved: Int = 0) {
   def containsUpdates =
     nodesCreated > 0 ||
       relationshipsCreated > 0 ||
@@ -44,8 +44,8 @@ case class InternalQueryStatistics(nodesCreated: Int = 0,
       indexesRemoved > 0 ||
       uniqueConstraintsAdded > 0 ||
       uniqueConstraintsRemoved > 0||
-      mandatoryConstraintsAdded > 0 ||
-      mandatoryConstraintsRemoved > 0
+      existenceConstraintsAdded > 0 ||
+      existenceConstraintsRemoved > 0
 
   override def toString = {
     val builder = new StringBuilder
@@ -61,8 +61,8 @@ case class InternalQueryStatistics(nodesCreated: Int = 0,
     includeIfNonZero(builder, "Indexes removed: ", indexesRemoved)
     includeIfNonZero(builder, "Unique constraints added: ", uniqueConstraintsAdded)
     includeIfNonZero(builder, "Unique constraints removed: ", uniqueConstraintsRemoved)
-    includeIfNonZero(builder, "Mandatory property constraints added: ", mandatoryConstraintsAdded)
-    includeIfNonZero(builder, "Mandatory property constraints removed: ", mandatoryConstraintsRemoved)
+    includeIfNonZero(builder, "Property existence constraints added: ", existenceConstraintsAdded)
+    includeIfNonZero(builder, "Property existence constraints removed: ", existenceConstraintsRemoved)
 
     val result = builder.toString()
 

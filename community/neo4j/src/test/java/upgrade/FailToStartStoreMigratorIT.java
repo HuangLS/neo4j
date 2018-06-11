@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -61,9 +61,7 @@ public class FailToStartStoreMigratorIT
         catch ( RuntimeException e )
         {
             assertThat( e.getCause(), instanceOf( LifecycleException.class ) );
-            assertThat( e.getCause().getCause(), instanceOf( LifecycleException.class ) );
-            assertThat( e.getCause().getCause().getCause(), instanceOf( LifecycleException.class ) );
-            Throwable root = e.getCause().getCause().getCause().getCause();
+            Throwable root = e.getCause().getCause();
             assertThat( root, instanceOf( NonUniqueTokenException.class ) );
             assertNull( root.getCause() );
             assertTrue( root.getMessage().startsWith( "The PropertyKey \"name\" is not unique" ) );

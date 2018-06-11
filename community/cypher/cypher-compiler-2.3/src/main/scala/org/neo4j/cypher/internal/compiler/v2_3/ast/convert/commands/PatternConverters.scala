@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,7 @@ import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.ExpressionCo
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expression => CommandExpression}
 import org.neo4j.cypher.internal.compiler.v2_3.commands.{expressions => commandexpressions, values => commandvalues}
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.UnNamedNameGenerator
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticDirection, SyntaxException, ast}
 import org.neo4j.helpers.ThisShouldNotHappenError
 
 object PatternConverters {
@@ -243,8 +243,8 @@ object PatternConverters {
     private def labels = node.labels.map(t => commandvalues.KeyToken.Unresolved(t.name, commandvalues.TokenType.Label))
 
     def legacyProperties = node.properties match {
-      case Some(m: ast.MapExpression) => m.items.map(p => (p._1.name, p._2.asCommandExpression)).toMap
-      case Some(p: ast.Parameter)     => Map[String, CommandExpression]("*" -> p.asCommandExpression)
+      case Some(m: ast.MapExpression) => m.items.map(p => (p._1.name, toCommandExpression(p._2))).toMap
+      case Some(p: ast.Parameter)     => Map[String, CommandExpression]("*" -> toCommandExpression(p))
       case Some(p)                    => throw new SyntaxException(s"Properties of a node must be a map or parameter (${p.position})")
       case None                       => Map[String, CommandExpression]()
     }
@@ -270,7 +270,7 @@ object PatternConverters {
 
     def asLegacyCreates(fromEnd: mutation.RelationshipEndpoint, toEnd: mutation.RelationshipEndpoint): mutation.CreateRelationship = {
       val (from, to) = relationship.direction match {
-        case Direction.INCOMING => (toEnd, fromEnd)
+        case SemanticDirection.INCOMING => (toEnd, fromEnd)
         // Direction.{OUTGOING|BOTH}
         case _                  => (fromEnd, toEnd)
       }
@@ -285,8 +285,8 @@ object PatternConverters {
 
     def legacyProperties: Map[String, CommandExpression] = relationship.properties match {
       case None                       => Map.empty[String, CommandExpression]
-      case Some(m: ast.MapExpression) => m.items.map(p => p._1.name -> p._2.asCommandExpression)(collection.breakOut)
-      case Some(p: ast.Parameter)     => Map("*" -> p.asCommandExpression)
+      case Some(m: ast.MapExpression) => m.items.map(p => p._1.name -> toCommandExpression(p._2))(collection.breakOut)
+      case Some(p: ast.Parameter)     => Map("*" -> toCommandExpression(p))
       case Some(p)                    => throw new SyntaxException(s"Properties of a node must be a map or parameter (${p.position})")
     }
   }

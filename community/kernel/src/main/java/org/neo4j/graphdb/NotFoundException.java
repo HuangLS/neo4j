@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,7 +26,7 @@ package org.neo4j.graphdb;
  * will cause this exception to be thrown.
  * {@link PropertyContainer#getProperty(String)} will also throw this exception
  * if the given key does not exist.
- * <p/>
+ * <p>
  * Another scenario involves multiple concurrent transactions which obtain a reference to the same node or
  * relationship, which is then deleted by one of the transactions. If the deleting transaction commits, then invoking
  * any node or relationship methods within any of the remaining open transactions will cause this exception to be

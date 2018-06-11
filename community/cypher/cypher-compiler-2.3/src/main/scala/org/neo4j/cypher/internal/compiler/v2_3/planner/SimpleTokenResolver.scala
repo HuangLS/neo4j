@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.spi.TokenContext
-import org.neo4j.cypher.internal.compiler.v2_3.LabelId
-import org.neo4j.cypher.internal.compiler.v2_3.PropertyKeyId
-import org.neo4j.cypher.internal.compiler.v2_3.ast.Query
-import org.neo4j.cypher.internal.compiler.v2_3.RelTypeId
+import org.neo4j.cypher.internal.frontend.v2_3.ast.Query
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticTable, PropertyKeyId, RelTypeId, LabelId}
 
 class SimpleTokenResolver {
   def resolve(ast: Query)(implicit semanticTable: SemanticTable, tokenContext: TokenContext) {

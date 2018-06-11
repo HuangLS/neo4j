@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,8 +31,9 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.TestHighlyAvailableGraphDatabaseFactory;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.HighlyAvailableGraphDatabase;
-import org.neo4j.kernel.ha.UpdatePullerClient;
+import org.neo4j.kernel.ha.UpdatePuller;
 import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointer;
+import org.neo4j.kernel.impl.transaction.log.checkpoint.SimpleTriggerInfo;
 import org.neo4j.kernel.impl.transaction.log.rotation.LogRotation;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.tooling.GlobalGraphOperations;
@@ -104,7 +105,7 @@ public class TestInstanceJoin
 
             slave = start( slaveDir, 1,
                     stringMap( ClusterSettings.initial_hosts.name(), "127.0.0.1:5001,127.0.0.1:5002" ) );
-            slave.getDependencyResolver().resolveDependency( UpdatePullerClient.class ).pullUpdates();
+            slave.getDependencyResolver().resolveDependency( UpdatePuller.class ).pullUpdates();
 
             try ( Transaction ignore = slave.beginTx() )
             {
@@ -132,7 +133,9 @@ public class TestInstanceJoin
 
     private void checkPoint( HighlyAvailableGraphDatabase db ) throws IOException
     {
-        db.getDependencyResolver().resolveDependency( CheckPointer.class ).forceCheckPoint();
+        db.getDependencyResolver().resolveDependency( CheckPointer.class ).forceCheckPoint(
+                new SimpleTriggerInfo( "test" )
+        );
     }
 
     private int nodesHavingProperty( HighlyAvailableGraphDatabase slave, String key, String value )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,21 +35,21 @@ public class AtomicBroadcastSerializer
 
     public AtomicBroadcastSerializer()
     {
-        this(new ObjectStreamFactory(), new ObjectStreamFactory());
+        this( new ObjectStreamFactory(), new ObjectStreamFactory() );
     }
 
     public AtomicBroadcastSerializer( ObjectInputStreamFactory objectInputStreamFactory,
-                                      ObjectOutputStreamFactory objectOutputStreamFactory )
+            ObjectOutputStreamFactory objectOutputStreamFactory )
     {
         this.objectInputStreamFactory = objectInputStreamFactory;
         this.objectOutputStreamFactory = objectOutputStreamFactory;
     }
 
-    public Payload broadcast(Object value)
-        throws IOException
+    public Payload broadcast( Object value )
+            throws IOException
     {
-        ByteArrayOutputStream bout = new ByteArrayOutputStream(  );
-        ObjectOutputStream oout = objectOutputStreamFactory.create(bout);
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        ObjectOutputStream oout = objectOutputStreamFactory.create( bout );
         oout.writeObject( value );
         oout.close();
         byte[] bytes = bout.toByteArray();
@@ -57,7 +57,7 @@ public class AtomicBroadcastSerializer
     }
 
     public Object receive( Payload payload )
-        throws IOException, ClassNotFoundException
+            throws IOException, ClassNotFoundException
     {
         ByteArrayInputStream in = new ByteArrayInputStream( payload.getBuf(), 0, payload.getLen() );
         ObjectInputStream oin = objectInputStreamFactory.create( in );

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,9 +30,10 @@ import org.neo4j.graphdb.index.LegacyIndexProviderTransaction;
 import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.kernel.api.LegacyIndex;
 import org.neo4j.kernel.api.LegacyIndexHits;
-import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
+import org.neo4j.kernel.impl.transaction.command.CommandHandler;
+import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
-public class DummyIndexImplementation implements IndexImplementation
+public class DummyIndexImplementation extends LifecycleAdapter implements IndexImplementation
 {
     @Override
     public Map<String, String> fillInDefaults( Map<String, String> config )
@@ -211,10 +212,10 @@ public class DummyIndexImplementation implements IndexImplementation
         };
     }
 
-    private static final NeoCommandHandler NO_APPLIER = new NeoCommandHandler.Adapter();
+    private static final CommandHandler NO_APPLIER = new CommandHandler.Adapter();
 
     @Override
-    public NeoCommandHandler newApplier( boolean recovery )
+    public CommandHandler newApplier( boolean recovery )
     {
         return NO_APPLIER;
     }

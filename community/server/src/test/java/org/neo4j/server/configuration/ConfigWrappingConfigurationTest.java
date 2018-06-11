@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,7 +38,7 @@ public class ConfigWrappingConfigurationTest
     public void shouldGetDefaultPropertyByKey() throws Exception
     {
         // GIVEN
-        Config config = new Config( new HashMap<String,String>(), ServerConfigFactory.getDefaultSettingsClasses() );
+        Config config = new Config( new HashMap<String,String>(), BaseServerConfigLoader.getDefaultSettingsClasses() );
         ConfigWrappingConfiguration wrappingConfiguration = new ConfigWrappingConfiguration( config );
 
         // WHEN
@@ -52,7 +52,7 @@ public class ConfigWrappingConfigurationTest
     public void shouldGetPropertyInRightFormat() throws Exception
     {
         // GIVEN
-        Config config = new Config( new HashMap<String,String>(), ServerConfigFactory.getDefaultSettingsClasses() );
+        Config config = new Config( new HashMap<String,String>(), BaseServerConfigLoader.getDefaultSettingsClasses() );
         ConfigWrappingConfiguration wrappingConfiguration = new ConfigWrappingConfiguration( config );
 
         // WHEN
@@ -69,7 +69,7 @@ public class ConfigWrappingConfigurationTest
     {
         // GIVEN
 
-        Config config = new Config( new HashMap<String,String>(), ServerConfigFactory.getDefaultSettingsClasses() );
+        Config config = new Config( new HashMap<String,String>(), BaseServerConfigLoader.getDefaultSettingsClasses() );
         ConfigWrappingConfiguration wrappingConfiguration = new ConfigWrappingConfiguration( config );
 
         // THEN
@@ -79,7 +79,7 @@ public class ConfigWrappingConfigurationTest
     @Test
     public void shouldAbleToAccessRegisteredPropertyByName()
     {
-        Config config = new Config( new HashMap<String,String>(), ServerConfigFactory.getDefaultSettingsClasses() );
+        Config config = new Config( new HashMap<String,String>(), BaseServerConfigLoader.getDefaultSettingsClasses() );
         ConfigWrappingConfiguration wrappingConfiguration = new ConfigWrappingConfiguration( config );
 
         assertEquals( 60000L, wrappingConfiguration.getProperty( ServerSettings.transaction_timeout.name() ) );

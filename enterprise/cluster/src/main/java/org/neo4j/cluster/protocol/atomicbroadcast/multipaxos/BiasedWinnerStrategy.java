@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,6 +27,10 @@ import org.neo4j.cluster.InstanceId;
 import org.neo4j.cluster.protocol.atomicbroadcast.multipaxos.context.ElectionContextImpl;
 import org.neo4j.cluster.protocol.cluster.ClusterContext;
 
+/**
+ * If a server is promoted or demoted, then use this {@link WinnerStrategy} during election so that that decision is
+ * adhered to, if possible.
+ */
 public class BiasedWinnerStrategy implements WinnerStrategy
 {
     private ClusterContext electionContext;
@@ -40,12 +44,12 @@ public class BiasedWinnerStrategy implements WinnerStrategy
         this.nodePromoted = nodePromoted;
     }
 
-    public static BiasedWinnerStrategy promotion(ClusterContext clusterContext, InstanceId biasedNode)
+    public static BiasedWinnerStrategy promotion( ClusterContext clusterContext, InstanceId biasedNode )
     {
         return new BiasedWinnerStrategy( clusterContext, biasedNode, true );
     }
 
-    public static BiasedWinnerStrategy demotion(ClusterContext clusterContext, InstanceId biasedNode)
+    public static BiasedWinnerStrategy demotion( ClusterContext clusterContext, InstanceId biasedNode )
     {
         return new BiasedWinnerStrategy( clusterContext, biasedNode, false );
     }
@@ -55,9 +59,9 @@ public class BiasedWinnerStrategy implements WinnerStrategy
     {
         List<Vote> eligibleVotes = ElectionContextImpl.removeBlankVotes( votes );
 
-        moveMostSuitableCandidatesToTop(eligibleVotes);
+        moveMostSuitableCandidatesToTop( eligibleVotes );
 
-        logElectionOutcome(votes, eligibleVotes);
+        logElectionOutcome( votes, eligibleVotes );
 
         for ( Vote vote : eligibleVotes )
         {
@@ -66,6 +70,13 @@ public class BiasedWinnerStrategy implements WinnerStrategy
             {
                 return vote.getSuggestedNode();
             }
+        }
+
+        // None were chosen - try again, without considering promotions or demotions
+        // This most commonly happens if current master is demoted but all other instances are slave-only
+        for ( Vote vote : eligibleVotes )
+        {
+            return vote.getSuggestedNode();
         }
 
         return null;
@@ -82,7 +93,7 @@ public class BiasedWinnerStrategy implements WinnerStrategy
         String electionOutcome =
                 String.format( "Election: received votes %s, eligible votes %s (Instance #%s has been %s)",
                         votes, eligibleVotes, biasedNode, nodePromoted ? "promoted" : "demoted" );
-        electionContext.getInternalLog( getClass() ).debug( electionOutcome );
+        electionContext.getLog( getClass() ).debug( electionOutcome );
     }
 
     private boolean winnerIsBiasedInstance( Vote vote )

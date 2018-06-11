@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -552,9 +552,9 @@ public class RestfulGraphDatabase
 
     @GET
     @Path( PATH_LABELS )
-    public Response getAllLabels( )
+    public Response getAllLabels( @QueryParam( "in_use" ) @DefaultValue( "true" ) boolean inUse )
     {
-        return output.ok( actions.getAllLabels() );
+        return output.ok( actions.getAllLabels( inUse ) );
     }
 
     // Property keys
@@ -571,8 +571,7 @@ public class RestfulGraphDatabase
     @SuppressWarnings("unchecked")
     @POST
     @Path(PATH_NODE_RELATIONSHIPS)
-    public Response createRelationship(
-                                        @PathParam("nodeId") long startNodeId, String body )
+    public Response createRelationship( @PathParam("nodeId") long startNodeId, String body )
     {
         final Map<String, Object> data;
         final long endNodeId;
@@ -631,8 +630,7 @@ public class RestfulGraphDatabase
 
     @DELETE
     @Path(PATH_RELATIONSHIP)
-    public Response deleteRelationship(
-                                        @PathParam("relationshipId") long relationshipId )
+    public Response deleteRelationship( @PathParam("relationshipId") long relationshipId )
     {
         try
         {
@@ -1844,65 +1842,6 @@ public class RestfulGraphDatabase
                         "Supply single property key or list of property keys" ) );
             }
             return output.ok( actions.createPropertyUniquenessConstraint( labelName, singlePropertyKey ) );
-        }
-        catch( UnsupportedOperationException e )
-        {
-            return output.badRequest( e );
-        }
-        catch ( BadInputException e )
-        {
-            return output.badRequest( e );
-        }
-        catch ( org.neo4j.graphdb.ConstraintViolationException e )
-        {
-            return output.conflict( e );
-        }
-    }
-
-    @POST
-    @Path( PATH_SCHEMA_CONSTRAINT_LABEL_EXISTENCE )
-    public Response createNodePropertyExistenceConstraint( @PathParam( "label" ) String labelName, String body )
-    {
-        try
-        {
-            Map<String, Object> data = input.readMap( body, "property_keys" );
-            Iterable<String> singlePropertyKey = singleOrList( data, "property_keys" );
-            if ( singlePropertyKey == null )
-            {
-                return output.badRequest( new IllegalArgumentException(
-                        "Supply single property key or list of property keys" ) );
-            }
-            return output.ok( actions.createNodePropertyExistenceConstraint( labelName, singlePropertyKey ) );
-        }
-        catch( UnsupportedOperationException e )
-        {
-            return output.badRequest( e );
-        }
-        catch ( BadInputException e )
-        {
-            return output.badRequest( e );
-        }
-        catch ( org.neo4j.graphdb.ConstraintViolationException e )
-        {
-            return output.conflict( e );
-        }
-    }
-
-    @POST
-    @Path( PATH_SCHEMA_RELATIONSHIP_CONSTRAINT_TYPE_EXISTENCE )
-    public Response createRelationshipPropertyExistenceConstraint( @PathParam( "type" ) String typeName,
-            String body )
-    {
-        try
-        {
-            Map<String, Object> data = input.readMap( body, "property_keys" );
-            Iterable<String> singlePropertyKey = singleOrList( data, "property_keys" );
-            if ( singlePropertyKey == null )
-            {
-                return output.badRequest( new IllegalArgumentException(
-                        "Supply single property key or list of property keys" ) );
-            }
-            return output.ok( actions.createRelationshipPropertyExistenceConstraint( typeName, singlePropertyKey ) );
         }
         catch( UnsupportedOperationException e )
         {

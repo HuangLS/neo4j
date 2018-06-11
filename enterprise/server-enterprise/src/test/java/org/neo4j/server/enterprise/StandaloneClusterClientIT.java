@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.server.enterprise;
 
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -65,7 +66,6 @@ import static org.junit.Assume.assumeFalse;
 import static org.neo4j.cluster.ClusterSettings.cluster_server;
 import static org.neo4j.cluster.ClusterSettings.initial_hosts;
 import static org.neo4j.cluster.ClusterSettings.server_id;
-import static org.neo4j.helpers.Settings.osIsWindows;
 import static org.neo4j.helpers.collection.MapUtil.store;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 import static org.neo4j.server.enterprise.StandaloneClusterClientTestProxy.START_SIGNAL;
@@ -89,7 +89,7 @@ public class StandaloneClusterClientIT
     @Test
     public void willFailJoinIfIncorrectInitialHostsSet() throws Exception
     {
-        assumeFalse( "Cannot kill processes on windows.", osIsWindows() );
+        assumeFalse( "Cannot kill processes on windows.", SystemUtils.IS_OS_WINDOWS );
         startAndAssertJoined( SHOULD_NOT_JOIN,
                 // Config file
                 stringMap(),
@@ -113,7 +113,7 @@ public class StandaloneClusterClientIT
     @Test
     public void willFailJoinIfIncorrectInitialHostsSetInConfigFile() throws Exception
     {
-        assumeFalse( "Cannot kill processes on windows.", osIsWindows() );
+        assumeFalse( "Cannot kill processes on windows.", SystemUtils.IS_OS_WINDOWS );
         startAndAssertJoined( SHOULD_NOT_JOIN,
                 // Config file
                 stringMap( initial_hosts.name(), ":5011" ),
@@ -188,8 +188,10 @@ public class StandaloneClusterClientIT
             config.put( server_id.name(), "" + i );
             config.put( initial_hosts.name(), ":5001" );
 
-            ClusterClientModule clusterClientModule = new ClusterClientModule(null, new Dependencies(), new Monitors(),
-                    new Config(config),  NullLogService.getInstance(), new ServerIdElectionCredentialsProvider());
+            LifeSupport moduleLife = new LifeSupport();
+            ClusterClientModule clusterClientModule = new ClusterClientModule( moduleLife, new Dependencies(),
+                    new Monitors(), new Config(config),  NullLogService.getInstance(),
+                    new ServerIdElectionCredentialsProvider() );
 
             final ClusterClient client = clusterClientModule.clusterClient;
             final CountDownLatch latch = new CountDownLatch( 1 );
@@ -202,7 +204,7 @@ public class StandaloneClusterClientIT
                     client.removeClusterListener( this );
                 }
             } );
-            life.add(clusterClientModule.life);
+            life.add( moduleLife );
             clients[i - 1] = client;
             assertTrue( "Didn't join the cluster", latch.await( 20, SECONDS ) );
         }
@@ -313,7 +315,7 @@ public class StandaloneClusterClientIT
     private static void kill( Process process )
             throws NoSuchFieldException, IllegalAccessException, IOException, InterruptedException
     {
-        if ( osIsWindows() )
+        if ( SystemUtils.IS_OS_WINDOWS )
         {
             process.destroy();
         }

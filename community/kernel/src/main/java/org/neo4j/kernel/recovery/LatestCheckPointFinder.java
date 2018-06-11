@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,6 +54,7 @@ public class LatestCheckPointFinder
     public LatestCheckPoint find( long fromVersionBackwards ) throws IOException
     {
         long version = fromVersionBackwards;
+        long versionToSearchForCommits = fromVersionBackwards;
         LogEntryStart latestStartEntry = null;
         long oldestVersionFound = -1;
         while ( version >= INITIAL_LOG_VERSION )
@@ -61,7 +62,7 @@ public class LatestCheckPointFinder
             LogVersionedStoreChannel channel = PhysicalLogFile.tryOpenForVersion( logFiles, fileSystem, version );
             if ( channel == null )
             {
-                return new LatestCheckPoint( null, false, oldestVersionFound );
+                break;
             }
 
             oldestVersionFound = version;
@@ -80,7 +81,7 @@ public class LatestCheckPointFinder
                     {
                         latestCheckPoint = entry.as();
                     }
-                    if ( entry instanceof LogEntryStart && ( version == fromVersionBackwards ) )
+                    if ( entry instanceof LogEntryStart && ( version == versionToSearchForCommits ) )
                     {
                         latestStartEntry = entry.as();
                     }
@@ -95,6 +96,12 @@ public class LatestCheckPointFinder
             }
 
             version--;
+
+            // if we have found no commits in the latest log, keep searching in the next one
+            if ( latestStartEntry == null )
+            {
+                versionToSearchForCommits--;
+            }
         }
 
         return new LatestCheckPoint( null, latestStartEntry != null, oldestVersionFound );
@@ -139,6 +146,16 @@ public class LatestCheckPointFinder
             result = 31 * result + (commitsAfterCheckPoint ? 1 : 0);
             result = 31 * result + (int) (oldestLogVersionFound ^ (oldestLogVersionFound >>> 32));
             return result;
+        }
+
+        @Override
+        public String toString()
+        {
+            return "LatestCheckPoint{" +
+                   "checkPoint=" + checkPoint +
+                   ", commitsAfterCheckPoint=" + commitsAfterCheckPoint +
+                   ", oldestLogVersionFound=" + oldestLogVersionFound +
+                   '}';
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,13 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.steps
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
-import org.neo4j.cypher.internal.compiler.v2_3.commands.{ManyQueryExpression, QueryExpression}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.QueryExpression
 import org.neo4j.cypher.internal.compiler.v2_3.planner.QueryGraph
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
-import org.neo4j.kernel.api.index.IndexDescriptor
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.notification.IndexLookupUnfulfillableNotification
 
 
 abstract class AbstractIndexSeekLeafPlanner extends LeafPlanner {
@@ -42,7 +43,7 @@ abstract class AbstractIndexSeekLeafPlanner extends LeafPlanner {
       yield {
         val propertyName = propertyKeyName.name
         val hint = qg.hints.collectFirst {
-          case hint @ UsingIndexHint(Identifier(`name`), `labelName`, Identifier(`propertyName`)) => hint
+          case hint @ UsingIndexHint(Identifier(`name`), `labelName`, PropertyKeyName(`propertyName`)) => hint
         }
         val entryConstructor: (Seq[Expression]) => LogicalPlan =
           constructPlan(idName, LabelToken(labelName, labelId), PropertyKeyToken(propertyKeyName, propertyKeyName.id.head),
@@ -53,21 +54,44 @@ abstract class AbstractIndexSeekLeafPlanner extends LeafPlanner {
 
     val arguments = qg.argumentIds.map(n => Identifier(n.name)(null))
 
-    predicates.collect {
+    val resultPlans = predicates.collect {
       // n.prop IN [ ... ]
       case predicate@AsPropertySeekable(seekable)
         if seekable.args.dependencies.forall(arguments) && !arguments(seekable.ident) =>
         producePlanFor(seekable.name, seekable.propertyKey, predicate, seekable.args.asQueryExpression)
 
-      // n.prop LIKE "prefix%..."
+      // n.prop STARTS WITH "prefix%..."
       case predicate@AsStringRangeSeekable(seekable) =>
-        producePlanFor(seekable.name, seekable.propertyKey, PartialPredicate.ifNotEqual(seekable.expr, predicate), seekable.asQueryExpression)
+        producePlanFor(seekable.name, seekable.propertyKey, PartialPredicate(seekable.expr, predicate), seekable.asQueryExpression)
 
       // n.prop <|<=|>|>= value
       case predicate@AsValueRangeSeekable(seekable) =>
         producePlanFor(seekable.name, seekable.propertyKeyName, predicate, seekable.asQueryExpression)
     }.flatten
+
+    if (resultPlans.isEmpty) {
+      DynamicPropertyNotifier.process(findNonSeekableIdentifiers(predicates), IndexLookupUnfulfillableNotification, qg)
+    }
+
+    resultPlans
   }
+
+  private def findNonSeekableIdentifiers(predicates: Seq[Expression])(implicit context: LogicalPlanningContext) =
+    predicates.flatMap {
+      // n['some' + n.prop] IN [ ... ]
+      case predicate@AsDynamicPropertyNonSeekable(nonSeekableId)
+        if context.semanticTable.isNode(nonSeekableId) => Some(nonSeekableId)
+
+      // n['some' + n.prop] STARTS WITH "prefix%..."
+      case predicate@AsStringRangeNonSeekable(nonSeekableId)
+        if context.semanticTable.isNode(nonSeekableId) => Some(nonSeekableId)
+
+      // n['some' + n.prop] <|<=|>|>= value
+      case predicate@AsValueRangeNonSeekable(nonSeekableId)
+        if context.semanticTable.isNode(nonSeekableId) => Some(nonSeekableId)
+
+      case _ => None
+    }.toSet
 
   protected def constructPlan(idName: IdName,
                               label: LabelToken,
@@ -76,8 +100,6 @@ abstract class AbstractIndexSeekLeafPlanner extends LeafPlanner {
                               hint: Option[UsingIndexHint],
                               argumentIds: Set[IdName])
                              (implicit context: LogicalPlanningContext): (Seq[Expression]) => LogicalPlan
-
-
 
   protected def findIndexesFor(label: String, property: String)(implicit context: LogicalPlanningContext): Option[IndexDescriptor]
 }

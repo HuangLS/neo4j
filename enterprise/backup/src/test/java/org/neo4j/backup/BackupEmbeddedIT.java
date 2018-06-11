@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.backup;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Rule;
@@ -35,15 +36,13 @@ import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
-import org.neo4j.helpers.Settings;
+import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.test.DbRepresentation;
 import org.neo4j.test.EmbeddedDatabaseRule;
 import org.neo4j.test.ProcessStreamHandler;
 import org.neo4j.test.TargetDirectory;
 
 import static org.junit.Assert.assertEquals;
-
-import static org.neo4j.helpers.Settings.osIsWindows;
 
 public class BackupEmbeddedIT
 {
@@ -60,7 +59,7 @@ public class BackupEmbeddedIT
     @Before
     public void before() throws Exception
     {
-        if ( osIsWindows() ) return;
+        if ( SystemUtils.IS_OS_WINDOWS ) return;
         FileUtils.deleteDirectory( backupPath );
         ip = InetAddress.getLocalHost().getHostAddress();
     }
@@ -81,7 +80,7 @@ public class BackupEmbeddedIT
     @Test
     public void makeSureBackupCanBePerformedWithDefaultPort() throws Exception
     {
-        if ( osIsWindows() ) return;
+        if ( SystemUtils.IS_OS_WINDOWS ) return;
         startDb( null );
         assertEquals(
                 0,
@@ -100,7 +99,7 @@ public class BackupEmbeddedIT
     @Test
     public void makeSureBackupCanBePerformedWithCustomPort() throws Exception
     {
-        if ( osIsWindows() ) return;
+        if ( SystemUtils.IS_OS_WINDOWS ) return;
         int port = 4445;
         startDb( "" + port );
         assertEquals(

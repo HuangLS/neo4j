@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.server;
+
+import org.neo4j.logging.Log;
+
+import static java.lang.String.format;
 
 /**
  * Thrown during start-up of the server.
@@ -47,5 +51,12 @@ public class ServerStartupException extends RuntimeException
     public ServerStartupException( String message )
     {
         super( message );
+    }
+
+    public void describeTo( Log log )
+    {
+        // By default, log the full error. The intention is that sub classes can override this and
+        // specify less extreme logging options.
+        log.error( format( "Failed to start Neo4j: %s", getMessage() ), this );
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,9 @@
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.ast.AstConstructionTestSupport
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.ast.AstConstructionTestSupport
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.{Rewriter, SyntaxException}
 
 class NormalizeReturnClausesTest extends CypherFunSuite with RewriteTest with AstConstructionTestSupport {
   val mkException = new SyntaxExceptionCreator("<Query>", Some(pos))
@@ -53,15 +54,6 @@ class NormalizeReturnClausesTest extends CypherFunSuite with RewriteTest with As
       """MATCH n
         |WITH * ORDER BY n.foo SKIP 2 LIMIT 5
         |RETURN *""".stripMargin)
-  }
-
-  test("introduce WITH clause for ORDER BY where returning all IDs and additional columns") {
-    assertRewrite(
-      """MATCH n
-        |RETURN *, n.foo AS bar ORDER BY n.foo SKIP 2 LIMIT 5""".stripMargin,
-      """MATCH n
-        |WITH *, n.foo AS `  FRESHID20` ORDER BY `  FRESHID20` SKIP 2 LIMIT 5
-        |RETURN *, `  FRESHID20` AS bar""".stripMargin)
   }
 
   test("match n return n, count(*) as c order by c") {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -70,6 +70,24 @@ public class CheckPointerIntegrationTest
         fs = fsRule.get();
         fs.deleteRecursively( storeDir );
         builder = new TestGraphDatabaseFactory().setFileSystem( fs ).newImpermanentDatabaseBuilder( storeDir );
+    }
+
+    @Test
+    public void databaseShutdownDuringConstantCheckPointing() throws
+            InterruptedException, IOException
+    {
+        GraphDatabaseService db = builder
+                .setConfig( GraphDatabaseSettings.check_point_interval_time, 0 + "ms" )
+                .setConfig( GraphDatabaseSettings.check_point_interval_tx, "1" )
+                .setConfig( GraphDatabaseSettings.logical_log_rotation_threshold, "1g" )
+                .newGraphDatabase();
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.createNode();
+            tx.success();
+        }
+        Thread.sleep( 10 );
+        db.shutdown();
     }
 
     @Test

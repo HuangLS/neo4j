@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,7 +25,9 @@ import org.neo4j.cypher.internal.compiler.v2_3.commands.values.KeyToken
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, _}
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.CollectionSupport
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.CypherTypeException
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
 import scala.collection.Map
 
@@ -35,10 +37,11 @@ case class CreateNode(key: String, properties: Map[String, Expression], labels: 
   with CollectionSupport {
 
   def localEffects(symbols: SymbolTable) = {
+    val writeEffects = if (labels.isEmpty) Effects(WritesAnyNode) else Effects(WritesNodesWithLabels(labels.map(_.name).toSet))
     val propertyEffects = properties.values.foldLeft(Effects())(_ | _.effects(symbols))
-    val labelEffects = Effects(labels.map(kt => WritesLabel(kt.name)).toSet[Effect])
+    val labelEffects = Effects(labels.map(kt => WritesNodesWithLabels(kt.name)).toSet[Effect])
 
-    Effects(WritesNodes) | propertyEffects | labelEffects
+    writeEffects | propertyEffects | labelEffects
   }
 
   def exec(context: ExecutionContext, state: QueryState): Iterator[ExecutionContext] = {
@@ -52,7 +55,7 @@ case class CreateNode(key: String, properties: Map[String, Expression], labels: 
 
       val queryCtx = state.query
       val labelIds = labels.map(_.getOrCreateId(state.query))
-      if (labelIds.size > 0)
+      if (labelIds.nonEmpty)
         queryCtx.setLabelsOnNode(node.getId, labelIds.iterator)
 
       val newContext = context.newWith(key -> node)

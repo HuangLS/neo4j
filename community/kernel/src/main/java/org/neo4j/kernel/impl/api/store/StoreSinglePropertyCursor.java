@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.kernel.impl.api.store;
 
 import org.neo4j.function.Consumer;
 import org.neo4j.kernel.api.StatementConstants;
+import org.neo4j.kernel.impl.locking.Lock;
 import org.neo4j.kernel.impl.store.PropertyStore;
 
 /**
@@ -29,18 +30,16 @@ import org.neo4j.kernel.impl.store.PropertyStore;
 public class StoreSinglePropertyCursor extends StorePropertyCursor
 {
     private int propertyKeyId;
-    private Consumer<StoreSinglePropertyCursor> instanceCache;
 
-    public StoreSinglePropertyCursor( PropertyStore propertyStore,
-            Consumer<StoreSinglePropertyCursor> instanceCache )
+    public StoreSinglePropertyCursor( PropertyStore propertyStore, Consumer<StoreSinglePropertyCursor> instanceCache )
     {
+        //noinspection unchecked
         super( propertyStore, (Consumer) instanceCache );
-        this.instanceCache = instanceCache;
     }
 
-    public StoreSinglePropertyCursor init( long firstPropertyId, int propertyKeyId )
+    public StoreSinglePropertyCursor init( long firstPropertyId, int propertyKeyId, Lock lock )
     {
-        super.init( firstPropertyId );
+        super.init( firstPropertyId, lock );
         this.propertyKeyId = propertyKeyId;
         return this;
     }
@@ -67,12 +66,5 @@ public class StoreSinglePropertyCursor extends StorePropertyCursor
         {
             this.propertyKeyId = StatementConstants.NO_SUCH_PROPERTY_KEY;
         }
-    }
-
-    @Override
-    public void close()
-    {
-        super.close();
-        instanceCache.accept( this );
     }
 }

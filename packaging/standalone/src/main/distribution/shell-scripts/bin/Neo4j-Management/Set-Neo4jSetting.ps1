@@ -1,4 +1,4 @@
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -17,18 +17,66 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+<#
+.SYNOPSIS
+Sets properties of a Neo4j installation
 
+.DESCRIPTION
+Sets properties of a Neo4j installation
+
+.PARAMETER Neo4jHome
+The path to the Neo4j installation
+
+.PARAMETER Neo4jServer
+An object representing a Neo4j Server.  Either an empty string (path determined by Get-Neo4jHome), a string (path to Neo4j installation) or a valid Neo4j Server object
+
+.PARAMETER ConfigurationFile
+The name of the configuration file where the property is set
+
+.PARAMETER Name
+The name of the property to set
+
+.PARAMETER Value
+The value of the property to set
+
+.PARAMETER Force
+Create the configuration file if it does not exist
+
+.EXAMPLE
+'C:\Neo4j\neo4j-community' | Set-Neo4jSetting -ConfigurationFile 'neo4j.properties' -Name 'node_auto_indexing' -Value 'false' 
+
+Set node_auto_indexing=false in the neo4j.properties file for the Neo4j installation at C:\Neo4j\neo4j-community
+
+.EXAMPLE
+Import-CSV -Path 'C:\settings.csv' | Set-Neo4jSetting -Force
+
+Forcibly apply all settings in the C:\settings.csv file
+
+.OUTPUTS
+System.Management.Automation.PSCustomObject
+This is a Neo4j Setting Object
+Properties;
+'Name' : Name of the property
+'Value' : Value of the property.  Multivalue properties are string arrays (string[])
+'ConfigurationFile' : Name of the configuration file where the setting is defined
+'IsDefault' : Whether this setting is a default value (Reserved for future use)
+'Neo4jHome' : Path to the Neo4j installation
+
+.LINK
+Get-Neo4jSetting
+
+#>
 Function Set-Neo4jSetting
 {
   [cmdletBinding(SupportsShouldProcess=$true,ConfirmImpact='Medium',DefaultParameterSetName='ByServerObject')]
   param (
     [Parameter(Mandatory=$false,ValueFromPipeline=$true,ParameterSetName='ByServerObject')]
     [object]$Neo4jServer = ''
-  
+
     ,[Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true,ParameterSetName='BySettingObject')]
     [alias('Home')]
     [string]$Neo4jHome
-    
+
     ,[Parameter(Mandatory=$true,ParameterSetName='ByServerObject')]
     [Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true,ParameterSetName='BySettingObject')]
     [alias('File')]
@@ -42,11 +90,11 @@ Function Set-Neo4jSetting
     ,[Parameter(Mandatory=$true,ParameterSetName='ByServerObject')]
     [Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true,ParameterSetName='BySettingObject')]
     [string[]]$Value
-    
+
     ,[Parameter(Mandatory=$false)]
     [switch]$Force = $false
   )
-  
+
   Begin
   {
   }
@@ -69,7 +117,7 @@ Function Set-Neo4jSetting
               return
             }
             $thisServer = $Neo4jServer
-          }      
+          }
           default
           {
             $thisServer = Get-Neo4jServer -Neo4jHome $Neo4jServer
@@ -114,7 +162,7 @@ Function Set-Neo4jSetting
       $line = $originalLine
       $misc = $line.IndexOf('#')
       if ($misc -ge 0) { $line = $line.SubString(0,$misc) }
-  
+
       if ($matches -ne $null) { $matches.Clear() }
       if ($line -match "^$($Name)=(.+)`$")
       {
@@ -132,7 +180,7 @@ Function Set-Neo4jSetting
       if ($originalLine -ne "donotwrite") { Write-Output $originalLine }
     })
     $valuesSet = ($valuesSet -join '=') + '=' # Converting the array to string is required for PS 2.0 compatibility
-    
+
     # Check if any values were not written and append if not
     $Value | ForEach-Object -Process `
     {
@@ -143,15 +191,15 @@ Function Set-Neo4jSetting
         $newContent += "$($Name)=$($_)"; $settingChanged = $true
       }
     }
-    
+
     # Modify the settings file if needed
     if ($settingChanged)
     {
       if ($PSCmdlet.ShouldProcess( ("Item: $($filePath) Setting: $($Name) Value: $($Value)", 'Write configuration file')))
-      {  
+      {
         Set-Content -Path "$filePath" -Encoding ASCII -Value $newContent -Force:$Force -Confirm:$false | Out-Null
-      }  
-    }  
+      }
+    }
     $properties = @{
       'Name' = $Name;
       'Value' = $null;
@@ -170,7 +218,7 @@ Function Set-Neo4jSetting
     }
     Write-Output (New-Object -TypeName PSCustomObject -Property $properties)
   }
-  
+
   End
   {
   }

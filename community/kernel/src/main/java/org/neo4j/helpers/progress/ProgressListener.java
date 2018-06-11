@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,8 +24,6 @@ package org.neo4j.helpers.progress;
  * <p>
  * Progress objects are not thread safe, and are to be used by a single thread only. Each Progress object from a {@link
  * ProgressMonitorFactory.MultiPartBuilder} can be used from different threads.
- *
- * @author Tobias Lindaaker <tobias.lindaaker@neotechnology.com>
  */
 public interface ProgressListener
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,6 @@
  */
 package org.neo4j.graphalgo.impl.centrality;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -54,23 +53,11 @@ public class EigenvectorCentralityPower extends EigenvectorCentralityBase
 
     public int runInternalIteration()
     {
-        Map<Node, Double> newValues = new HashMap<Node, Double>();
 
         incrementTotalIterations();
-        // "matrix multiplication"
-        for ( Relationship relationship : relationshipSet )
-        {
-            if ( relationDirection.equals( Direction.BOTH )
-                 || relationDirection.equals( Direction.OUTGOING ) )
-            {
-                processRelationship( newValues, relationship, false );
-            }
-            if ( relationDirection.equals( Direction.BOTH )
-                 || relationDirection.equals( Direction.INCOMING ) )
-            {
-                processRelationship( newValues, relationship, true );
-            }
-        }
+
+        Map<Node, Double> newValues = processRelationships();
+
         normalize( newValues );
 
         values = newValues;

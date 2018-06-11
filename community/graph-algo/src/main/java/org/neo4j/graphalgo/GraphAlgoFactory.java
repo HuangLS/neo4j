@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -129,6 +129,11 @@ public abstract class GraphAlgoFactory
     public static PathFinder<Path> shortestPath( RelationshipExpander expander, int maxDepth )
     {
         return new ShortestPath( maxDepth, expander );
+    }
+
+    public static PathFinder<Path> shortestPath( RelationshipExpander expander, int maxDepth, ShortestPath.ShortestPathPredicate predicate )
+    {
+        return new ShortestPath( maxDepth, expander, predicate );
     }
 
     /**
@@ -331,7 +336,7 @@ public abstract class GraphAlgoFactory
      * See {@link #dijkstra(PathExpander, CostEvaluator)} for documentation.
      *
      * Uses a cost evaluator which uses the supplied property key to
-     * represent the cost (values of type <bold>double</bold>).
+     * represent the cost (values of type <b>double</b>).
      *
      * @param expander the {@link RelationshipExpander} to use for expanding
      * {@link Relationship}s for each {@link Node}.
@@ -350,7 +355,7 @@ public abstract class GraphAlgoFactory
      * See {@link #dijkstra(PathExpander, CostEvaluator)} for documentation.
      *
      * Uses a cost evaluator which uses the supplied property key to
-     * represent the cost (values of type <bold>double</bold>).
+     * represent the cost (values of type <b>double</b>).
      *
      * @param expander the {@link PathExpander} to use for expanding
      * {@link Relationship}s for each {@link Path}.
@@ -368,11 +373,11 @@ public abstract class GraphAlgoFactory
     /**
      * See {@link #dijkstra(PathExpander, CostEvaluator)} for documentation
      *
-     * Instead of finding all shortest paths with equal cost, find the top {@param numberOfWantedPaths} paths.
+     * Instead of finding all shortest paths with equal cost, find the top {@code numberOfWantedPaths} paths.
      * This is usually slower than finding all shortest paths with equal cost.
      *
      * Uses a cost evaluator which uses the supplied property key to
-     * represent the cost (values of type <bold>double</bold>).
+     * represent the cost (values of type <b>double</b>).
      *
      * @param expander the {@link PathExpander} to use for expanding
      * {@link Relationship}s for each {@link Path}.
@@ -391,7 +396,7 @@ public abstract class GraphAlgoFactory
     /**
      * See {@link #dijkstra(PathExpander, CostEvaluator)} for documentation
      *
-     * Instead of finding all shortest paths with equal cost, find the top {@param numberOfWantedPaths} paths.
+     * Instead of finding all shortest paths with equal cost, find the top {@code numberOfWantedPaths} paths.
      * This is usually slower than finding all shortest paths with equal cost.
      *
      * @param expander the {@link PathExpander} to use for expanding
@@ -416,7 +421,7 @@ public abstract class GraphAlgoFactory
      * See {@link #dijkstra(PathExpander, CostEvaluator)} for documentation.
      *
      * Uses a cost evaluator which uses the supplied property key to
-     * represent the cost (values of type <bold>double</bold>).
+     * represent the cost (values of type <b>double</b>).
      *
      * @param expander the {@link PathExpander} to use for expanding
      * {@link Relationship}s for each {@link Path}.
@@ -438,7 +443,7 @@ public abstract class GraphAlgoFactory
      * See {@link #dijkstra(PathExpander, CostEvaluator)} for documentation.
      *
      * Uses a cost evaluator which uses the supplied property key to
-     * represent the cost (values of type <bold>double</bold>).
+     * represent the cost (values of type <b>double</b>).
      *
      * @param expander the {@link PathExpander} to use for expanding
      * {@link Relationship}s for each {@link Path}.
@@ -460,7 +465,7 @@ public abstract class GraphAlgoFactory
      * See {@link #dijkstra(PathExpander, CostEvaluator)} for documentation.
      *
      * Uses a cost evaluator which uses the supplied property key to
-     * represent the cost (values of type <bold>double</bold>).
+     * represent the cost (values of type <b>double</b>).
      *
      * @param expander the {@link PathExpander} to use for expanding
      * {@link Relationship}s for each {@link Path}.
@@ -483,7 +488,7 @@ public abstract class GraphAlgoFactory
      * See {@link #dijkstra(PathExpander, CostEvaluator)} for documentation.
      *
      * Uses a cost evaluator which uses the supplied property key to
-     * represent the cost (values of type <bold>double</bold>).
+     * represent the cost (values of type <b>double</b>).
      *
      * @param expander the {@link PathExpander} to use for expanding
      * {@link Relationship}s for each {@link Path}.

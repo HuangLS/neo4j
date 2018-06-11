@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,8 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands
 
-import org.neo4j.cypher.internal.compiler.v2_3._
+import org.neo4j.cypher.internal.compiler.v2_3.commands
+import org.neo4j.cypher.internal.frontend.v2_3.ast
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.ExpressionConverters._
 
 object OtherConverters {
@@ -30,7 +31,7 @@ object OtherConverters {
         case ast.AscSortItem(expr) => (expr, true)
         case ast.DescSortItem(expr) => (expr, false)
       }
-      commands.SortItem(expression.asCommandExpression, ascending)
+      commands.SortItem(toCommandExpression(expression), ascending)
     }
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.function;
 
 /**
  * Represents a predicate (boolean-valued function) of one int-valued argument. This is the int-consuming primitive type specialization of {@link Predicate}.
+ * @deprecated Usages will be replaced by corresponding {@code java.util.function} interface and classes in 3.0.
  */
 public interface IntPredicate extends ThrowingIntPredicate<RuntimeException>
 {

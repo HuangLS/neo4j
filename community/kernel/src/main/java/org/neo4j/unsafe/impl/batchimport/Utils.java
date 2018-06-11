@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,7 +33,7 @@ public class Utils
     {
         if ( value > Integer.MAX_VALUE )
         {
-            throw new UnsupportedOperationException( "Not supported a.t.m" );
+            throw new ArithmeticException( getOverflowMessage( value, Integer.TYPE ) );
         }
         return (int) value;
     }
@@ -42,7 +42,7 @@ public class Utils
     {
         if ( value > Short.MAX_VALUE )
         {
-            throw new UnsupportedOperationException( "Not supported a.t.m" );
+            throw new ArithmeticException( getOverflowMessage( value, Short.TYPE ) );
         }
         return (short) value;
     }
@@ -51,7 +51,7 @@ public class Utils
     {
         if ( value > Byte.MAX_VALUE )
         {
-            throw new UnsupportedOperationException( "Not supported a.t.m" );
+            throw new ArithmeticException( getOverflowMessage( value, Byte.TYPE ) );
         }
         return (byte) value;
     }
@@ -191,6 +191,11 @@ public class Utils
                 into[t--] = into[i--];
             }
         }
+    }
+
+    private static String getOverflowMessage( long value, Class clazz )
+    {
+        return "Value " + value + " is too big to be represented as " + clazz.getName();
     }
 
     private Utils()

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -47,7 +47,7 @@ public class IoMonitor implements StatsProvider
     {
         startTime = currentTimeMillis();
         endTime = 0;
-        resetPoint = tracer.countBytesWrittem();
+        resetPoint = tracer.countBytesWritten();
     }
 
     public void stop()
@@ -62,7 +62,7 @@ public class IoMonitor implements StatsProvider
 
     public long totalBytesWritten()
     {
-        return tracer.countBytesWrittem() - resetPoint;
+        return tracer.countBytesWritten() - resetPoint;
     }
 
     @Override

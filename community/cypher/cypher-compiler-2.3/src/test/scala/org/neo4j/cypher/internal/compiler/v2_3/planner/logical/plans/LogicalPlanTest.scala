@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,7 @@
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans
 
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{CardinalityEstimation, LogicalPlanningTestSupport, PlannerQuery}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class LogicalPlanTest extends CypherFunSuite with LogicalPlanningTestSupport  {
   case class TestPlan()(val solved: PlannerQuery with CardinalityEstimation) extends LogicalPlan with LogicalPlanWithoutExpressions {
@@ -64,5 +64,12 @@ class LogicalPlanTest extends CypherFunSuite with LogicalPlanningTestSupport  {
     val metaApply = Apply(apply1, apply2)(solved)
 
     metaApply.leafs should equal(Seq(singleRow1, singleRow2, singleRow3, singleRow4))
+  }
+
+  test("calling updateSolved on argument should work") {
+    val argument = Argument(Set(IdName("a")))(solved)()
+    val updatedPlannerQuery = CardinalityEstimation.lift(PlannerQuery.empty.updateGraph(_.addPatternNodes(IdName("a"))), 0.0)
+    val newPlan = argument.updateSolved(updatedPlannerQuery)
+    newPlan.solved should equal(updatedPlannerQuery)
   }
 }

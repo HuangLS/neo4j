@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
-import org.neo4j.cypher.internal.compiler.v2_3.commands.True
-import org.neo4j.cypher.internal.compiler.v2_3.commands.Predicate
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.{True, Predicate}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{PipeMonitor, FilterPipe, Pipe}
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{PlanBuilder, ExecutionPlanInProgress}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
@@ -32,7 +31,7 @@ class FilterBuilder extends PlanBuilder {
 
     val onlyDeterministic = !allPatternsSolved(plan)
     val item = q.where.filter(pred => yesOrNo(pred, p, onlyDeterministic))
-    val pred: Predicate = item.map(_.token).reduce(_ ++ _)
+    val pred: Predicate = item.map(_.token).reduce(_ andWith _)
 
     val newPipe = if (pred == True()) {
       p

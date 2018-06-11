@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,8 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{ASTAnnotationMap, Expression}
-import org.neo4j.cypher.internal.compiler.v2_3.ExpressionTypeInfo
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{ASTAnnotationMap, Expression}
+import org.neo4j.cypher.internal.frontend.v2_3.{ExpressionTypeInfo, SemanticTable}
 
 object SemanticTableBuilder {
   def apply() = new SemanticTableBuilder

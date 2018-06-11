@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,7 +31,7 @@ import org.neo4j.cluster.com.message.MessageHolder;
 import org.neo4j.cluster.com.message.MessageType;
 import org.neo4j.cluster.com.message.TrackingMessageHolder;
 import org.neo4j.cluster.protocol.atomicbroadcast.multipaxos.PaxosInstance.State;
-import org.neo4j.cluster.protocol.omega.MessageArgumentMatcher;
+import org.neo4j.cluster.protocol.MessageArgumentMatcher;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.logging.NullLog;
 
@@ -62,7 +62,7 @@ public class ProposerStateTest
     public void ifProposingWithClosedInstanceThenRetryWithNextInstance() throws Throwable
     {
         ProposerContext context = Mockito.mock(ProposerContext.class);
-        when(context.getInternalLog( any( Class.class ) )).thenReturn( NullLog.getInstance() );
+        when(context.getLog( any( Class.class ) )).thenReturn( NullLog.getInstance() );
 
         org.neo4j.cluster.protocol.atomicbroadcast.multipaxos.InstanceId instanceId = new org.neo4j.cluster.protocol.atomicbroadcast.multipaxos.InstanceId( 42 );
         PaxosInstanceStore paxosInstanceStore = new PaxosInstanceStore();
@@ -176,7 +176,7 @@ public class ProposerStateTest
         instance.ready( payload, true );
         instance.pending();
         ProposerContext context = mock( ProposerContext.class );
-        when( context.getInternalLog( any(Class.class) ) ).thenReturn( NullLog.getInstance() );
+        when( context.getLog( any( Class.class ) ) ).thenReturn( NullLog.getInstance() );
         when( context.getPaxosInstance( any( org.neo4j.cluster.protocol.atomicbroadcast.multipaxos.InstanceId.class ) ) ).thenReturn( instance );
         when( context.getMyId() ).thenReturn( new org.neo4j.cluster.InstanceId( parseInt( instanceId ) ) );
         TrackingMessageHolder outgoing = new TrackingMessageHolder();

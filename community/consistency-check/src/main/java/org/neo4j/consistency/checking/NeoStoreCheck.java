@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,9 +20,15 @@
 package org.neo4j.consistency.checking;
 
 import org.neo4j.consistency.report.ConsistencyReport;
+import org.neo4j.consistency.report.ConsistencyReport.NeoStoreConsistencyReport;
 import org.neo4j.kernel.impl.store.record.NeoStoreRecord;
 
-class NeoStoreCheck extends PrimitiveRecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport>
+class NeoStoreCheck extends PrimitiveRecordCheck<NeoStoreRecord,ConsistencyReport.NeoStoreConsistencyReport>
 {
+    @SafeVarargs
+    NeoStoreCheck( RecordField<NeoStoreRecord,NeoStoreConsistencyReport>...fields )
+    {
+        super( fields );
+    }
     // nothing added over PrimitiveRecordCheck
 }

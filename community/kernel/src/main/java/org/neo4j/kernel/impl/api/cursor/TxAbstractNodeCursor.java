@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -191,6 +191,12 @@ public abstract class TxAbstractNodeCursor
     public Cursor<DegreeItem> degrees()
     {
         return new DegreeCursor( relationshipTypes() );
+    }
+
+    @Override
+    public boolean isDense()
+    {
+        return cursor.get().isDense();
     }
 
     private class RelationshipTypeCursor extends GenericCursor<IntSupplier>

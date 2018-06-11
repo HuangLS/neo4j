@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,6 +40,11 @@ public abstract class AbstractLongHopScotchCollection<VALUE> extends AbstractHop
     @Override
     public <E extends Exception> void visitKeys( PrimitiveLongVisitor<E> visitor ) throws E
     {
+        if ( table.isEmpty() )
+        {
+            return;
+        }
+
         int capacity = table.capacity();
         long nullKey = table.nullKey();
         for ( int i = 0; i < capacity; i++ )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,8 @@ package org.neo4j.cypher.internal.compiler.v2_3.spi
 
 import java.util.concurrent.atomic.AtomicInteger
 import org.neo4j.cypher.internal.compiler.v2_3.InternalQueryStatistics
-import org.neo4j.graphdb.{Direction, PropertyContainer, Relationship, Node}
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.graphdb.{PropertyContainer, Relationship, Node}
 
 class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryContext(inner) {
 
@@ -36,8 +37,8 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
   private val indexesRemoved = new Counter
   private val uniqueConstraintsAdded = new Counter
   private val uniqueConstraintsRemoved = new Counter
-  private val mandatoryConstraintsAdded = new Counter
-  private val mandatoryConstraintsRemoved = new Counter
+  private val propertyExistenceConstraintsAdded = new Counter
+  private val propertyExistenceConstraintsRemoved = new Counter
 
   def getStatistics = InternalQueryStatistics(
     nodesCreated = nodesCreated.count,
@@ -51,8 +52,8 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
     indexesRemoved = indexesRemoved.count,
     uniqueConstraintsAdded = uniqueConstraintsAdded.count,
     uniqueConstraintsRemoved = uniqueConstraintsRemoved.count,
-    mandatoryConstraintsAdded = mandatoryConstraintsAdded.count,
-    mandatoryConstraintsRemoved = mandatoryConstraintsRemoved.count)
+    existenceConstraintsAdded = propertyExistenceConstraintsAdded.count,
+    existenceConstraintsRemoved = propertyExistenceConstraintsRemoved.count)
 
   override def getOptStatistics = Some(getStatistics)
 
@@ -61,10 +62,11 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
     inner.createNode()
   }
 
-  override def nodeOps: Operations[Node] = new CountingOps[Node](inner.nodeOps, nodesDeleted)
+  override def nodeOps: Operations[Node] =
+    new CountingOps[Node](inner.nodeOps, nodesDeleted)
 
-  override def relationshipOps: Operations[Relationship] = new CountingOps[Relationship](inner.relationshipOps,
-    relationshipsDeleted)
+  override def relationshipOps: Operations[Relationship] =
+    new CountingOps[Relationship](inner.relationshipOps, relationshipsDeleted)
 
   override def setLabelsOnNode(node: Long, labelIds: Iterator[Int]): Int = {
     val added = inner.setLabelsOnNode(node, labelIds)
@@ -77,10 +79,22 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
     inner.createRelationship(start, end, relType)
   }
 
+  override def createRelationship(start: Long, end: Long, relType: Int) = {
+    relationshipsCreated.increase()
+    inner.createRelationship(start, end, relType)
+  }
+
   override def removeLabelsFromNode(node: Long, labelIds: Iterator[Int]): Int = {
     val removed = inner.removeLabelsFromNode(node, labelIds)
     labelsRemoved.increase(removed)
     removed
+  }
+
+  override def detachDeleteNode(obj: Node): Int = {
+    nodesDeleted.increase()
+    val count = inner.detachDeleteNode(obj)
+    relationshipsDeleted.increase(count)
+    count
   }
 
   override def addIndexRule(labelId: Int, propertyKeyId: Int) = {
@@ -105,29 +119,29 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
     uniqueConstraintsRemoved.increase()
   }
 
-  override def createNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int) = {
-    val result = inner.createNodeMandatoryConstraint(labelId, propertyKeyId)
-    result.ifCreated { mandatoryConstraintsAdded.increase() }
+  override def createNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int) = {
+    val result = inner.createNodePropertyExistenceConstraint(labelId, propertyKeyId)
+    result.ifCreated { propertyExistenceConstraintsAdded.increase() }
     result
   }
 
-  override def dropNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int) {
-    inner.dropNodeMandatoryConstraint(labelId, propertyKeyId)
-    mandatoryConstraintsRemoved.increase()
+  override def dropNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int) {
+    inner.dropNodePropertyExistenceConstraint(labelId, propertyKeyId)
+    propertyExistenceConstraintsRemoved.increase()
   }
 
-  override def createRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int) = {
-    val result = inner.createRelationshipMandatoryConstraint(relTypeId, propertyKeyId)
-    result.ifCreated { mandatoryConstraintsAdded.increase() }
+  override def createRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int) = {
+    val result = inner.createRelationshipPropertyExistenceConstraint(relTypeId, propertyKeyId)
+    result.ifCreated { propertyExistenceConstraintsAdded.increase() }
     result
   }
 
-  override def dropRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int) {
-    inner.dropRelationshipMandatoryConstraint(relTypeId, propertyKeyId)
-    mandatoryConstraintsRemoved.increase()
+  override def dropRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int) {
+    inner.dropRelationshipPropertyExistenceConstraint(relTypeId, propertyKeyId)
+    propertyExistenceConstraintsRemoved.increase()
   }
 
-  override def nodeGetDegree(node: Long, dir: Direction): Int = super.nodeGetDegree(node, dir)
+  override def nodeGetDegree(node: Long, dir: SemanticDirection): Int = super.nodeGetDegree(node, dir)
 
   class Counter {
     val counter: AtomicInteger = new AtomicInteger()
@@ -139,8 +153,7 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
     }
   }
 
-  private class CountingOps[T <: PropertyContainer](inner: Operations[T],
-                                                    deletes: Counter)
+  private class CountingOps[T <: PropertyContainer](inner: Operations[T], deletes: Counter)
     extends DelegatingOperations[T](inner) {
 
     override def delete(obj: T) {

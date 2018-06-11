@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,15 +20,17 @@
 package org.neo4j.cypher.internal.compiler.v2_3.mutation
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.commands.Predicate
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Expression
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.Predicate
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.KeyToken
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, ReadsNodes, WritesNodes}
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ReadsAllNodes, WritesAnyNode, WritesNodesWithLabels, ReadsNodesWithLabels, Effects}
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.PropertySupport
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{EntityProducer, QueryState}
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.Argument
 import org.neo4j.cypher.internal.compiler.v2_3.spi.QueryContext
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.{InternalException, InvalidSemanticsException, MergeConstraintConflictException}
 import org.neo4j.graphdb.Node
 
 final case class IndexNodeProducer(label: KeyToken, propertyKey: KeyToken, producer: EntityProducer[Node]) extends EntityProducer[Node] {
@@ -168,7 +170,9 @@ case class MergeNodeAction(identifier: String,
       ++ onCreate.flatMap(_.symbolTableDependencies)
       ++ onMatch.flatMap(_.symbolTableDependencies)).toSet - identifier
 
-  def localEffects(symbols: SymbolTable) = Effects(WritesNodes, ReadsNodes)
+  def localEffects(symbols: SymbolTable) =
+    if (labels.isEmpty) Effects(WritesAnyNode, ReadsAllNodes)
+    else Effects(ReadsNodesWithLabels(labels.map(_.name).toSet), WritesNodesWithLabels(labels.map(_.name).toSet))
 
   override def updateSymbols(symbol: SymbolTable): SymbolTable = symbol.add(identifiers.toMap)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,9 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.FreshIdNameGenerator
-import org.neo4j.cypher.internal.compiler.v2_3.{topDown, CypherException, InputPosition, Rewriter, bottomUp}
+import org.neo4j.cypher.internal.frontend.v2_3._
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
 
 /**
  * This rewriter makes sure that all return items in a RETURN clauses are aliased, and moves
@@ -43,7 +43,7 @@ case class normalizeReturnClauses(mkException: (String, InputPosition) => Cypher
   def apply(that: AnyRef): AnyRef = bottomUp(instance).apply(that)
 
   private val clauseRewriter: (Clause => Seq[Clause]) = {
-    case clause @ Return(_, ri, None, _, _) =>
+    case clause @ Return(_, ri, None, _, _, _) =>
       val aliasedItems = ri.items.map({
         case i: AliasedReturnItem =>
           i
@@ -55,8 +55,8 @@ case class normalizeReturnClauses(mkException: (String, InputPosition) => Cypher
         clause.copy(returnItems = ri.copy(items = aliasedItems)(ri.position))(clause.position)
       )
 
-    case clause @ Return(distinct, ri, orderBy, skip, limit) =>
-      clause.verifyOrderByAggregationUse(mkException)
+    case clause @ Return(distinct, ri, orderBy, skip, limit, _) =>
+      clause.verifyOrderByAggregationUse((s,i) => throw mkException(s,i))
       var rewrites = Map[Expression, Identifier]()
 
       val (aliasProjection, finalProjection) = ri.items.map {
@@ -78,9 +78,13 @@ case class normalizeReturnClauses(mkException: (String, InputPosition) => Cypher
         case exp: Expression if rewrites.contains(exp) => rewrites(exp).copyId
       }))
 
+      val introducedVariables = if (ri.includeExisting) aliasProjection.map(_.identifier.name).toSet else Set.empty[String]
+
       Seq(
-        With(distinct = distinct, returnItems = ri.copy(items = aliasProjection)(ri.position), orderBy = newOrderBy, skip = skip, limit = limit, where = None)(clause.position),
-        Return(distinct = false, returnItems = ri.copy(items = finalProjection)(ri.position), orderBy = None, skip = None, limit = None)(clause.position)
+        With(distinct = distinct, returnItems = ri.copy(items = aliasProjection)(ri.position),
+          orderBy = newOrderBy, skip = skip, limit = limit, where = None)(clause.position),
+        Return(distinct = false, returnItems = ri.copy(items = finalProjection)(ri.position),
+          orderBy = None, skip = None, limit = None, excludedNames = introducedVariables)(clause.position)
       )
 
     case clause =>

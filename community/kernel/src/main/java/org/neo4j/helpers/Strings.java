@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,10 +27,17 @@ import java.util.Arrays;
  */
 public final class Strings
 {
+
+    public static final String TAB = "\t";
+
     private Strings()
     {
     }
 
+    /**
+     * @deprecated This field will be removed in the next major release.
+     */
+    @Deprecated
     public static final Function<String,String> decamelize = new Function<String,String>()
     {
         @Override
@@ -57,6 +64,10 @@ public final class Strings
         }
     };
 
+    /**
+     * @deprecated This method will be removed in the next major release.
+     */
+    @Deprecated
     public static boolean isBlank( String str )
     {
         if ( str == null || str.isEmpty() )
@@ -73,6 +84,10 @@ public final class Strings
         return true;
     }
 
+    /**
+     * @deprecated This method will be removed in the next major release.
+     */
+    @Deprecated
     public static String defaultIfBlank( String str, String defaultStr )
     {
         return isBlank( str ) ? defaultStr : str;
@@ -145,6 +160,22 @@ public final class Strings
         return builder.toString();
     }
 
+    /**
+     * Joining independent lines from provided elements into one line with {@link java.lang.System#lineSeparator} after
+     * each element
+     * @param elements - lines to join
+     * @return joined line
+     */
+    public static String joinAsLines( String... elements )
+    {
+        StringBuilder result = new StringBuilder();
+        for ( String line : elements )
+        {
+            result.append( line ).append( System.lineSeparator() );
+        }
+        return result.toString();
+    }
+
     public static void escape( Appendable output, String arg ) throws IOException
     {
         int len = arg.length();
@@ -195,10 +226,12 @@ public final class Strings
      * Use this to standardize the width of some text output to all be left-justified and space-padded
      * on the right side to fill up the given column width.
      *
-     * @param str
-     * @param columnWidth
-     * @return
+     * @param str the text to format
+     * @param columnWidth the column width
+     * @return the left-justified space-padded text
+     * @deprecated This method will be removed in the next major release.
      */
+    @Deprecated
     public static String ljust( String str, int columnWidth )
     {
         return String.format( "%-" + columnWidth + "s", str );
@@ -208,10 +241,12 @@ public final class Strings
      * Use this to standardize the width of some text output to all be right-justified and space-padded
      * on the left side to fill up the given column width.
      *
-     * @param str
-     * @param columnWidth
-     * @return
+     * @param str the text to format
+     * @param columnWidth the column width
+     * @return the right-justified space-padded text
+     * @deprecated This method will be removed in the next major release.
      */
+    @Deprecated
     public static String rjust( String str, int columnWidth )
     {
         return String.format( "%" + columnWidth + "s", str );

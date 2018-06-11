@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -58,14 +58,11 @@ public class RootServiceDocTest
         Response serviceDefinition = svc.getServiceDefinition( uriInfo, output );
 
         assertEquals( 200, serviceDefinition.getStatus() );
-        Map<String, Object> result = (Map<String, Object>) output.getResultAsMap()
-                .get( "services" );
+        Map<String, Object> result = (Map<String, Object>) output.getResultAsMap().get( "services" );
 
         assertThat( result.get( "console" )
                 .toString(), containsString( String.format( "%sserver/console", uri.toString() ) ) );
         assertThat( result.get( "jmx" )
                 .toString(), containsString( String.format( "%sserver/jmx", uri.toString() ) ) );
-        assertThat( result.get( "monitor" )
-                .toString(), containsString( String.format( "%sserver/monitor", uri.toString() ) ) );
     }
 }

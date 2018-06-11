@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.neo4j.helpers.Settings;
+import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.logging.NullLogProvider;
@@ -46,13 +46,13 @@ import org.neo4j.server.webadmin.console.ScriptSession;
 import org.neo4j.shell.ShellSettings;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
+import static java.lang.System.lineSeparator;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
 
 public class Neo4jShellConsoleSessionDocTest implements ConsoleSessionFactory
 {
-    private static final String LN = System.getProperty( "line.separator" );
     private ConsoleService consoleService;
     private Database database;
     private final URI uri = URI.create( "http://peteriscool.com:6666/" );
@@ -93,11 +93,11 @@ public class Neo4jShellConsoleSessionDocTest implements ConsoleSessionFactory
         assertEquals( 200, response.getStatus() );
         String result = decode( response ).get( 0 );
 
-        String expected = "+-----------+" + LN
-                + "| n         |" + LN
-                + "+-----------+" + LN
-                + "| Node[0]{} |" + LN
-                + "+-----------+" + LN
+        String expected = "+-----------+" + lineSeparator()
+                + "| n         |" + lineSeparator()
+                + "+-----------+" + lineSeparator()
+                + "| Node[0]{} |" + lineSeparator()
+                + "+-----------+" + lineSeparator()
                 + "1 row";
 
         assertThat( result, containsString( expected ) );

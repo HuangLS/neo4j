@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,7 @@ package org.neo4j.cypher.internal.compiler.v2_3
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions._
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryStateHelper
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class TypeTest extends CypherFunSuite {
 
@@ -30,7 +30,7 @@ class TypeTest extends CypherFunSuite {
 
     val result = calc(op)
 
-    result shouldBe a [java.lang.Integer]
+    result shouldBe a [java.lang.Long]
   }
 
   test("plus double int") {
@@ -46,7 +46,7 @@ class TypeTest extends CypherFunSuite {
 
     val result = calc(op)
 
-    result shouldBe a [java.lang.Integer]
+    result shouldBe a [java.lang.Long]
   }
 
   test("minus double int") {
@@ -62,7 +62,7 @@ class TypeTest extends CypherFunSuite {
 
     val result = calc(op)
 
-    result shouldBe a [java.lang.Integer]
+    result shouldBe a [java.lang.Long]
   }
 
   test("multiply double int") {

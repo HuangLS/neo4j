@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,12 +37,12 @@ import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.helpers.CancellationRequest;
 import org.neo4j.index.impl.lucene.Hits;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
+import org.neo4j.kernel.api.impl.index.LuceneDocumentStructure.ValueEncoding;
 import org.neo4j.kernel.api.index.IndexReader;
 import org.neo4j.kernel.impl.api.index.sampling.NonUniqueIndexSampler;
+import org.neo4j.register.Register.DoubleLong;
 
-import static org.neo4j.kernel.api.impl.index.LuceneDocumentStructure.*;
 import static org.neo4j.kernel.api.impl.index.LuceneDocumentStructure.NODE_ID_KEY;
-import static org.neo4j.register.Register.DoubleLong;
 
 class LuceneIndexAccessorReader implements IndexReader
 {
@@ -66,15 +66,18 @@ class LuceneIndexAccessorReader implements IndexReader
     public long sampleIndex( DoubleLong.Out result ) throws IndexNotFoundKernelException
     {
         NonUniqueIndexSampler sampler = new NonUniqueIndexSampler( bufferSizeLimit );
-        try ( TermEnum terms = luceneIndexReader().terms() )
+        org.apache.lucene.index.IndexReader indexReader = luceneIndexReader();
+        try ( TermEnum terms = indexReader.terms() )
         {
             while ( terms.next() )
             {
                 Term term = terms.term();
+
                 if ( !NODE_ID_KEY.equals( term.field() ))
                 {
                     String value = term.text();
-                    sampler.include( value );
+                    int frequency = terms.docFreq();
+                    sampler.include( value, frequency );
                 }
                 checkCancellation();
             }
@@ -84,7 +87,12 @@ class LuceneIndexAccessorReader implements IndexReader
             throw new RuntimeException( e );
         }
 
-        return sampler.result( result );
+        sampler.result( result );
+
+        // Here do not return the count from the sampler, since when traversing all terms lucene will consider also the
+        // logical delete once that are gonna be physically deleted in the next compaction. The index size can be
+        // computed exactly by asking the current number of documents in the lucene index.
+        return indexReader.numDocs();
     }
 
     @Override
@@ -94,10 +102,9 @@ class LuceneIndexAccessorReader implements IndexReader
     }
 
     @Override
-    public PrimitiveLongIterator rangeSeekByNumber( Number lower, boolean includeLower,
-                                                    Number upper, boolean includeUpper )
+    public PrimitiveLongIterator rangeSeekByNumberInclusive( Number lower, Number upper )
     {
-        return query( documentLogic.newRangeSeekByNumberQuery( lower, includeLower, upper, includeUpper ) );
+        return query( documentLogic.newInclusiveNumericRangeSeekQuery( lower, upper ) );
     }
 
     @Override

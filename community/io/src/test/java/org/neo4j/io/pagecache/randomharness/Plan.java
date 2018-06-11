@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -87,7 +87,12 @@ class Plan
         out.println( "Plan: [thread; action]" );
         for ( int i = 0; i < plan.length; i++ )
         {
-            out.printf( "  % 3d : %s%n", executedByThread[i], plan[i] );
+            long threadId = executedByThread[i];
+            out.printf( "  % 3d : %s%n", threadId, plan[i] );
+            if ( threadId == -1 )
+            {
+                break;
+            }
         }
     }
 

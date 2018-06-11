@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,13 +21,13 @@ package org.neo4j.cypher.internal.compiler.v2_3.profiler
 
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{NestedPipeExpression, ProjectedPath}
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, WritesNodes}
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{WritesAnyNode, Effects, WritesNodes}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes._
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments.{DbHits, Rows}
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.{Argument, InternalPlanDescription}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.QueryContext
 import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 import scala.collection.immutable.::
 
@@ -165,7 +165,7 @@ class ProfilerTest extends CypherFunSuite {
 
     val pipe1 = SingleRowPipe()
     val ctx1 = mock[QueryContext]
-    val state1 = QueryState(ctx1, mock[ExternalResource], Map.empty, mock[PipeDecorator])
+    val state1 = new QueryState(ctx1, mock[ExternalResource], Map.empty, mock[PipeDecorator])
 
     val profiled1 = profiler.decorate(pipe1, state1)
     profiled1.query.createNode()
@@ -173,7 +173,7 @@ class ProfilerTest extends CypherFunSuite {
 
     val pipe2 = SingleRowPipe()
     val ctx2 = mock[QueryContext]
-    val state2 = QueryState(ctx2, mock[ExternalResource], Map.empty, mock[PipeDecorator])
+    val state2 = new QueryState(ctx2, mock[ExternalResource], Map.empty, mock[PipeDecorator])
 
     val profiled2 = profiler.decorate(pipe2, state2)
     profiled2.query.createNode()
@@ -207,7 +207,7 @@ case class ProfilerTestPipe(source: Pipe, name: String, rows: Int, dbAccess: Int
     (0 until rows).map(x => ExecutionContext.empty).toIterator
   }
 
-  def localEffects: Effects = Effects(WritesNodes)
+  def localEffects: Effects = Effects(WritesAnyNode)
 
   def symbols: SymbolTable = SymbolTable()
 

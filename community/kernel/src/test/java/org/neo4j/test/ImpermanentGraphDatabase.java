@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,10 +38,11 @@ import org.neo4j.kernel.impl.logging.LogService;
 import org.neo4j.kernel.impl.logging.SimpleLogService;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.logging.NullLogProvider;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.pagecache_memory;
-import static org.neo4j.helpers.Settings.TRUE;
 import static org.neo4j.kernel.GraphDatabaseDependencies.newDependencies;
+import static org.neo4j.kernel.configuration.Settings.TRUE;
 import static org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory.Configuration.ephemeral;
 import static org.neo4j.test.GraphDatabaseServiceCleaner.cleanDatabaseContent;
 
@@ -140,11 +141,13 @@ public class ImpermanentGraphDatabase extends EmbeddedGraphDatabase
         new CommunityFacadeFactory()
         {
             @Override
-            protected PlatformModule createPlatform( File storeDir, Map<String, String> params, Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade )
+            protected PlatformModule createPlatform( File storeDir, Map<String, String> params,
+                    Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade,
+                    OperationalMode operationalMode )
             {
                 return new ImpermanentPlatformModule( storeDir, params, dependencies, graphDatabaseFacade );
             }
-        }.newFacade( storeDir, new HashMap<>( params ), dependencies, this );
+        }.newFacade( storeDir, new HashMap<>( params ), dependencies, this, OperationalMode.single );
     }
 
     private void trackUnclosedUse( File storeDir )
@@ -194,7 +197,8 @@ public class ImpermanentGraphDatabase extends EmbeddedGraphDatabase
                                           GraphDatabaseFacadeFactory.Dependencies dependencies,
                                           GraphDatabaseFacade graphDatabaseFacade )
         {
-            super( storeDir, withForcedInMemoryConfiguration(params), dependencies, graphDatabaseFacade );
+            super( storeDir, withForcedInMemoryConfiguration(params), dependencies, graphDatabaseFacade,
+                    OperationalMode.single );
         }
 
         @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,13 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.commands
 
-import expressions._
-import values.KeyToken
-import values.TokenType.PropertyKey
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.mutation.{MergePatternAction, UpdateAction, PropertySetAction, MergeNodeAction}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions._
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.{Equals, HasLabel}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.values.KeyToken
+import org.neo4j.cypher.internal.compiler.v2_3.commands.values.TokenType.PropertyKey
+import org.neo4j.cypher.internal.compiler.v2_3.mutation.{SetAction, MergeNodeAction, MergePatternAction, PropertySetAction, UpdateAction}
+import org.neo4j.cypher.internal.frontend.v2_3.PatternException
 
 case class MergeAst(patterns: Seq[AbstractPattern],
                     onActions: Seq[OnAction],
@@ -69,9 +71,9 @@ case class MergeAst(patterns: Seq[AbstractPattern],
     if (!matches.exists(_.isInstanceOf[RelatedTo]))
       None
     else
-      Some(MergePatternAction(matches, create ++ getActionsFor(On.Create), getActionsFor(On.Match)))
+      Some(MergePatternAction(matches, create, getActionsFor(On.Create), getActionsFor(On.Match)))
 
-  private def getActionsFor(action:Action): Seq[UpdateAction] = onActions.collect {
+  private def getActionsFor(action:Action): Seq[SetAction] = onActions.collect {
     case p if p.verb == action => p.set
   }.flatten
 

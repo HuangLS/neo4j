@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,6 +38,7 @@ import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeLabels;
 import org.neo4j.kernel.impl.store.NodeLabelsField;
 import org.neo4j.kernel.impl.store.NodeStore;
@@ -46,7 +47,6 @@ import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.util.Bits;
 import org.neo4j.logging.NullLogProvider;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.test.EphemeralFileSystemRule;
 import org.neo4j.test.PageCacheRule;
 
@@ -62,11 +62,15 @@ import static org.neo4j.helpers.collection.IteratorUtil.cloned;
 import static org.neo4j.helpers.collection.IteratorUtil.count;
 import static org.neo4j.helpers.collection.IteratorUtil.first;
 import static org.neo4j.helpers.collection.IteratorUtil.single;
+
 import static org.neo4j.kernel.impl.util.Bits.bits;
 import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.safeCastLongToInt;
 
 public class NodeLabelsFieldTest
 {
+
+    private NeoStores neoStores;
+
     @Test
     public void shouldInlineOneLabel() throws Exception
     {
@@ -453,26 +457,16 @@ public class NodeLabelsFieldTest
     {
         File storeDir = new File( "dir" );
         fs.get().mkdirs( storeDir );
-        Monitors monitors = new Monitors();
-        StoreFactory storeFactory = new StoreFactory(
-                storeDir,
-                new Config(),
-                new DefaultIdGeneratorFactory( fs.get() ),
-                pageCacheRule.getPageCache( fs.get() ),
-                fs.get(),
-                NullLogProvider.getInstance(),
-                monitors );
-        storeFactory.createNodeStore();
-        nodeStore = storeFactory.newNodeStore();
+        StoreFactory storeFactory = new StoreFactory( storeDir, new Config(), new DefaultIdGeneratorFactory( fs.get() ),
+                pageCacheRule.getPageCache( fs.get() ), fs.get(), NullLogProvider.getInstance() );
+        neoStores = storeFactory.openAllNeoStores( true );
+        nodeStore = neoStores.getNodeStore();
     }
 
     @After
     public void cleanUp()
     {
-        if ( nodeStore != null )
-        {
-            nodeStore.close();
-        }
+        neoStores.close();
     }
 
     private NodeRecord nodeRecordWithInlinedLabels( long... labels )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,7 +26,7 @@ class StartPointFindingAcceptanceTest extends ExecutionEngineFunSuite with NewPl
   test("Scan all nodes") {
     val nodes = Set(createNode("a"), createNode("b"), createNode("c"))
 
-    executeWithAllPlannersAndRuntimes("match n return n").columnAs[Node]("n").toSet should equal(nodes)
+    executeWithAllPlanners("match n return n").columnAs[Node]("n").toSet should equal(nodes)
   }
 
   test("Scan labeled node") {
@@ -34,7 +34,7 @@ class StartPointFindingAcceptanceTest extends ExecutionEngineFunSuite with NewPl
     createLabeledNode("Person")
     val animals = Set(createLabeledNode("Animal"), createLabeledNode("Animal"))
 
-    executeWithAllPlannersAndRuntimes("match (n:Animal) return n").columnAs[Node]("n").toSet should equal(animals)
+    executeWithAllPlanners("match (n:Animal) return n").columnAs[Node]("n").toSet should equal(animals)
   }
 
   test("Seek node by id given on the left") {
@@ -110,6 +110,18 @@ class StartPointFindingAcceptanceTest extends ExecutionEngineFunSuite with NewPl
     result.toList should equal(List(
       Map("r" -> r, "a" -> a, "b" -> b),
       Map("r" -> r, "a" -> b, "b" -> a)))
+  }
+
+  test("Seek relationship by id and unwind") {
+    val a = createNode("x")
+    val b = createNode("x")
+    val r = relate(a, b)
+
+    val result = executeWithAllPlanners(s"PROFILE UNWIND [${r.getId}] as rId match (a)-[r]->(b) where id(r) = rId return a,r,b")
+
+    result.executionPlanDescription().toString should include("RelationshipById")
+
+    result.toList should equal(List(Map("r" -> r, "a" -> a, "b" -> b)))
   }
 
   test("Seek relationship by id with type that is not matching") {

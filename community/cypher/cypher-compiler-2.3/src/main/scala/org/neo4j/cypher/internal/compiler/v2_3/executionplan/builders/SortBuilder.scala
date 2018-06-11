@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,11 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
-import org.neo4j.cypher.internal.compiler.v2_3.CypherTypeException
-import org.neo4j.cypher.internal.compiler.v2_3.pipes.{PipeMonitor, LegacySortPipe}
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{PlanBuilder, ExecutionPlanInProgress}
-import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Identifier, CachedExpression, Expression}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{CachedExpression, Expression, Identifier}
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ExecutionPlanInProgress, PlanBuilder}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.{LegacySortPipe, PipeMonitor}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
+import org.neo4j.cypher.internal.frontend.v2_3.CypherTypeException
 
 class SortBuilder extends PlanBuilder with SortingPreparations {
   def apply(plan: ExecutionPlanInProgress, ctx: PlanContext)(implicit pipeMonitor: PipeMonitor) = {

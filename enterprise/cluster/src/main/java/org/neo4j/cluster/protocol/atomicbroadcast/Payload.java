@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -61,7 +61,8 @@ public class Payload
     public void writeExternal( ObjectOutput out )
             throws IOException
     {
-        out.write( len );
+        // NOTE: This was changed from writing only a byte in 2.2, which doesn't work
+        out.writeInt( len );
         out.write( buf, 0, len );
     }
 
@@ -69,7 +70,8 @@ public class Payload
     public void readExternal( ObjectInput in )
             throws IOException, ClassNotFoundException
     {
-        len = in.read();
+        // NOTE: This was changed from reading only a byte in 2.2, which doesn't work
+        len = in.readInt();
         buf = new byte[len];
         in.read( buf, 0, len );
     }

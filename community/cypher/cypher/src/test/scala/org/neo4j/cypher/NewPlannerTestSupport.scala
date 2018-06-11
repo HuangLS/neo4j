@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,13 +23,15 @@ import org.neo4j.cypher.NewPlannerMonitor.{NewPlannerMonitorCall, NewQuerySeen, 
 import org.neo4j.cypher.NewRuntimeMonitor.{NewPlanSeen, NewRuntimeMonitorCall, UnableToCompileQuery}
 import org.neo4j.cypher.internal.RewindableExecutionResult
 import org.neo4j.cypher.internal.compatibility.ExecutionResultWrapperFor2_3
-import org.neo4j.cypher.internal.compiler.v2_3.ast.Statement
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{InternalExecutionResult, NewLogicalPlanSuccessRateMonitor, NewRuntimeSuccessRateMonitor}
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.Eagerly
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.LogicalPlan
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{CantCompileQueryException, CantHandleQueryException}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherTestSupport
+import org.neo4j.cypher.internal.frontend.v2_3.ast.Statement
+import org.neo4j.cypher.internal.frontend.v2_3.helpers.Eagerly
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherTestSupport
+import org.neo4j.graphdb.factory.GraphDatabaseSettings
 import org.neo4j.helpers.Exceptions
+import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.util.{Failure, Success, Try}
 
@@ -94,7 +96,9 @@ trait NewPlannerTestSupport extends CypherTestSupport {
 
   //todo once the compiled runtime handles dumpToString and plan descriptions, we should enable it by default here
   //in that way we will notice when we support new queries
-  override def databaseConfig(): Map[String, String] = Map("cypher_parser_version" -> CypherVersion.v2_3.name)
+  override def databaseConfig(): Map[String, String] =
+    Map("cypher_parser_version" -> CypherVersion.v2_3.name,
+        GraphDatabaseSettings.query_non_indexed_label_warning_threshold.name() -> "10")
 
   val newPlannerMonitor = new NewPlannerMonitor
 
@@ -150,13 +154,13 @@ trait NewPlannerTestSupport extends CypherTestSupport {
 
   def executeWithAllPlanners(queryText: String, params: (String, Any)*): InternalExecutionResult = {
     val ruleResult = innerExecute(s"CYPHER planner=rule $queryText", params: _*)
-    val idpResult = innerExecute(s"CYPHER planner=idp $queryText", params: _*)
-    val costResult = executeWithCostPlannerOnly(queryText, params: _*)
+    val greedyResult = innerExecute(s"CYPHER planner=greedy $queryText", params: _*)
+    val idpResult = executeWithCostPlannerOnly(queryText, params: _*)
 
-    assertResultsAreSame(ruleResult, costResult, queryText, "Diverging results between rule and cost planners")
-    assertResultsAreSame(idpResult, costResult, queryText, "Diverging results between IDP and greedy planner")
+    assertResultsAreSame(ruleResult, idpResult, queryText, "Diverging results between rule and cost planners")
+    assertResultsAreSame(greedyResult, idpResult, queryText, "Diverging results between IDP and greedy planner")
     ruleResult.close()
-    costResult
+    idpResult
   }
 
   def executeWithAllPlannersReplaceNaNs(queryText: String, params: (String, Any)*): InternalExecutionResult = {
@@ -164,36 +168,15 @@ trait NewPlannerTestSupport extends CypherTestSupport {
     val idpResult = innerExecute(s"CYPHER planner=idp $queryText", params: _*)
     val costResult = executeWithCostPlannerOnly(queryText, params: _*)
 
-    assertResultsAreSame(ruleResult, costResult, queryText, "Diverging results between rule and cost planners", true)
-    assertResultsAreSame(idpResult, costResult, queryText, "Diverging results between IDP and greedy planner", true)
+    assertResultsAreSame(ruleResult, costResult, queryText, "Diverging results between rule and cost planners", replaceNaNs = true)
+    assertResultsAreSame(idpResult, costResult, queryText, "Diverging results between IDP and greedy planner", replaceNaNs = true)
     ruleResult.close()
     costResult
   }
 
-  //TODO remove as soon compiled plans support dumpToString and PROFILE
-  def executeWithAllPlannersOnInterpretedRuntime(queryText: String, params: (String, Any)*): InternalExecutionResult = {
-    val ruleResult = innerExecute(s"CYPHER planner=rule $queryText", params: _*)
-    val costResult = innerExecute(s"CYPHER planner=cost runtime=interpreted $queryText", params: _*)
-
-    assertResultsAreSame(ruleResult, costResult, queryText, "Diverging results between rule and cost planners")
-
-    costResult
-  }
 
   def executeWithCostPlannerOnly(queryText: String, params: (String, Any)*): InternalExecutionResult =
     monitoringNewPlanner(innerExecute(queryText, params: _*))(failedToUseNewPlanner(queryText))(unexpectedlyUsedNewRuntime(queryText))
-
-  def executeWithAllPlannersAndRuntimes(queryText: String, params: (String, Any)*): InternalExecutionResult = {
-    val ruleResult = innerExecute(s"CYPHER planner=rule $queryText", params: _*)
-    val interpretedResult = innerExecute(s"CYPHER runtime=interpreted $queryText", params: _*)
-    val compiledResult = monitoringNewPlanner(innerExecute(s"CYPHER runtime=compiled $queryText", params: _*))(failedToUseNewPlanner(queryText))(failedToUseNewRuntime(queryText))
-
-    assertResultsAreSame(interpretedResult, compiledResult, queryText, "Diverging results between interpreted and compiled runtime")
-    assertResultsAreSame(ruleResult, interpretedResult, queryText, "Diverging results between rule planner and interpreted runtime")
-    ruleResult.close()
-    interpretedResult.close()
-    compiledResult
-  }
 
   private def assertResultsAreSame(ruleResult: InternalExecutionResult, costResult: InternalExecutionResult, queryText: String, errorMsg: String, replaceNaNs: Boolean = false) {
     withClue(errorMsg) {
@@ -205,17 +188,6 @@ trait NewPlannerTestSupport extends CypherTestSupport {
     }
   }
 
-  def executeScalarWithNewRuntime[T](queryText: String, params: (String, Any)*) = {
-    val interpretedResult = self.executeScalar[T](s"CYPHER runtime=interpreted $queryText", params: _*)
-    val compiledResult = monitoringNewPlanner(self.executeScalar[T](s"CYPHER runtime=compiled $queryText", params: _*))(failedToUseNewPlanner(queryText))(failedToUseNewRuntime(queryText))
-    val ruleResult = self.executeScalar[T](s"CYPHER planner=rule $queryText", params: _*)
-
-    assert(interpretedResult === compiledResult, "Diverging results between interpreted and compiled runtime")
-    assert(compiledResult === ruleResult, "Diverging results between compiled runtime and rule planner")
-
-    compiledResult
-  }
-
   protected def innerExecute(queryText: String, params: (String, Any)*): InternalExecutionResult =
     eengine.execute(queryText, params.toMap) match {
       case e:ExecutionResultWrapperFor2_3 => RewindableExecutionResult(e)
@@ -223,6 +195,10 @@ trait NewPlannerTestSupport extends CypherTestSupport {
 
   override def execute(queryText: String, params: (String, Any)*) =
     fail("Don't use execute together with NewPlannerTestSupport")
+
+  def withEachPlanner(body: ((String, Seq[(String, Any)]) => InternalExecutionResult) => Any) = {
+    List(executeWithRulePlanner _, executeWithCostPlannerOnly _).foreach(body)
+  }
 
   def executeWithRulePlanner(queryText: String, params: (String, Any)*) = {
     val plannerWatcher: (List[NewPlannerMonitorCall]) => Unit = unexpectedlyUsedNewPlanner(queryText)
@@ -280,6 +256,15 @@ trait NewPlannerTestSupport extends CypherTestSupport {
       res.map((map: Map[String, Any]) => map.map {
         case (k, v) => k -> convert(v)
       })
+    }
+  }
+
+  def evaluateTo(expected: Seq[Map[String, Any]]): Matcher[InternalExecutionResult] = new Matcher[InternalExecutionResult] {
+    override def apply(actual: InternalExecutionResult): MatchResult = {
+      MatchResult(
+        matches = actual.toComparableResult == expected.toCompararableSeq(replaceNaNs = false),
+        rawFailureMessage = s"Results differ: ${actual.toComparableResult} did not equal to $expected",
+        rawNegatedFailureMessage = s"Results are equal")
     }
   }
 }

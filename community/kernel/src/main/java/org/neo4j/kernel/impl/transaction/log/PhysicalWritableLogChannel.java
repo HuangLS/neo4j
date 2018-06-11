@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,9 +24,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 
-import static java.lang.Math.min;
+import org.neo4j.io.ByteUnit;
 
-import static org.neo4j.helpers.Format.KB;
+import static java.lang.Math.min;
 
 public class PhysicalWritableLogChannel implements WritableLogChannel
 {
@@ -37,7 +37,7 @@ public class PhysicalWritableLogChannel implements WritableLogChannel
 
     public PhysicalWritableLogChannel( LogVersionedStoreChannel channel )
     {
-        this( channel, 512*KB );
+        this( channel, (int) ByteUnit.kibiBytes( 512 ) );
     }
 
     public PhysicalWritableLogChannel( LogVersionedStoreChannel channel, int bufferSize )

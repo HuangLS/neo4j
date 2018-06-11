@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,27 +30,34 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.neo4j.com.ComException;
 import org.neo4j.graphdb.ConstraintViolationException;
+import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.QueryExecutionException;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.TransactionFailureException;
+import org.neo4j.graphdb.TransientTransactionFailureException;
 import org.neo4j.helpers.Exceptions;
+import org.neo4j.kernel.api.exceptions.schema.ConstraintVerificationFailedKernelException;
+import org.neo4j.kernel.impl.ha.ClusterManager;
 import org.neo4j.test.OtherThreadExecutor.WorkerCommand;
 import org.neo4j.test.OtherThreadRule;
 import org.neo4j.test.RepeatRule;
-import org.neo4j.test.ha.ClusterManager;
+import org.neo4j.test.SuppressOutput;
 import org.neo4j.test.ha.ClusterRule;
 import org.neo4j.tooling.GlobalGraphOperations;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.junit.Assert.assertThat;
+
+import static java.lang.String.format;
+
 import static org.neo4j.graphdb.DynamicLabel.label;
 import static org.neo4j.graphdb.DynamicRelationshipType.withName;
 import static org.neo4j.helpers.collection.IteratorUtil.loop;
@@ -64,6 +71,8 @@ public class PropertyConstraintsStressIT
     @Parameterized.Parameter
     public ConstraintOperations constraintOps;
 
+    @Rule
+    public final SuppressOutput suppressOutput = SuppressOutput.suppressAll();
     @Rule
     public final ClusterRule clusterRule = new ClusterRule( getClass() );
 
@@ -96,15 +105,15 @@ public class PropertyConstraintsStressIT
     {
         return Arrays.asList( new Object[][]{
                 {UNIQUE_PROPERTY_CONSTRAINT_OPS},
-                {MANDATORY_NODE_PROPERTY_CONSTRAINT_OPS},
-                {MANDATORY_REL_PROPERTY_CONSTRAINT_OPS},
+                {NODE_PROPERTY_EXISTENCE_CONSTRAINT_OPS},
+                {REL_PROPERTY_EXISTENCE_CONSTRAINT_OPS},
         } );
     }
 
     @Before
     public void setup() throws Exception
     {
-        cluster = clusterRule.config( HaSettings.pull_interval, "0" ).startCluster();
+        cluster = clusterRule.withSharedSetting( HaSettings.pull_interval, "0" ).startCluster();
     }
 
     /* The different orders and delays in the below variations try to stress all known scenarios, as well as
@@ -121,7 +130,7 @@ public class PropertyConstraintsStressIT
             void perform()
             {
                 constraintCreation = masterWork.execute( createConstraint( master ) );
-                constraintViolation = slaveWork.execute( performInsert( slave ) );
+                constraintViolation = slaveWork.execute( performConstraintViolatingInserts( slave ) );
             }
         } );
     }
@@ -135,7 +144,7 @@ public class PropertyConstraintsStressIT
             @Override
             void perform()
             {
-                constraintViolation = slaveWork.execute( performInsert( slave ) );
+                constraintViolation = slaveWork.execute( performConstraintViolatingInserts( slave ) );
                 constraintCreation = masterWork.execute( createConstraint( master ) );
             }
         } );
@@ -160,7 +169,7 @@ public class PropertyConstraintsStressIT
                 {
                 }
 
-                constraintViolation = slaveWork.execute( performInsert( slave ) );
+                constraintViolation = slaveWork.execute( performConstraintViolatingInserts( slave ) );
             }
         } );
     }
@@ -174,7 +183,7 @@ public class PropertyConstraintsStressIT
             @Override
             void perform()
             {
-                constraintViolation = slaveWork.execute( performInsert( slave ) );
+                constraintViolation = slaveWork.execute( performConstraintViolatingInserts( slave ) );
 
                 try
                 {
@@ -208,7 +217,7 @@ public class PropertyConstraintsStressIT
                 {
                 }
 
-                constraintViolation = slaveWork.execute( performInsert( slave ) );
+                constraintViolation = slaveWork.execute( performConstraintViolatingInserts( slave ) );
             }
         } );
     }
@@ -222,7 +231,7 @@ public class PropertyConstraintsStressIT
             @Override
             void perform()
             {
-                constraintViolation = slaveWork.execute( performInsert( slave ) );
+                constraintViolation = slaveWork.execute( performConstraintViolatingInserts( slave ) );
 
                 try
                 {
@@ -243,7 +252,8 @@ public class PropertyConstraintsStressIT
         HighlyAvailableGraphDatabase master = cluster.getMaster();
         HighlyAvailableGraphDatabase slave = cluster.getAnySlave();
 
-        // Because this is a brute-force test, we run for a user-specified time, and consider ourselves successful if no failure is found.
+        // Because this is a brute-force test, we run for a user-specified time, and consider ourselves successful if
+        // no failure is found.
         long end = System.currentTimeMillis() + runtime;
         int successfulAttempts = 0;
         while ( end > System.currentTimeMillis() )
@@ -251,7 +261,8 @@ public class PropertyConstraintsStressIT
             // Each round of this loop:
             //  - on a slave, creates a set of nodes with a label/property combo with all-unique values
             //  - on the master, creates a property constraint
-            //  - on a slave, while the master is creating the constraint, starts issuing transactions that will violate the constraint
+            //  - on a slave, while the master is creating the constraint, starts transactions that will
+            //    violate the constraint
 
             //setup :
             {
@@ -261,10 +272,10 @@ public class PropertyConstraintsStressIT
                 // Ensure slave has constraints from previous round
                 cluster.sync();
 
-                // Create the initial data
+                // Create the initial data that *does not* violate the constraint
                 try
                 {
-                    slaveWork.execute( performInsert( slave ) ).get();
+                    slaveWork.execute( performConstraintCompliantInserts( slave ) ).get();
                 }
                 catch ( ExecutionException e )
                 {
@@ -316,12 +327,23 @@ public class PropertyConstraintsStressIT
         return constraintOps.createConstraint( master, labelOrRelType, property );
     }
 
+    private WorkerCommand<Object,Integer> performConstraintCompliantInserts( HighlyAvailableGraphDatabase slave )
+    {
+        return performInserts( slave, true );
+    }
+
+    private WorkerCommand<Object,Integer> performConstraintViolatingInserts( HighlyAvailableGraphDatabase slave )
+    {
+        return performInserts( slave, false );
+    }
+
     /**
      * Inserts a bunch of new nodes with the label and property key currently set in the fields in this class, where
-     * running this method twice will insert nodes with duplicate property values, assuming propertykey or label has not
-     * changed.
+     * running this method twice will insert nodes with duplicate property values, assuming property key or label has
+     * not changed.
      */
-    private WorkerCommand<Object,Integer> performInsert( final HighlyAvailableGraphDatabase slave )
+    private WorkerCommand<Object,Integer> performInserts( final HighlyAvailableGraphDatabase slave,
+            final boolean constraintCompliant )
     {
         return new WorkerCommand<Object,Integer>()
         {
@@ -336,12 +358,13 @@ public class PropertyConstraintsStressIT
                     {
                         try ( Transaction tx = slave.beginTx() )
                         {
-                            constraintOps.createEntity( slave, labelOrRelType, property, "value" + i );
+                            constraintOps.createEntity( slave, labelOrRelType, property, "value" + i,
+                                    constraintCompliant );
                             tx.success();
                         }
                     }
                 }
-                catch ( TransactionFailureException e )
+                catch ( TransactionFailureException | TransientTransactionFailureException e )
                 {
                     // Swallowed on purpose, we except it to fail sometimes due to either
                     //  - constraint violation on master
@@ -354,7 +377,8 @@ public class PropertyConstraintsStressIT
                 catch ( ComException e )
                 {
                     // Happens sometimes, cause:
-                    // - The lock session requested to start is already in use. Please retry your request in a few seconds.
+                    // - The lock session requested to start is already in use.
+                    //   Please retry your request in a few seconds.
                 }
                 return i;
             }
@@ -380,7 +404,8 @@ public class PropertyConstraintsStressIT
 
     interface ConstraintOperations
     {
-        void createEntity( HighlyAvailableGraphDatabase db, String type, String propertyKey, Object value );
+        void createEntity( HighlyAvailableGraphDatabase db, String type, String propertyKey, Object value,
+                boolean constraintCompliant );
 
         boolean isValid( HighlyAvailableGraphDatabase master, String type, String property );
 
@@ -390,7 +415,8 @@ public class PropertyConstraintsStressIT
     private static final ConstraintOperations UNIQUE_PROPERTY_CONSTRAINT_OPS = new ConstraintOperations()
     {
         @Override
-        public void createEntity( HighlyAvailableGraphDatabase db, String type, String propertyKey, Object value )
+        public void createEntity( HighlyAvailableGraphDatabase db, String type, String propertyKey, Object value,
+                boolean constraintComplient )
         {
             db.createNode( label( type ) ).setProperty( propertyKey, value );
         }
@@ -450,14 +476,14 @@ public class PropertyConstraintsStressIT
         }
     };
 
-    private static final ConstraintOperations MANDATORY_NODE_PROPERTY_CONSTRAINT_OPS = new ConstraintOperations()
+    private static final ConstraintOperations NODE_PROPERTY_EXISTENCE_CONSTRAINT_OPS = new ConstraintOperations()
     {
         @Override
-        public void createEntity( HighlyAvailableGraphDatabase db, String type, String propertyKey, Object value )
+        public void createEntity( HighlyAvailableGraphDatabase db, String type, String propertyKey, Object value,
+                boolean constraintCompliant )
         {
             Node node = db.createNode( label( type ) );
-            // 75 percent of nodes get the property set
-            if ( ThreadLocalRandom.current().nextDouble( 1.0 ) < 0.75 )
+            if ( constraintCompliant )
             {
                 node.setProperty( propertyKey, value );
             }
@@ -482,50 +508,30 @@ public class PropertyConstraintsStressIT
         }
 
         @Override
-        public WorkerCommand<Object,Boolean> createConstraint( final HighlyAvailableGraphDatabase db, final String type,
-                final String property )
+        public WorkerCommand<Object,Boolean> createConstraint( HighlyAvailableGraphDatabase db, String type,
+                String property )
         {
-            return new WorkerCommand<Object,Boolean>()
-            {
-                @Override
-                public Boolean doWork( Object state ) throws Exception
-                {
-                    boolean constraintCreationFailed = false;
-
-                    try ( Transaction tx = db.beginTx() )
-                    {
-                        db.schema().constraintFor( label( type ) ).assertPropertyExists( property ).create();
-                        tx.success();
-                    }
-                    catch ( ConstraintViolationException e )
-                    {
-                    /* Unable to create constraint since it is not consistent with existing data. */
-                        constraintCreationFailed = true;
-                    }
-
-                    return constraintCreationFailed;
-                }
-            };
+            String query = format( "CREATE CONSTRAINT ON (n:`%s`) ASSERT exists(n.`%s`)", type, property );
+            return createPropertyExistenceConstraintCommand( db, query );
         }
 
         @Override
         public String toString()
         {
-            return "MANDATORY_NODE_PROPERTY_CONSTRAINT";
+            return "NODE_PROPERTY_EXISTENCE_CONSTRAINT";
         }
     };
 
-    private static final ConstraintOperations MANDATORY_REL_PROPERTY_CONSTRAINT_OPS = new ConstraintOperations()
+    private static final ConstraintOperations REL_PROPERTY_EXISTENCE_CONSTRAINT_OPS = new ConstraintOperations()
     {
         @Override
-        public void createEntity( HighlyAvailableGraphDatabase db, String type, String propertyKey, Object value )
+        public void createEntity( HighlyAvailableGraphDatabase db, String type, String propertyKey, Object value,
+                boolean constraintCompliant )
         {
             Node start = db.createNode();
             Node end = db.createNode();
             Relationship relationship = start.createRelationshipTo( end, withName( type ) );
-
-            // 75 percent of relationships get the property set
-            if ( ThreadLocalRandom.current().nextDouble( 1.0 ) < 0.75 )
+            if ( constraintCompliant )
             {
                 relationship.setProperty( propertyKey, value );
             }
@@ -552,36 +558,56 @@ public class PropertyConstraintsStressIT
         }
 
         @Override
-        public WorkerCommand<Object,Boolean> createConstraint( final HighlyAvailableGraphDatabase db, final String type,
-                final String property )
+        public WorkerCommand<Object,Boolean> createConstraint( HighlyAvailableGraphDatabase db, String type,
+                String property )
         {
-            return new WorkerCommand<Object,Boolean>()
-            {
-                @Override
-                public Boolean doWork( Object state ) throws Exception
-                {
-                    boolean constraintCreationFailed = false;
-
-                    try ( Transaction tx = db.beginTx() )
-                    {
-                        db.schema().constraintFor( withName( type ) ).assertPropertyExists( property ).create();
-                        tx.success();
-                    }
-                    catch ( ConstraintViolationException e )
-                    {
-                    /* Unable to create constraint since it is not consistent with existing data. */
-                        constraintCreationFailed = true;
-                    }
-
-                    return constraintCreationFailed;
-                }
-            };
+            String query = format( "CREATE CONSTRAINT ON ()-[r:`%s`]-() ASSERT exists(r.`%s`)", type, property );
+            return createPropertyExistenceConstraintCommand( db, query );
         }
 
         @Override
         public String toString()
         {
-            return "MANDATORY_RELATIONSHIP_PROPERTY_CONSTRAINT";
+            return "RELATIONSHIP_PROPERTY_EXISTENCE_CONSTRAINT";
         }
     };
+
+    private static WorkerCommand<Object,Boolean> createPropertyExistenceConstraintCommand(
+            final GraphDatabaseService db, final String query )
+    {
+        return new WorkerCommand<Object,Boolean>()
+        {
+            @Override
+            public Boolean doWork( Object state ) throws Exception
+            {
+                boolean constraintCreationFailed = false;
+
+                try ( Transaction tx = db.beginTx() )
+                {
+                    db.execute( query );
+                    tx.success();
+                }
+                catch ( QueryExecutionException e )
+                {
+                    System.out.println( "Constraint failed: " + e.getMessage() );
+                    if ( Exceptions.rootCause( e ) instanceof ConstraintVerificationFailedKernelException )
+                    {
+                        // Unable to create constraint since it is not consistent with existing data
+                        constraintCreationFailed = true;
+                    }
+                    else
+                    {
+                        throw e;
+                    }
+                }
+
+                if ( !constraintCreationFailed )
+                {
+                    System.out.println( "Constraint created: " + query );
+                }
+
+                return constraintCreationFailed;
+            }
+        };
+    }
 }

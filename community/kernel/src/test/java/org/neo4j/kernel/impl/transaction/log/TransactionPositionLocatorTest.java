@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,9 @@
  */
 package org.neo4j.kernel.impl.transaction.log;
 
-import java.io.IOException;
-
 import org.junit.Test;
+
+import java.io.IOException;
 
 import org.neo4j.kernel.impl.transaction.command.Command;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryCommand;
@@ -50,7 +50,7 @@ public class TransactionPositionLocatorTest
 
     private final LogEntryStart start = new LogEntryStart( 0, 0, 0, 0, null, startPosition );
     private final LogEntryCommand command = new LogEntryCommand( new Command.NodeCommand() );
-    private final LogEntryCommit commit = new OnePhaseCommit( txId, 0 );
+    private final LogEntryCommit commit = new OnePhaseCommit( txId, System.currentTimeMillis() );
 
     @Test
     public void shouldFindTransactionLogPosition() throws IOException
@@ -73,7 +73,8 @@ public class TransactionPositionLocatorTest
                 startPosition,
                 start.getMasterId(),
                 start.getLocalId(),
-                LogEntryStart.checksum( start )
+                LogEntryStart.checksum( start ),
+                commit.getTimeWritten()
         );
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,8 +29,9 @@ case class MatchingPair(patternElement: PatternElement, entity: Any) {
 
   override def toString = patternElement.key + "=" + entity
 
-  def matchesBoundEntity(boundNodes: Map[String, MatchingPair]): Boolean = boundNodes.get(patternElement.key) match {
-    case Some(pinnedNode) => (entity, pinnedNode.entity) match {
+  def matchesBoundEntity(boundNodes: Map[String, Set[MatchingPair]]): Boolean = boundNodes.get(patternElement.key)
+  match {
+    case Some(pinnedNodeSet) => pinnedNodeSet.forall(pinnedNode => (entity, pinnedNode.entity) match {
       case (a: Node, b: Node)                                                       => a == b
       case (a: SingleGraphRelationship, b: Relationship)                            => a.rel == b
       case (a: Relationship, b: SingleGraphRelationship)                            => a == b.rel
@@ -38,7 +39,7 @@ case class MatchingPair(patternElement: PatternElement, entity: Any) {
       case (a: VariableLengthGraphRelationship, b)                                  => false
       case (a, b: VariableLengthGraphRelationship)                                  => false
 
-    }
+    })
     case None             => true
   }
 

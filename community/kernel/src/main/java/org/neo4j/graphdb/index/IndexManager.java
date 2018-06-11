@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -80,6 +80,7 @@ public interface IndexManager
      * Other options can f.ex. say that the index will be a fulltext index and that it
      * should be case insensitive. The parameters given here (except "provider") are
      * only interpreted by the implementation represented by the provider.
+     * @return a named {@link Index} for {@link Node}s
      */
     Index<Node> forNodes( String indexName, Map<String, String> customConfiguration );
 
@@ -132,6 +133,7 @@ public interface IndexManager
      * Other options can f.ex. say that the index will be a fulltext index and that it
      * should be case insensitive. The parameters given here (except "provider") are
      * only interpreted by the implementation represented by the provider.
+     * @return a named {@link Index} for {@link Relationship}s
      */
     RelationshipIndex forRelationships( String indexName,
             Map<String, String> customConfiguration );
@@ -151,6 +153,7 @@ public interface IndexManager
      * or with {@link #setConfiguration(Index, String, String)} or
      * {@link #removeConfiguration(Index, String)}.
      *
+     * @param index the index to get the configuration for
      * @return configuration for the {@code index}.
      */
     Map<String, String> getConfiguration( Index<? extends PropertyContainer> index );
@@ -189,7 +192,17 @@ public interface IndexManager
      */
     String removeConfiguration( Index<? extends PropertyContainer> index, String key );
 
+    /**
+     * @deprecated this feature will be removed in a future release, please consider using schema indexes instead
+     * @return the auto indexing manager for nodes
+     */
+    @Deprecated
     AutoIndexer<Node> getNodeAutoIndexer();
 
+    /**
+     * @deprecated this feature will be removed in a future release, please consider using schema indexes instead
+     * @return the auto indexing manager for relationships
+     */
+    @Deprecated
     RelationshipAutoIndexer getRelationshipAutoIndexer();
 }

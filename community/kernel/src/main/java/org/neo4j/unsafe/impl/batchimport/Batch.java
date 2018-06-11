@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,6 +31,12 @@ import org.neo4j.unsafe.impl.batchimport.staging.Step;
  */
 public class Batch<INPUT,RECORD extends PrimitiveRecord>
 {
+    /**
+     * Used in a scenario where a step merely needs to signal that the next step in the stage should execute,
+     * not necessarily that it needs any data from the previous step.
+     */
+    public static final Batch EMPTY = new Batch<>( null );
+
     public final INPUT[] input;
     public RECORD[] records;
     public int[] propertyBlocksLengths;

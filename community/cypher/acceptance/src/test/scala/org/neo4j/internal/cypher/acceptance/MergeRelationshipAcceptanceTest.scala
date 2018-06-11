@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -469,5 +469,23 @@ class MergeRelationshipAcceptanceTest extends ExecutionEngineFunSuite with Query
     intercept[SyntaxException]{
       execute("merge (a: Foo)-[r:KNOWS]->(a: Bar)")
     }
+  }
+
+  test("merge should handle array properties properly from identifier") {
+    val query =
+      """
+        |CREATE (a:Foo),(b:Bar) WITH a,b
+        |UNWIND ["a,b","a,b"] AS str WITH a,b,split(str,",") AS roles
+        |MERGE (a)-[r:FB {foobar:roles}]->(b)
+        |RETURN a,b,r""".stripMargin
+
+    val result = execute(query)
+    assertStats(result, nodesCreated = 2, relationshipsCreated = 1, propertiesSet = 1, labelsAdded = 2)
+  }
+
+  test("merge should handle array properties properly") {
+    relate(createLabeledNode("A"), createLabeledNode("B"), "T", Map("prop" -> Array(42, 43)))
+    val result = execute("MATCH (a:A),(b:B) MERGE (a)-[r:T {prop: [42,43]}]->(b) RETURN count(*)")
+    assertStats(result, nodesCreated = 0, relationshipsCreated = 0, propertiesSet = 0)
   }
 }

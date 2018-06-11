@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,11 +22,9 @@ package org.neo4j.consistency.report;
 import org.junit.Test;
 
 import org.neo4j.consistency.RecordType;
-import org.neo4j.logging.AssertableLogProvider;
+import org.neo4j.helpers.Strings;
 import org.neo4j.kernel.impl.store.record.NeoStoreRecord;
-
-import static org.neo4j.consistency.report.InconsistencyMessageLogger.LINE_SEPARATOR;
-import static org.neo4j.consistency.report.InconsistencyMessageLogger.TAB;
+import org.neo4j.logging.AssertableLogProvider;
 
 public class MessageConsistencyLoggerTest
 {
@@ -104,7 +102,7 @@ public class MessageConsistencyLoggerTest
         StringBuilder expected = new StringBuilder( firstLine );
         for ( String line : lines )
         {
-            expected.append( LINE_SEPARATOR ).append( TAB ).append( line );
+            expected.append( System.lineSeparator() ).append( Strings.TAB ).append( line );
         }
         return expected.toString();
     }

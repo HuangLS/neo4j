@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -61,7 +61,6 @@ import org.neo4j.cluster.statemachine.StateMachineRules;
 import org.neo4j.cluster.timeout.TimeoutStrategy;
 import org.neo4j.cluster.timeout.Timeouts;
 import org.neo4j.helpers.collection.Iterables;
-import org.neo4j.kernel.impl.logging.LogService;
 import org.neo4j.logging.LogProvider;
 
 import static org.neo4j.cluster.com.message.Message.internal;
@@ -73,34 +72,35 @@ public class MultiPaxosServerFactory
         implements ProtocolServerFactory
 {
     private final ClusterConfiguration initialConfig;
-    private final LogService logService;
+    private final LogProvider logging;
     private StateMachines.Monitor stateMachinesMonitor;
 
-    public MultiPaxosServerFactory( ClusterConfiguration initialConfig, LogService logService, StateMachines.Monitor stateMachinesMonitor )
+    public MultiPaxosServerFactory( ClusterConfiguration initialConfig, LogProvider logging, StateMachines.Monitor stateMachinesMonitor )
     {
         this.initialConfig = initialConfig;
-        this.logService = logService;
+        this.logging = logging;
         this.stateMachinesMonitor = stateMachinesMonitor;
     }
 
     @Override
-    public ProtocolServer newProtocolServer( InstanceId me, TimeoutStrategy timeoutStrategy, MessageSource input,
+    public ProtocolServer newProtocolServer( InstanceId me, int maxAcceptors,
+                                             TimeoutStrategy timeoutStrategy, MessageSource input,
                                              MessageSender output, AcceptorInstanceStore acceptorInstanceStore,
                                              ElectionCredentialsProvider electionCredentialsProvider,
                                              Executor stateMachineExecutor,
                                              ObjectInputStreamFactory objectInputStreamFactory,
                                              ObjectOutputStreamFactory objectOutputStreamFactory )
     {
-        DelayedDirectExecutor executor = new DelayedDirectExecutor( logService.getInternalLogProvider() );
+        DelayedDirectExecutor executor = new DelayedDirectExecutor( logging );
 
         // Create state machines
         Timeouts timeouts = new Timeouts( timeoutStrategy );
 
-        final MultiPaxosContext context = new MultiPaxosContext( me,
+        final MultiPaxosContext context = new MultiPaxosContext( me, maxAcceptors,
                 Iterables.<ElectionRole, ElectionRole>iterable( new ElectionRole( ClusterConfiguration.COORDINATOR ) ),
-                new ClusterConfiguration( initialConfig.getName(), logService.getInternalLogProvider(),
+                new ClusterConfiguration( initialConfig.getName(), logging,
                         initialConfig.getMemberURIs() ),
-                executor, logService, objectInputStreamFactory, objectOutputStreamFactory, acceptorInstanceStore, timeouts,
+                executor, logging, objectInputStreamFactory, objectOutputStreamFactory, acceptorInstanceStore, timeouts,
                 electionCredentialsProvider
         );
 
@@ -116,26 +116,24 @@ public class MultiPaxosServerFactory
                                              Timeouts timeouts,
                                              MultiPaxosContext context, SnapshotContext snapshotContext )
     {
-        LogProvider logProvider = logService.getInternalLogProvider();
-
         return constructSupportingInfrastructureFor( me, input, output, executor, timeouts, stateMachineExecutor,
                 context, new StateMachine[]
                 {
                         new StateMachine( context.getAtomicBroadcastContext(), AtomicBroadcastMessage.class,
-                                AtomicBroadcastState.start, logProvider ),
+                                AtomicBroadcastState.start, logging ),
                         new StateMachine( context.getAcceptorContext(), AcceptorMessage.class, AcceptorState.start,
-                                logProvider ),
+                                logging ),
                         new StateMachine( context.getProposerContext(), ProposerMessage.class, ProposerState.start,
-                                logProvider ),
+                                logging ),
                         new StateMachine( context.getLearnerContext(), LearnerMessage.class, LearnerState.start,
-                                logProvider ),
+                                logging ),
                         new StateMachine( context.getHeartbeatContext(), HeartbeatMessage.class, HeartbeatState.start,
-                                logProvider ),
+                                logging ),
                         new StateMachine( context.getElectionContext(), ElectionMessage.class, ElectionState.start,
-                                logProvider ),
-                        new StateMachine( snapshotContext, SnapshotMessage.class, SnapshotState.start, logProvider ),
+                                logging ),
+                        new StateMachine( snapshotContext, SnapshotMessage.class, SnapshotState.start, logging ),
                         new StateMachine( context.getClusterContext(), ClusterMessage.class, ClusterState.start,
-                                logProvider )
+                                logging )
                 } );
     }
 
@@ -151,9 +149,7 @@ public class MultiPaxosServerFactory
                                                                 final MultiPaxosContext context,
                                                                 StateMachine[] machines )
     {
-        LogProvider logProvider = logService.getInternalLogProvider();
-
-        StateMachines stateMachines = new StateMachines( logProvider, stateMachinesMonitor, input,
+        StateMachines stateMachines = new StateMachines( logging, stateMachinesMonitor, input,
                 output, timeouts, executor, stateMachineExecutor, me );
 
         for ( StateMachine machine : machines )
@@ -161,7 +157,7 @@ public class MultiPaxosServerFactory
             stateMachines.addStateMachine( machine );
         }
 
-        final ProtocolServer server = new ProtocolServer( me, stateMachines, logProvider );
+        final ProtocolServer server = new ProtocolServer( me, stateMachines, logging );
 
         server.addBindingListener( new BindingListener()
         {
@@ -179,13 +175,13 @@ public class MultiPaxosServerFactory
 
         Cluster cluster = server.newClient( Cluster.class );
         cluster.addClusterListener( new HeartbeatJoinListener( stateMachines.getOutgoing() ) );
-        cluster.addClusterListener( new HeartbeatLeftListener( context.getHeartbeatContext(), logProvider ) );
+        cluster.addClusterListener( new HeartbeatLeftListener( context.getHeartbeatContext(), logging ) );
 
         context.getHeartbeatContext().addHeartbeatListener( new HeartbeatReelectionListener(
-                server.newClient( Election.class ), logProvider ) );
+                server.newClient( Election.class ), logging ) );
         context.getClusterContext().addClusterListener( new ClusterLeaveReelectionListener( server.newClient(
                 Election.class ),
-                logProvider
+                logging
         ) );
 
         StateMachineRules rules = new StateMachineRules( stateMachines.getOutgoing() )

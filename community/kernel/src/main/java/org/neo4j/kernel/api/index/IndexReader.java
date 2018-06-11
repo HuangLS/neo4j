@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -42,9 +42,9 @@ public interface IndexReader extends Resource
     PrimitiveLongIterator seek( Object value );
 
     /**
-     * Numerical range query by index seek
+     * Inclusive numerical range query by index seek
      */
-    PrimitiveLongIterator rangeSeekByNumber( Number lower, boolean includeLower, Number upper, boolean includeUpper );
+    PrimitiveLongIterator rangeSeekByNumberInclusive( Number lower, Number upper );
 
     /**
      * String range query by index seek
@@ -96,10 +96,9 @@ public interface IndexReader extends Resource
         }
 
         @Override
-        public PrimitiveLongIterator rangeSeekByNumber( Number lower, boolean includeLower,
-                                                        Number upper, boolean includeUpper )
+        public PrimitiveLongIterator rangeSeekByNumberInclusive( Number lower, Number upper )
         {
-            return delegate.rangeSeekByNumber( lower, includeLower, upper, includeUpper );
+            return delegate.rangeSeekByNumberInclusive( lower, upper );
         }
 
         @Override
@@ -161,8 +160,7 @@ public interface IndexReader extends Resource
         }
 
         @Override
-        public PrimitiveLongIterator rangeSeekByNumber( Number lower, boolean includeLower,
-                                                        Number upper, boolean includeUpper )
+        public PrimitiveLongIterator rangeSeekByNumberInclusive( Number lower, Number upper )
         {
             return PrimitiveLongCollections.emptyIterator();
         }

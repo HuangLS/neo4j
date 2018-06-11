@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -63,7 +63,6 @@ public class PropertyStoreTest
         path = new File( "/tmp/foobar" );
 
         fileSystemAbstraction.mkdir( path.getParentFile() );
-        fileSystemAbstraction.create( path );
     }
 
     @Test
@@ -77,9 +76,9 @@ public class PropertyStoreTest
         DynamicStringStore stringPropertyStore = mock( DynamicStringStore.class );
 
         final PropertyStore store = new PropertyStore( path, config, new JumpingIdGeneratorFactory( 1 ), pageCache,
-                fileSystemAbstraction, NullLogProvider.getInstance(),
-                stringPropertyStore, mock( PropertyKeyTokenStore.class ), mock( DynamicArrayStore.class ),
-                StoreVersionMismatchHandler.FORCE_CURRENT_VERSION, null );
+                NullLogProvider.getInstance(), stringPropertyStore,
+                mock( PropertyKeyTokenStore.class ), mock( DynamicArrayStore.class )  );
+        store.initialise( true );
 
         try
         {

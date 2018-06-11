@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -69,6 +69,12 @@ public class DelegatingFileSystemAbstraction implements FileSystemAbstraction
                                                                                                      Function<Class<K>, K> creator )
     {
         return delegate.getOrCreateThirdPartyFileSystem( clazz, creator );
+    }
+
+    @Override
+    public void truncate( File path, long size ) throws IOException
+    {
+        delegate.truncate( path, size );
     }
 
     @Override

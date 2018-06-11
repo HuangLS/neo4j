@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -45,8 +45,10 @@ public interface PageCache extends AutoCloseable
      * size, an exception will be thrown.
      * @param openOptions The set of open options to use for mapping this file. The
      * {@link java.nio.file.StandardOpenOption#READ} and {@link java.nio.file.StandardOpenOption#WRITE} options always
-     * implicitly specified. The only supported option is {@link java.nio.file.StandardOpenOption#CREATE}, and
-     * all other options are either silently ignored, or will cause an exception to be thrown.
+     * implicitly specified. The {@link java.nio.file.StandardOpenOption#CREATE} open option will create the given
+     * file if it does not already exist, and the {@link java.nio.file.StandardOpenOption#TRUNCATE_EXISTING} will
+     * truncate any existing file <em>iff</em> it has not already been mapped.
+     * All other options are either silently ignored, or will cause an exception to be thrown.
      * @throws java.nio.file.NoSuchFileException if the given file does not exist, and the
      * {@link java.nio.file.StandardOpenOption#CREATE} option was not specified.
      * @throws IOException if the file could otherwise not be mapped.

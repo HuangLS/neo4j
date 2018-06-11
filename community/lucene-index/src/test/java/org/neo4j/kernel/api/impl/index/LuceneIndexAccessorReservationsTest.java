@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -198,7 +198,8 @@ public class LuceneIndexAccessorReservationsTest
                             public IndexAccessor create( ReservingLuceneIndexWriter writer ) throws IOException
                             {
                                 return new UniqueLuceneIndexAccessor( new LuceneDocumentStructure(),
-                                        factoryOfOne( writer ), new InMemoryDirectoryFactory(), new File( "unique" ) );
+                                        false, factoryOfOne( writer ), new InMemoryDirectoryFactory(), new
+                                        File( "unique" ) );
                             }
                         }},
                 new Object[]{
@@ -209,7 +210,7 @@ public class LuceneIndexAccessorReservationsTest
                             public IndexAccessor create( ReservingLuceneIndexWriter writer ) throws IOException
                             {
                                 return new NonUniqueLuceneIndexAccessor( new LuceneDocumentStructure(),
-                                        factoryOfOne( writer ), new InMemoryDirectoryFactory(),
+                                        false, factoryOfOne( writer ), new InMemoryDirectoryFactory(),
                                         new File( "non-unique" ), 100_000 );
                             }
                         }}

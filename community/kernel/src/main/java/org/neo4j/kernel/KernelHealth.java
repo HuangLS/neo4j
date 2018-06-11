@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -97,6 +97,15 @@ public class KernelHealth
     public boolean isHealthy()
     {
         return tmOk;
+    }
+
+    public Throwable getCauseOfPanic()
+    {
+        if ( tmOk )
+        {
+            throw new IllegalStateException( "Kernel is healthy, no panic cause found" );
+        }
+        return causeOfPanic;
     }
 
     public void healed()

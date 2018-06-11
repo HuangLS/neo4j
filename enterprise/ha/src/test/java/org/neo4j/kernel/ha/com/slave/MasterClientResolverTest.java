@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -48,7 +48,7 @@ public class MasterClientResolverTest
         {
             life.start();
             MasterClient masterClient1 =
-                    resolver.instantiate( "cluster://localhost", 44, new Monitors(), StoreId.DEFAULT, life );
+                    resolver.instantiate( "cluster://localhost", 44, null, new Monitors(), StoreId.DEFAULT, life );
             assertThat( masterClient1, instanceOf( MasterClient214.class ) );
         }
         finally
@@ -70,7 +70,7 @@ public class MasterClientResolverTest
         {
             life.start();
             MasterClient masterClient2 =
-                    resolver.instantiate( "cluster://localhost", 55, new Monitors(), StoreId.DEFAULT, life );
+                    resolver.instantiate( "cluster://localhost", 55, null, new Monitors(), StoreId.DEFAULT, life );
 
             assertThat( masterClient2, instanceOf( MasterClient210.class ) );
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,14 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality.assumeIndependence
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.LabelName
+import org.neo4j.cypher.internal.frontend.v2_3.ast.LabelName
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.Metrics.{QueryGraphCardinalityModel, QueryGraphSolverInput}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality.{ExpressionSelectivityCalculator, SelectivityCombiner}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, SimplePatternLength, VarPatternLength}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, Selectivity}
-import org.neo4j.cypher.internal.compiler.v2_3.planner.{QueryGraph, SemanticTable}
+import org.neo4j.cypher.internal.compiler.v2_3.planner.QueryGraph
 import org.neo4j.cypher.internal.compiler.v2_3.spi.GraphStatistics
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticTable
 
 case class AssumeIndependenceQueryGraphCardinalityModel(stats: GraphStatistics, combiner: SelectivityCombiner)
   extends QueryGraphCardinalityModel {
@@ -48,9 +49,7 @@ case class AssumeIndependenceQueryGraphCardinalityModel(stats: GraphStatistics, 
     if (queryGraph.optionalMatches.isEmpty)
       Seq(queryGraph)
     else {
-      (0 to queryGraph.optionalMatches.length)
-        .map(queryGraph.optionalMatches.combinations)
-        .flatten
+      (0 to queryGraph.optionalMatches.length).flatMap(queryGraph.optionalMatches.combinations)
         .map(_.map(_.withoutArguments()))
         .map(_.foldLeft(QueryGraph.empty)(_.withOptionalMatches(Seq.empty) ++ _.withOptionalMatches(Seq.empty)))
         .map(queryGraph.withOptionalMatches(Seq.empty) ++ _)
@@ -107,6 +106,6 @@ case class AssumeIndependenceQueryGraphCardinalityModel(stats: GraphStatistics, 
 
     val selectivity = combiner.andTogetherSelectivities(expressionSelectivities ++ patternSelectivities.flatten)
 
-    (selectivity.getOrElse(Selectivity(1)), numberOfZeroZeroRels)
+    (selectivity.getOrElse(Selectivity.ONE), numberOfZeroZeroRels)
   }
 }

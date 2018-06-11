@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,8 @@ import org.junit.Test;
 import java.util.HashMap;
 import java.util.Map;
 
+import static java.util.Arrays.asList;
+
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 
@@ -34,26 +36,19 @@ public class TokenHolderTest
     {
         // GIVEN
         TokenCreator creator = mock( TokenCreator.class );
-        TokenHolder<Token> holder = new TokenHolder<Token>( creator )
-        {
-            @Override
-            protected Token newToken( String name, int id )
-            {
-                return new Token( name, id );
-            }
-        };
+        TokenHolder<Token> holder = new DelegatingTokenHolder<Token>( creator, new Token.Factory() ) {};
         holder.setInitialTokens(
-                token( "one", 1 ),
-                token( "two", 2 ) );
+                asList( token( "one", 1 ),
+                        token( "two", 2 ) ));
         assertTokens( holder.getAllTokens(),
                 token( "one", 1 ),
                 token( "two", 2 ) );
 
         // WHEN
-        holder.setInitialTokens(
+        holder.setInitialTokens(asList(
                 token( "two", 2 ),
                 token( "three", 3 ),
-                token( "four", 4 ) );
+                token( "four", 4 ) ));
 
         // THEN
         assertTokens( holder.getAllTokens(),

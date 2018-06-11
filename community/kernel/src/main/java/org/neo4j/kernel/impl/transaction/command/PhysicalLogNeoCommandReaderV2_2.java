@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
 import org.neo4j.kernel.impl.index.IndexCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
@@ -65,6 +66,7 @@ import static org.neo4j.kernel.impl.util.Bits.notFlag;
 import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.read2bLengthAndString;
 import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.read2bMap;
 import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.read3bLengthAndString;
+import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.shortToUnsignedInt;
 
 public class PhysicalLogNeoCommandReaderV2_2 implements CommandReader
 {
@@ -208,8 +210,18 @@ public class PhysicalLogNeoCommandReaderV2_2 implements CommandReader
         }
     }
 
-    private class PhysicalNeoCommandReader implements NeoCommandHandler
+    private class PhysicalNeoCommandReader implements CommandHandler
     {
+        @Override
+        public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
+            throw new UnsupportedOperationException( "TGraph: not implement." );
+        }
+
+        @Override
+        public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
+            throw new UnsupportedOperationException( "TGraph: not implement." );
+        }
+
         @Override
         public boolean visitNodeCommand( Command.NodeCommand command ) throws IOException
         {
@@ -304,7 +316,7 @@ public class PhysicalLogNeoCommandReaderV2_2 implements CommandReader
             {
                 throw new IOException( "Illegal in use flag: " + inUseByte );
             }
-            int type = channel.getShort();
+            int type = shortToUnsignedInt( channel.getShort() );
             RelationshipGroupRecord record = new RelationshipGroupRecord( id, type );
             record.setInUse( inUse );
             record.setNext( channel.getLong() );

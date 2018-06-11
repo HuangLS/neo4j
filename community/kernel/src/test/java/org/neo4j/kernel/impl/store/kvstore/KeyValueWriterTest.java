@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,11 @@
  */
 package org.neo4j.kernel.impl.store.kvstore;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-
 import org.junit.After;
 import org.junit.Test;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -58,7 +58,6 @@ public class KeyValueWriterTest
         assertTrue( "format specifier", writer.writeHeader( key, value ) );
         assertTrue( "end-of-header marker", writer.writeHeader( key, value ) );
         assertTrue( "end marker + number of data items", writer.writeHeader( key, value ) );
-        writer.writeTrailer( "all ok" );
 
         // then
 
@@ -68,7 +67,7 @@ public class KeyValueWriterTest
                                     0x00, 0, 0, 0, 0, 0, 0, 0x00, // zero padding
                                     0x00, 0, 0, 0, 0, 0, 0, 0x00, // end marker
                                     0x00, 0, 0, 0, 0, 0, 0, 0x00, // number of data items
-                                    'a', 'l', 'l', ' ', 'o', 'k'} ); // trailer
+                                    } );
     }
 
     @Test

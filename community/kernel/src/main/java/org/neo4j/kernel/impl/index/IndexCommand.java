@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,11 +21,11 @@ package org.neo4j.kernel.impl.index;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Objects;
 
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.kernel.impl.transaction.command.Command;
-import org.neo4j.kernel.impl.transaction.command.CommandRecordVisitor;
-import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
+import org.neo4j.kernel.impl.transaction.command.CommandHandler;
 import org.neo4j.kernel.impl.transaction.command.NeoCommandType;
 
 import static java.lang.String.format;
@@ -89,12 +89,6 @@ public abstract class IndexCommand extends Command
         return value;
     }
 
-    @Override
-    public void accept( CommandRecordVisitor visitor )
-    {
-        // no op
-    }
-
     public byte startNodeNeedsLong()
     {
         return 0;
@@ -151,7 +145,7 @@ public abstract class IndexCommand extends Command
         }
 
         @Override
-        public boolean handle( NeoCommandHandler visitor ) throws IOException
+        public boolean handle( CommandHandler visitor ) throws IOException
         {
             return visitor.visitIndexAddNodeCommand( this );
         }
@@ -205,26 +199,32 @@ public abstract class IndexCommand extends Command
         }
 
         @Override
-        public int hashCode()
+        public boolean equals( Object o )
         {
-            int result = (int) (startNode ^ (startNode >>> 32));
-            result = 31 * result + (int) (endNode ^ (endNode >>> 32));
-            return result;
-        }
-
-        @Override
-        public boolean equals( Object obj )
-        {
-            if ( !super.equals( obj ) )
+            if ( this == o )
+            {
+                return true;
+            }
+            if ( o == null || getClass() != o.getClass() )
             {
                 return false;
             }
-            AddRelationshipCommand other = (AddRelationshipCommand) obj;
-            return startNode == other.startNode && endNode == other.endNode;
+            if ( !super.equals( o ) )
+            {
+                return false;
+            }
+            AddRelationshipCommand that = (AddRelationshipCommand) o;
+            return startNode == that.startNode && endNode == that.endNode;
         }
 
         @Override
-        public boolean handle( NeoCommandHandler visitor ) throws IOException
+        public int hashCode()
+        {
+            return Objects.hash( super.hashCode(), startNode, endNode );
+        }
+
+        @Override
+        public boolean handle( CommandHandler visitor ) throws IOException
         {
             return visitor.visitIndexAddRelationshipCommand( this );
         }
@@ -248,7 +248,7 @@ public abstract class IndexCommand extends Command
         }
 
         @Override
-        public boolean handle( NeoCommandHandler visitor ) throws IOException
+        public boolean handle( CommandHandler visitor ) throws IOException
         {
             return visitor.visitIndexRemoveCommand( this );
         }
@@ -269,7 +269,7 @@ public abstract class IndexCommand extends Command
         }
 
         @Override
-        public boolean handle( NeoCommandHandler visitor ) throws IOException
+        public boolean handle( CommandHandler visitor ) throws IOException
         {
             return visitor.visitIndexDeleteCommand( this );
         }
@@ -297,19 +297,32 @@ public abstract class IndexCommand extends Command
         }
 
         @Override
+        public boolean equals( Object o )
+        {
+            if ( this == o )
+            {
+                return true;
+            }
+            if ( o == null || getClass() != o.getClass() )
+            {
+                return false;
+            }
+            if ( !super.equals( o ) )
+            {
+                return false;
+            }
+            CreateCommand that = (CreateCommand) o;
+            return Objects.equals( config, that.config );
+        }
+
+        @Override
         public int hashCode()
         {
-            return config != null ? config.hashCode() : 0;
+            return Objects.hash( super.hashCode(), config );
         }
 
         @Override
-        public boolean equals( Object obj )
-        {
-            return super.equals( obj ) && config.equals( ((CreateCommand)obj).config );
-        }
-
-        @Override
-        public boolean handle( NeoCommandHandler visitor ) throws IOException
+        public boolean handle( CommandHandler visitor ) throws IOException
         {
             return visitor.visitIndexCreateCommand( this );
         }
@@ -323,20 +336,34 @@ public abstract class IndexCommand extends Command
     }
 
     @Override
-    public boolean equals( Object obj )
+    public boolean equals( Object o )
     {
-        IndexCommand other = (IndexCommand) obj;
-        boolean equals = getCommandType() == other.getCommandType() &&
-                entityType == other.entityType &&
-                indexNameId == other.indexNameId &&
-                keyId == other.keyId &&
-                getValueType() == other.getValueType();
-        if ( !equals )
+        if ( this == o )
+        {
+            return true;
+        }
+        if ( o == null || getClass() != o.getClass() )
         {
             return false;
         }
+        if ( !super.equals( o ) )
+        {
+            return false;
+        }
+        IndexCommand that = (IndexCommand) o;
+        return commandType == that.commandType &&
+               indexNameId == that.indexNameId &&
+               entityType == that.entityType &&
+               entityId == that.entityId &&
+               keyId == that.keyId &&
+               valueType == that.valueType &&
+               Objects.equals( value, that.value );
+    }
 
-        return value == null ? other.value == null : value.equals( other.value );
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash( super.hashCode(), commandType, indexNameId, entityType, entityId, keyId, valueType, value );
     }
 
     public byte getCommandType()

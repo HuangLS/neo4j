@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,13 +26,13 @@ public interface LogProvider
 {
     /**
      * @param loggingClass the context for the returned {@link Log}
-     * @return a {@link Log} that logs messages with the {@code loggingClass} as context
+     * @return a {@link Log} that logs messages with the {@code loggingClass} as the context
      */
     Log getLog( Class loggingClass );
 
     /**
-     * @param context the named context for the returned {@link Log}
-     * @return a {@link Log} that logs messages with the given context
+     * @param name the context for the returned {@link Log}
+     * @return a {@link Log} that logs messages with the specified name as the context
      */
-    Log getLog( String context );
+    Log getLog( String name );
 }

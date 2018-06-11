@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -313,7 +313,6 @@ public abstract class MapUtil
      * {@link RuntimeException} instead.
      * @param config the data to store in the properties file.
      * @param stream the {@link OutputStream} to store the properties in.
-     * @throws IOException IO error.
      */
     public static void storeStrictly( Map<String, String> config, OutputStream stream )
     {
@@ -349,7 +348,6 @@ public abstract class MapUtil
      *
      * @param config the data to store in the properties file.
      * @param writer the {@link Writer} to store the properties in.
-     * @throws IOException IO error.
      */
     public static void storeStrictly( Map<String, String> config, Writer writer )
     {
@@ -401,9 +399,9 @@ public abstract class MapUtil
     public static Map<String, String> toStringMap( PropertyContainer entity )
     {
         Map<String, String> out = new HashMap<>();
-        for ( String key : entity.getPropertyKeys() )
+        for ( Map.Entry<String, Object> property : entity.getAllProperties().entrySet() )
         {
-            out.put( key, entity.getProperty( key ).toString() );
+            out.put( property.getKey(), property.getValue().toString() );
         }
         return out;
     }
@@ -447,4 +445,26 @@ public abstract class MapUtil
 
         return true;
     }
+
+    public static <K, V> MapBuilder<K, V> entry( K key, V value )
+    {
+        return new MapBuilder<K, V>().entry( key, value );
+    }
+
+    public static class MapBuilder<K, V>
+    {
+        private Map<K, V> map = new HashMap<>();
+
+        public MapBuilder<K, V> entry( K key, V value )
+        {
+            map.put( key, value );
+            return this;
+        }
+
+        public Map<K, V> create()
+        {
+            return map;
+        }
+    }
+
 }

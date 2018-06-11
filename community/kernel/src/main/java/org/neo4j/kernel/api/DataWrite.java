@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,16 +20,20 @@
 package org.neo4j.kernel.api;
 
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.RelationshipTypeIdNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 interface DataWrite
 {
     long nodeCreate();
 
     void nodeDelete( long nodeId ) throws EntityNotFoundException;
+
+    int nodeDetachDelete( long nodeId ) throws EntityNotFoundException;
 
     long relationshipCreate( int relationshipTypeId, long startNodeId, long endNodeId )
             throws RelationshipTypeIdNotFoundKernelException, EntityNotFoundException;
@@ -71,4 +75,15 @@ interface DataWrite
     Property relationshipRemoveProperty( long relationshipId, int propertyKeyId ) throws EntityNotFoundException;
 
     Property graphRemoveProperty( int propertyKeyId );
+
+    /**
+     * TGraph operations
+     */
+    void nodeSetTemporalProperty(TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException;
+    void relationshipSetTemporalProperty(TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException;
+//    void nodeSetTemporalProperty( TemporalPropertyKey tpKey, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
+//    void nodeRemoveTemporalProperty( long nodeId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
+//    void relationshipSetTemporalProperty( TemporalPropertyKey tpKey, Object value ) throws EntityNotFoundException, PropertyNotFoundException;
+//    void relationshipRemoveTemporalProperty( long relId, int propertyKeyId ) throws EntityNotFoundException, PropertyNotFoundException;
+
 }

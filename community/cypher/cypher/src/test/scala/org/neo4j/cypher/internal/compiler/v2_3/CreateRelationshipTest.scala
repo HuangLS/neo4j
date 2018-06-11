@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,7 +40,7 @@ class CreateRelationshipTest extends GraphDatabaseFunSuite {
 
     val tx = graph.beginTx()
     try {
-      val state = QueryStateHelper.queryStateFrom(graph, tx).copy(params = props)
+      val state = QueryStateHelper.queryStateFrom(graph, tx, props)
       val ctx = ExecutionContext.from("a" -> a, "b" -> b)
 
       //when

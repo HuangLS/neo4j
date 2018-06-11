@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,8 @@ import scala.collection.immutable.BitSet
 // can be stored efficiently using immutable BitSets
 //
 trait IdRegistry[I] {
+  def compacted(): Boolean
+
   // register elem and returns it's assigned id
   def register(elem: I): Int
 
@@ -113,6 +115,8 @@ class DefaultIdRegistry[I] extends IdRegistry[I] {
     }
     target.result()
   }
+
+  override def compacted() = compactionMap.nonEmpty
 }
 
 

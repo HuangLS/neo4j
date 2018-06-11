@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,7 +34,7 @@ import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddRelationshipCommand;
 import org.neo4j.kernel.impl.index.IndexConfigStore;
 import org.neo4j.kernel.impl.index.IndexDefineCommand;
-import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
+import org.neo4j.kernel.impl.transaction.command.CommandHandler;
 import org.neo4j.kernel.lifecycle.LifeRule;
 import org.neo4j.test.EphemeralFileSystemRule;
 
@@ -53,19 +53,21 @@ import static org.neo4j.kernel.impl.util.IdOrderingQueue.BYPASS;
 
 public class LegacyIndexApplierTest
 {
-    public final @Rule LifeRule life = new LifeRule( true );
-    public final @Rule EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
+    @Rule
+    public final LifeRule life = new LifeRule( true );
+    @Rule
+    public final EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
 
     @Test
     public void shouldOnlyCreateOneApplierPerProvider() throws Exception
     {
         // GIVEN
-        Map<String,Integer> names = MapUtil.<String,Integer> genericMap( "first", 0, "second", 1 );
-        Map<String,Integer> keys = MapUtil.<String,Integer> genericMap( "key", 0 );
+        Map<String,Integer> names = MapUtil.genericMap( "first", 0, "second", 1 );
+        Map<String,Integer> keys = MapUtil.genericMap( "key", 0 );
         String applierName = "test-applier";
         IndexConfigStore config = newIndexConfigStore( names, applierName );
         LegacyIndexApplierLookup applierLookup = mock( LegacyIndexApplierLookup.class );
-        when( applierLookup.newApplier( anyString(), anyBoolean() ) ).thenReturn( mock( NeoCommandHandler.class ) );
+        when( applierLookup.newApplier( anyString(), anyBoolean() ) ).thenReturn( mock( CommandHandler.class ) );
         try ( LegacyIndexApplier applier = new LegacyIndexApplier( config, applierLookup, BYPASS, BASE_TX_ID, INTERNAL ) )
         {
             // WHEN

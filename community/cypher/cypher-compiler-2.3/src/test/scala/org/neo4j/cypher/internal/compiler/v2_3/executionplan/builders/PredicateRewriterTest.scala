@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,9 +21,10 @@ package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Identifier, Literal, Property}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.{Equals, HasLabel, Predicate}
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.{UnresolvedLabel, UnresolvedProperty}
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ExecutionPlanInProgress, Namer, PlanBuilder}
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 
 class PredicateRewriterTest extends BuilderTest {
 
@@ -49,20 +50,20 @@ class PredicateRewriterTest extends BuilderTest {
   val bareB = SingleNode("b")
 
   // Relationships
-  val relationshipLabeledBoth = RelatedTo(labeledA, labeledB, "r", Seq.empty, Direction.OUTGOING, Map.empty)
+  val relationshipLabeledBoth = RelatedTo(labeledA, labeledB, "r", Seq.empty, SemanticDirection.OUTGOING, Map.empty)
   val relationshipLabeledLeft = relationshipLabeledBoth.copy(right = bareB)
   val relationshipLabeledRight = relationshipLabeledBoth.copy(left = bareA)
   val relationshipBare = relationshipLabeledLeft.copy(left = bareA)
   val relationshipPropsOnBoth = relationshipBare.copy(left = propertiedA, right = propertiedB)
   val relationshipPropsOnLeft = relationshipBare.copy(left = propertiedA)
   val relationshipPropsOnRight = relationshipBare.copy(right = propertiedB)
-  val varlengthRelatedToNoLabels = VarLengthRelatedTo("p", bareA, bareB, None, None, Seq(), Direction.OUTGOING, None, Map.empty)
+  val varlengthRelatedToNoLabels = VarLengthRelatedTo("p", bareA, bareB, None, None, Seq(), SemanticDirection.OUTGOING, None, Map.empty)
   val varlengthRelatedToWithProps = varlengthRelatedToNoLabels.copy(properties = properties)
 
 
   val predicateForLabelA = HasLabel(Identifier("a"), label)
   val predicateForLabelB = HasLabel(Identifier("b"), label)
-  val shortestPathNoLabels = ShortestPath("p", bareA, bareB, Seq.empty, Direction.OUTGOING, false, None, single = false, None)
+  val shortestPathNoLabels = ShortestPath("p", bareA, bareB, Seq.empty, SemanticDirection.OUTGOING, false, None, single = false, None)
 
   val prop = UnresolvedProperty("foo")
 

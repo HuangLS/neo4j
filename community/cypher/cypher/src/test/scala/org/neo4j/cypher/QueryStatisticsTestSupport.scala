@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,11 @@
  */
 package org.neo4j.cypher
 
+import java.util
+
 import org.neo4j.cypher.internal.compatibility.ExecutionResultWrapperFor2_3
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.InternalExecutionResult
-import org.neo4j.cypher.internal.compiler.v2_3.{CompiledRuntimeName, CostBasedPlannerName}
+import org.neo4j.cypher.internal.compiler.v2_3.{CostBasedPlannerName, InterpretedRuntimeName}
 import org.neo4j.kernel.impl.query.{QueryEngineProvider, QueryExecutionMonitor, QuerySession}
 import org.scalatest.Assertions
 
@@ -35,14 +37,14 @@ trait QueryStatisticsTestSupport {
 
     def apply(actual: InternalExecutionResult) {
       implicit val monitor = new QueryExecutionMonitor {
-        override def startQueryExecution(session: QuerySession, query: String){}
+        override def startQueryExecution(session: QuerySession, query: String, parameters: util.Map[String, AnyRef]){}
 
         override def endSuccess(session: QuerySession){}
 
         override def endFailure(session: QuerySession, throwable: Throwable){}
       }
       implicit val session = QueryEngineProvider.embeddedSession
-      val r = new ExecutionResultWrapperFor2_3(actual, CostBasedPlannerName.default, CompiledRuntimeName)
+      val r = new ExecutionResultWrapperFor2_3(actual, CostBasedPlannerName.default, InterpretedRuntimeName)
       apply(r.queryStatistics())
     }
   }

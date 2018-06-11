@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,9 +20,11 @@
 package org.neo4j.cypher.internal.compiler.v2_3
 
 import java.lang.Iterable
+import java.util
 import org.neo4j.cypher.internal.compiler.v2_3.mutation.{CreateUniqueAction, UniqueLink}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.graphdb.Traverser.Order
 import org.neo4j.graphdb._
 import org.neo4j.test.ImpermanentGraphDatabase
@@ -56,7 +58,7 @@ class DoubleCheckCreateUniqueTest extends CypherFunSuite {
     }
   }
 
-  val relateAction = CreateUniqueAction(UniqueLink("a", "b", "r", "X", Direction.OUTGOING))
+  val relateAction = CreateUniqueAction(UniqueLink("a", "b", "r", "X", SemanticDirection.OUTGOING))
 
   private def createExecutionContext(state:QueryState, a: Node): ExecutionContext = {
     ExecutionContext().newWith(Map("a" -> a))
@@ -160,6 +162,10 @@ class PausingNode(n: Node, afterGetRelationship: Node => Unit) extends Node {
   def removeProperty(key: String): AnyRef = ???
 
   def getPropertyKeys: Iterable[String] = ???
+
+  def getProperties( keys: String* ): util.Map[String, AnyRef] = ???
+
+  def getAllProperties: util.Map[String, AnyRef] = ???
 
   def addLabel(label: Label) {
     ???

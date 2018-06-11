@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,11 @@
  */
 package org.neo4j.kernel.impl.api.state;
 
+import org.act.temporalProperty.exception.TGraphNotImplementedException;
+import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.MemTable;
+
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -30,26 +33,31 @@ import org.neo4j.collection.primitive.Primitive;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveIntObjectMap;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.collection.primitive.PrimitiveLongSet;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.function.Consumer;
 import org.neo4j.function.Function;
 import org.neo4j.function.Predicate;
 import org.neo4j.graphdb.Direction;
 import org.neo4j.helpers.collection.Iterables;
-import org.neo4j.kernel.api.constraints.MandatoryNodePropertyConstraint;
-import org.neo4j.kernel.api.constraints.MandatoryRelationshipPropertyConstraint;
 import org.neo4j.kernel.api.constraints.NodePropertyConstraint;
+import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.PropertyConstraint;
 import org.neo4j.kernel.api.constraints.RelationshipPropertyConstraint;
+import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.cursor.LabelItem;
 import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.cursor.PropertyItem;
 import org.neo4j.kernel.api.cursor.RelationshipItem;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
+import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureSignature;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
+import org.neo4j.kernel.api.properties.TemporalProperty;
 import org.neo4j.kernel.api.txstate.ReadableTxState;
 import org.neo4j.kernel.api.txstate.RelationshipChangeVisitorAdapter;
 import org.neo4j.kernel.api.txstate.TransactionState;
@@ -70,6 +78,8 @@ import org.neo4j.kernel.impl.util.diffsets.DiffSetsVisitor;
 import org.neo4j.kernel.impl.util.diffsets.ReadableDiffSets;
 import org.neo4j.kernel.impl.util.diffsets.ReadableRelationshipDiffSets;
 import org.neo4j.kernel.impl.util.diffsets.RelationshipDiffSets;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 import static org.neo4j.collection.primitive.PrimitiveLongCollections.toPrimitiveIterator;
 import static org.neo4j.helpers.collection.Iterables.map;
@@ -145,6 +155,9 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     private DiffSets<IndexDescriptor> constraintIndexChanges;
     private DiffSets<PropertyConstraint> constraintsChanges;
 
+    private DiffSets<ProcedureDescriptor> procedureChanges;
+    private Map<ProcedureSignature.ProcedureName, ProcedureDescriptor> addedProcedures;
+
     private PropertyChanges propertyChangesForNodes;
 
     // Tracks added and removed nodes, not modified nodes
@@ -153,11 +166,13 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     // Tracks added and removed relationships, not modified relationships
     private RelationshipDiffSets<Long> relationships;
 
-    // This is temporary. It is needed until we've removed nodes and rels from the global cache, to tell
-    // that they were created and then deleted in the same tx. This is here just to set a save point to
-    // get a large set of changes in, and is meant to be removed in the coming days in a follow-up commit.
-    private final Set<Long> nodesDeletedInTx = new HashSet<>();
-    private final Set<Long> relationshipsDeletedInTx = new HashSet<>();
+    /**
+     * These two sets are needed because create-delete in same transaction is a no-op in {@link DiffSets}
+     * but we still need to provide correct answer in {@link #nodeIsDeletedInThisTx(long)} and
+     * {@link #relationshipIsDeletedInThisTx(long)} methods.
+     */
+    private PrimitiveLongSet nodesDeletedInTx;
+    private PrimitiveLongSet relationshipsDeletedInTx;
 
     private Map<UniquenessConstraint, Long> createdConstraintIndexesByConstraint;
 
@@ -247,8 +262,57 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
         };
     }
 
+    private MemTable nodeTemporalProperties;
+    private MemTable relTemporalProperties;
+
     @Override
-    public void accept( final TxStateVisitor visitor ) throws ConstraintValidationKernelException
+    public MemTable getNodeTemporalProperties()
+    {
+        return nodeTemporalProperties;
+    }
+
+    @Override
+    public MemTable getRelationshipTemporalProperties()
+    {
+        return relTemporalProperties;
+    }
+
+    @Override
+    public void nodeDoSetTemporalProperty(TemporalPropertyWriteOperation op)
+    {
+        if(nodeTemporalProperties==null)
+        {
+            nodeTemporalProperties = new MemTable();
+        }
+        InternalKey start = op.getInternalKey();
+        if(op.isEndEqNow()){
+            nodeTemporalProperties.addToNow( start, op.getValueSlice() );
+        }else{
+            nodeTemporalProperties.addInterval( start, op.getEnd(), op.getValueSlice() );
+        }
+        dataChanged();
+    }
+
+    @Override
+    public void relationshipDoSetTemporalProperty(TemporalPropertyWriteOperation op)
+    {
+        if(relTemporalProperties==null)
+        {
+            relTemporalProperties = new MemTable();
+        }
+        InternalKey start = op.getInternalKey();
+        if(op.isEndEqNow()){
+            relTemporalProperties.addToNow( start, op.getValueSlice() );
+        }else{
+            relTemporalProperties.addInterval( start, op.getEnd(), op.getValueSlice() );
+        }
+        dataChanged();
+    }
+
+
+    @Override
+    public void accept( final TxStateVisitor visitor )
+            throws ConstraintValidationKernelException, CreateConstraintFailureException
     {
         // Created nodes
         if ( nodes != null )
@@ -289,6 +353,11 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
         if ( indexChanges != null )
         {
             indexChanges.accept( indexVisitor( visitor, false ) );
+        }
+
+        if( procedureChanges != null )
+        {
+            procedureChanges.accept( procedureVisitor( visitor ) );
         }
 
         if ( constraintIndexChanges != null )
@@ -339,6 +408,16 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
             {
                 visitor.visitCreatedRelationshipLegacyIndex( entry.getKey(), entry.getValue() );
             }
+        }
+
+        if ( nodeTemporalProperties != null )
+        {
+            visitor.visitNodeTemporalPropertyChanges( nodeTemporalProperties );
+        }
+
+        if ( relTemporalProperties != null )
+        {
+            visitor.visitRelationshipTemporalPropertyChanges( relTemporalProperties );
         }
     }
 
@@ -407,7 +486,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
         }
 
         @Override
-        public void visitAdded( PropertyConstraint element )
+        public void visitAdded( PropertyConstraint element ) throws CreateConstraintFailureException
         {
             element.added( this );
         }
@@ -431,28 +510,49 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
         }
 
         @Override
-        public void visitAddedNodeMandatoryPropertyConstraint( MandatoryNodePropertyConstraint constraint )
+        public void visitAddedNodePropertyExistenceConstraint( NodePropertyExistenceConstraint constraint )
+                throws CreateConstraintFailureException
         {
-            visitor.visitAddedNodeMandatoryPropertyConstraint( constraint );
+            visitor.visitAddedNodePropertyExistenceConstraint( constraint );
         }
 
         @Override
-        public void visitRemovedNodeMandatoryPropertyConstraint( MandatoryNodePropertyConstraint constraint )
+        public void visitRemovedNodePropertyExistenceConstraint( NodePropertyExistenceConstraint constraint )
         {
-            visitor.visitRemovedNodeMandatoryPropertyConstraint( constraint );
+            visitor.visitRemovedNodePropertyExistenceConstraint( constraint );
         }
 
         @Override
-        public void visitAddedRelationshipMandatoryPropertyConstraint( MandatoryRelationshipPropertyConstraint constraint )
+        public void visitAddedRelationshipPropertyExistenceConstraint(
+                RelationshipPropertyExistenceConstraint constraint ) throws CreateConstraintFailureException
         {
-            visitor.visitAddedRelationshipMandatoryPropertyConstraint( constraint );
+            visitor.visitAddedRelationshipPropertyExistenceConstraint( constraint );
         }
 
         @Override
-        public void visitRemovedRelationshipMandatoryPropertyConstraint( MandatoryRelationshipPropertyConstraint constraint )
+        public void visitRemovedRelationshipPropertyExistenceConstraint(
+                RelationshipPropertyExistenceConstraint constraint )
         {
-            visitor.visitRemovedRelationshipMandatoryPropertyConstraint( constraint );
+            visitor.visitRemovedRelationshipPropertyExistenceConstraint( constraint );
         }
+    }
+
+    private static DiffSetsVisitor<ProcedureDescriptor> procedureVisitor( final TxStateVisitor visitor )
+    {
+        return new DiffSetsVisitor<ProcedureDescriptor>()
+        {
+            @Override
+            public void visitAdded( ProcedureDescriptor element )
+            {
+                visitor.visitCreatedProcedure( element );
+            }
+
+            @Override
+            public void visitRemoved( ProcedureDescriptor element )
+            {
+                visitor.visitDroppedProcedure( element );
+            }
+        };
     }
 
     private static DiffSetsVisitor<IndexDescriptor> indexVisitor( final TxStateVisitor visitor,
@@ -603,7 +703,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     {
         if ( nodes().remove( nodeId ) )
         {
-            nodesDeletedInTx.add( nodeId );
+            recordNodeDeleted( nodeId );
         }
 
         if ( nodeStatesMap != null )
@@ -646,9 +746,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     @Override
     public boolean nodeIsDeletedInThisTx( long nodeId )
     {
-        return addedAndRemovedNodes().isRemoved( nodeId )
-                // Temporary until we've stopped adding nodes to the global cache during tx.
-                || nodesDeletedInTx.contains( nodeId );
+        return nodesDeletedInTx != null && nodesDeletedInTx.contains( nodeId );
     }
 
     @Override
@@ -662,7 +760,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     {
         if ( relationships().remove( id ) )
         {
-            relationshipsDeletedInTx.add( id );
+            recordRelationshipDeleted( id );
         }
 
         if ( startNodeId == endNodeId )
@@ -703,9 +801,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     @Override
     public boolean relationshipIsDeletedInThisTx( long relationshipId )
     {
-        return addedAndRemovedRelationships().isRemoved( relationshipId )
-                // Temporary until we stop adding rels to the global cache during tx
-                || relationshipsDeletedInTx.contains( relationshipId );
+        return relationshipsDeletedInTx != null && relationshipsDeletedInTx.contains( relationshipId );
     }
 
     @Override
@@ -909,21 +1005,65 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     @Override
     public Cursor<NodeItem> augmentNodesGetAllCursor( Cursor<NodeItem> cursor )
     {
-        return hasChanges && nodes != null && !nodes.isEmpty() ? iteratorNodeCursor.get().init( cursor,
-                nodes.getAdded().iterator() ) : cursor;
+        return hasChanges && nodes != null && !nodes.isEmpty()
+               ? iteratorNodeCursor.get().init( cursor, nodes.getAdded().iterator() )
+               : cursor;
     }
 
     @Override
     public Cursor<RelationshipItem> augmentRelationshipsGetAllCursor( Cursor<RelationshipItem> cursor )
     {
-        return hasChanges && !relationships.isEmpty() ? iteratorRelationshipCursor.get().init( cursor,
-                toPrimitiveIterator( relationships.getAdded().iterator() ) ) : cursor;
+        return hasChanges && relationships != null && !relationships.isEmpty()
+               ? iteratorRelationshipCursor.get().init( cursor, toPrimitiveIterator( relationships.getAdded().iterator() ) )
+               : cursor;
     }
 
     @Override
     public ReadableDiffSets<Long> nodesWithLabelChanged( int labelId )
     {
         return LABEL_STATE.get( this, labelId ).nodeDiffSets();
+    }
+
+    private DiffSets<ProcedureDescriptor> procedureChanges()
+    {
+        return procedureChanges == null ? procedureChanges = new DiffSets<>() : procedureChanges;
+    }
+
+    private Map<ProcedureSignature.ProcedureName, ProcedureDescriptor> addedProcedures()
+    {
+        return addedProcedures == null ? addedProcedures = new HashMap<>() : addedProcedures;
+    }
+
+    @Override
+    public void procedureDoCreate( ProcedureSignature signature, String language, String body )
+    {
+        ProcedureDescriptor descriptor = new ProcedureDescriptor( signature, language, body );
+        procedureChanges().add( descriptor );
+        addedProcedures().put( signature.name(), descriptor );
+        hasChanges = true;
+    }
+
+    @Override
+    public void procedureDoDrop( ProcedureDescriptor descriptor )
+    {
+        procedureChanges().remove( descriptor );
+        if( addedProcedures != null )
+        {
+            addedProcedures.remove( descriptor.signature().name() );
+        }
+        hasChanges = true;
+    }
+
+    @Override
+    public Iterator<ProcedureDescriptor> augmentProcedures( Iterator<ProcedureDescriptor> procedures )
+    {
+        return procedureChanges != null ? procedureChanges.apply( procedures ) : procedures;
+    }
+
+    @Override
+    public ProcedureDescriptor getProcedure( ProcedureSignature.ProcedureName name )
+    {
+        return addedProcedures != null ? addedProcedures.get( name ) : null;
     }
 
     @Override
@@ -1096,7 +1236,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     }
 
     @Override
-    public void constraintDoAdd( MandatoryNodePropertyConstraint constraint )
+    public void constraintDoAdd( NodePropertyExistenceConstraint constraint )
     {
         constraintsChangesDiffSets().add( constraint );
         getOrCreateLabelState( constraint.label() ).getOrCreateConstraintsChanges().add( constraint );
@@ -1104,7 +1244,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     }
 
     @Override
-    public void constraintDoAdd( MandatoryRelationshipPropertyConstraint constraint )
+    public void constraintDoAdd( RelationshipPropertyExistenceConstraint constraint )
     {
         constraintsChangesDiffSets().add( constraint );
         relationshipConstraintChangesByType( constraint.relationshipType() ).add( constraint );
@@ -1440,7 +1580,7 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
         {
             return null;
         }
-        TreeMap<DefinedProperty,DiffSets<Long>> sortedUpdates = null;
+        TreeMap<DefinedProperty,DiffSets<Long>> sortedUpdates;
         if ( updates instanceof TreeMap )
         {
             sortedUpdates = (TreeMap<DefinedProperty,DiffSets<Long>>) updates;
@@ -1611,5 +1751,23 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
     public boolean hasDataChanges()
     {
         return hasDataChanges;
+    }
+
+    private void recordNodeDeleted( long id )
+    {
+        if ( nodesDeletedInTx == null )
+        {
+            nodesDeletedInTx = Primitive.longSet();
+        }
+        nodesDeletedInTx.add( id );
+    }
+
+    private void recordRelationshipDeleted( long id )
+    {
+        if ( relationshipsDeletedInTx == null )
+        {
+            relationshipsDeletedInTx = Primitive.longSet();
+        }
+        relationshipsDeletedInTx.add( id );
     }
 }

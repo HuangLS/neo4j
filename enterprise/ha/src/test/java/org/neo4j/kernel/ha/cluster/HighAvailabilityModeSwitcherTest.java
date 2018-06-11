@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,11 @@
  */
 package org.neo4j.kernel.ha.cluster;
 
+import org.junit.Test;
+import org.mockito.InOrder;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+
 import java.net.URI;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -30,11 +35,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.junit.Test;
-import org.mockito.InOrder;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-
 import org.neo4j.cluster.InstanceId;
 import org.neo4j.cluster.client.ClusterClient;
 import org.neo4j.cluster.member.ClusterMemberAvailability;
@@ -42,13 +42,15 @@ import org.neo4j.cluster.protocol.election.Election;
 import org.neo4j.com.ComException;
 import org.neo4j.function.Supplier;
 import org.neo4j.helpers.CancellationRequest;
-import org.neo4j.kernel.impl.store.MismatchingStoreIdException;
-import org.neo4j.logging.AssertableLogProvider;
-import org.neo4j.kernel.impl.logging.SimpleLogService;
-import org.neo4j.kernel.impl.store.StoreId;
-import org.neo4j.kernel.lifecycle.LifeSupport;
-import org.neo4j.logging.NullLogProvider;
+import org.neo4j.kernel.NeoStoreDataSource;
 import org.neo4j.kernel.impl.logging.NullLogService;
+import org.neo4j.kernel.impl.logging.SimpleLogService;
+import org.neo4j.kernel.impl.store.MismatchingStoreIdException;
+import org.neo4j.kernel.impl.store.StoreId;
+import org.neo4j.kernel.impl.transaction.state.DataSourceManager;
+import org.neo4j.kernel.lifecycle.LifeSupport;
+import org.neo4j.logging.AssertableLogProvider;
+import org.neo4j.logging.NullLogProvider;
 
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
@@ -62,7 +64,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
-
 import static org.neo4j.kernel.ha.cluster.HighAvailabilityMemberState.PENDING;
 import static org.neo4j.kernel.ha.cluster.HighAvailabilityMemberState.TO_SLAVE;
 import static org.neo4j.logging.AssertableLogProvider.inLog;
@@ -80,7 +81,8 @@ public class HighAvailabilityModeSwitcherTest
                 availability,
                 mock( ClusterClient.class ),
                 storeSupplierMock(),
-                mock( InstanceId.class ), NullLogService.getInstance() );
+                mock( InstanceId.class ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
 
         // When
         toTest.masterIsElected( new HighAvailabilityMemberChangeEvent( HighAvailabilityMemberState.MASTER,
@@ -106,7 +108,8 @@ public class HighAvailabilityModeSwitcherTest
                 availability,
                 mock( ClusterClient.class ),
                 storeSupplierMock(),
-                mock( InstanceId.class ), NullLogService.getInstance() );
+                mock( InstanceId.class ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
 
         // When
         toTest.masterIsAvailable( new HighAvailabilityMemberChangeEvent( HighAvailabilityMemberState.SLAVE,
@@ -132,7 +135,8 @@ public class HighAvailabilityModeSwitcherTest
                 availability,
                 mock( ClusterClient.class ),
                 storeSupplierMock(),
-                mock( InstanceId.class ), NullLogService.getInstance() );
+                mock( InstanceId.class ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
 
         // When
         toTest.masterIsElected( new HighAvailabilityMemberChangeEvent( HighAvailabilityMemberState.SLAVE,
@@ -158,7 +162,8 @@ public class HighAvailabilityModeSwitcherTest
                 availability,
                 mock( ClusterClient.class ),
                 storeSupplierMock(),
-                mock( InstanceId.class ), NullLogService.getInstance() );
+                mock( InstanceId.class ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
 
         // When
         toTest.slaveIsAvailable( new HighAvailabilityMemberChangeEvent( HighAvailabilityMemberState.MASTER,
@@ -181,6 +186,7 @@ public class HighAvailabilityModeSwitcherTest
         final AtomicBoolean firstSwitch = new AtomicBoolean( true );
         ClusterMemberAvailability availability = mock( ClusterMemberAvailability.class );
         SwitchToSlave switchToSlave = mock( SwitchToSlave.class );
+        @SuppressWarnings( "resource" )
         SwitchToMaster switchToMaster = mock( SwitchToMaster.class );
 
         when( switchToSlave.switchToSlave( any( LifeSupport.class ), any( URI.class ), any( URI.class ),
@@ -210,7 +216,8 @@ public class HighAvailabilityModeSwitcherTest
                 availability,
                 mock( ClusterClient.class ),
                 storeSupplierMock(),
-                mock( InstanceId.class ), NullLogService.getInstance() );
+                mock( InstanceId.class ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
         toTest.init();
         toTest.start();
         toTest.listeningAt( URI.create( "ha://server3?serverId=3" ) );
@@ -241,7 +248,6 @@ public class HighAvailabilityModeSwitcherTest
         // M1: Get masterIsAvailable for instance 1 at PENDING state, changing PENDING -> TO_SLAVE
         // M2: Get masterIsAvailable for instance 2 at TO_SLAVE state, changing TO_SLAVE -> TO_SLAVE
 
-        System.gc();
         // Given
         final CountDownLatch firstMasterAvailableHandled = new CountDownLatch( 1 );
         final CountDownLatch secondMasterAvailableComes = new CountDownLatch( 1 );
@@ -249,9 +255,10 @@ public class HighAvailabilityModeSwitcherTest
 
         SwitchToSlave switchToSlave = mock( SwitchToSlave.class );
 
-        HighAvailabilityModeSwitcher toTest = new HighAvailabilityModeSwitcher( switchToSlave,
+        HighAvailabilityModeSwitcher modeSwitcher = new HighAvailabilityModeSwitcher( switchToSlave,
                 mock( SwitchToMaster.class ), mock( Election.class ), mock( ClusterMemberAvailability.class ),
-                mock( ClusterClient.class ), mock( Supplier.class ), new InstanceId( 4 ), NullLogService.getInstance() )
+                mock( ClusterClient.class ), mock( Supplier.class ), new InstanceId( 4 ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() )
         {
             @Override
             ScheduledExecutorService createExecutor()
@@ -295,8 +302,6 @@ public class HighAvailabilityModeSwitcherTest
                                         secondMasterAvailableHandled.countDown();
                                         return null;
                                     }
-
-                                    ;
                                 } );
                                 return mock( ScheduledFuture.class );
                             }
@@ -304,9 +309,9 @@ public class HighAvailabilityModeSwitcherTest
                 return executor;
             }
         };
-        toTest.init();
-        toTest.start();
-        toTest.listeningAt( URI.create( "ha://server3?serverId=3" ) );
+        modeSwitcher.init();
+        modeSwitcher.start();
+        modeSwitcher.listeningAt( URI.create( "ha://server3?serverId=3" ) );
 
         // When
 
@@ -318,18 +323,17 @@ public class HighAvailabilityModeSwitcherTest
                 .switchToSlave( any( LifeSupport.class ), any( URI.class ), eq( uri1 ), any( CancellationRequest
                         .class ) );
 
-        toTest.masterIsAvailable( new HighAvailabilityMemberChangeEvent( PENDING, TO_SLAVE, new InstanceId( 1 ), uri1
-        ) );
-        firstMasterAvailableHandled.await(); // wait until the first masterIsAvailable triggers the exception
-        // handling process
+        modeSwitcher.masterIsAvailable(
+                new HighAvailabilityMemberChangeEvent( PENDING, TO_SLAVE, new InstanceId( 1 ), uri1 ) );
+        firstMasterAvailableHandled.await(); // wait until the first masterIsAvailable triggers the exception handling
         verify( switchToSlave ).switchToSlave( any( LifeSupport.class ), any( URI.class ), eq( uri1 ),
                 any( CancellationRequest.class ) );
 
 
         // masterIsAvailable for instance 2
         URI uri2 = URI.create( "ha://server2" );
-        toTest.masterIsAvailable( new HighAvailabilityMemberChangeEvent( TO_SLAVE, TO_SLAVE, new InstanceId( 2 ),
-                uri2 ) );
+        modeSwitcher.masterIsAvailable(
+                new HighAvailabilityMemberChangeEvent( TO_SLAVE, TO_SLAVE, new InstanceId( 2 ), uri2 ) );
         secondMasterAvailableComes.countDown();
         secondMasterAvailableHandled.await(); // wait until switchToSlave method is invoked again
 
@@ -362,7 +366,8 @@ public class HighAvailabilityModeSwitcherTest
                 mock( SwitchToMaster.class ), mock( Election.class ), mock( ClusterMemberAvailability.class ),
                 mock( ClusterClient.class ),
                 storeSupplierMock(),
-                new InstanceId( 1 ), NullLogService.getInstance() );
+                new InstanceId( 1 ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
         URI uri1 = URI.create( "ha://server1" );
         toTest.init();
         toTest.start();
@@ -424,7 +429,7 @@ public class HighAvailabilityModeSwitcherTest
                 mock( SwitchToMaster.class ), mock( Election.class ), mock( ClusterMemberAvailability.class ),
                 mock( ClusterClient.class ),
                 storeSupplierMock(),
-                new InstanceId( 2 ), logService );
+                new InstanceId( 2 ), logService, neoStoreDataSourceSupplierMock() );
         // That is properly started
         toTest.init();
         toTest.start();
@@ -459,9 +464,8 @@ public class HighAvailabilityModeSwitcherTest
 
         HighAvailabilityModeSwitcher modeSwitcher = new HighAvailabilityModeSwitcher( mock( SwitchToSlave.class ),
                 mock( SwitchToMaster.class ), election, memberAvailability, mock( ClusterClient.class ),
-                storeSupplierMock(),
-
-                mock( InstanceId.class ), NullLogService.getInstance() );
+                storeSupplierMock(), mock( InstanceId.class ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
 
         // When
         modeSwitcher.forceElections();
@@ -482,8 +486,8 @@ public class HighAvailabilityModeSwitcherTest
 
         HighAvailabilityModeSwitcher modeSwitcher = new HighAvailabilityModeSwitcher( mock( SwitchToSlave.class ),
                 mock( SwitchToMaster.class ), election, memberAvailability, mock( ClusterClient.class ),
-                storeSupplierMock(),
-                mock( InstanceId.class ), NullLogService.getInstance() );
+                storeSupplierMock(), mock( InstanceId.class ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
 
         // When: reelections are forced multiple times
         modeSwitcher.forceElections();
@@ -511,9 +515,8 @@ public class HighAvailabilityModeSwitcherTest
 
         HighAvailabilityModeSwitcher modeSwitcher = new HighAvailabilityModeSwitcher( switchToSlave,
                 mock( SwitchToMaster.class ), election, memberAvailability, mock( ClusterClient.class ),
-                storeSupplierMock(),
-
-                mock( InstanceId.class ), NullLogService.getInstance() )
+                storeSupplierMock(), mock( InstanceId.class ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() )
         {
             @Override
             ScheduledExecutorService createExecutor()
@@ -576,7 +579,8 @@ public class HighAvailabilityModeSwitcherTest
         HighAvailabilityModeSwitcher theSwitcher = new HighAvailabilityModeSwitcher( sts, stm, election, cma,
                 mock( ClusterClient.class ),
                 storeSupplierMock(),
-                instanceId, NullLogService.getInstance() );
+                instanceId, NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
 
         theSwitcher.init();
         theSwitcher.start();
@@ -609,10 +613,45 @@ public class HighAvailabilityModeSwitcherTest
         verify( election ).demote( instanceId );
     }
 
-    private static Supplier<StoreId> storeSupplierMock()
+    @Test
+    public void shouldSwitchToSlaveForNullMasterAndBeSilentWhenMovingToDetached() throws Throwable
+    {
+        // Given
+        ClusterMemberAvailability availability = mock( ClusterMemberAvailability.class );
+        HighAvailabilityModeSwitcher toTest = new HighAvailabilityModeSwitcher( mock( SwitchToSlave.class ),
+                mock( SwitchToMaster.class ),
+                mock( Election.class ),
+                availability,
+                mock( ClusterClient.class ),
+                storeSupplierMock(),
+                mock( InstanceId.class ), NullLogService.getInstance(),
+                neoStoreDataSourceSupplierMock() );
+        ModeSwitcher mockSwitcher = mock( ModeSwitcher.class );
+        toTest.addModeSwitcher( mockSwitcher );
+
+        // When
+        toTest.init();
+        toTest.start();
+        toTest.instanceDetached( new HighAvailabilityMemberChangeEvent( HighAvailabilityMemberState.MASTER,
+                HighAvailabilityMemberState.PENDING, null, null ) );
+
+        // Then
+        verify( mockSwitcher ).switchToSlave();
+        verifyZeroInteractions( availability );
+
+    }
+
+    public static Supplier<StoreId> storeSupplierMock()
     {
         Supplier<StoreId> supplier = mock( Supplier.class );
         when( supplier.get() ).thenReturn( StoreId.DEFAULT );
         return supplier;
+    }
+
+    public static DataSourceManager neoStoreDataSourceSupplierMock()
+    {
+        DataSourceManager dataSourceManager = new DataSourceManager();
+        dataSourceManager.register( mock( NeoStoreDataSource.class ) );
+        return dataSourceManager;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,11 +20,10 @@
 package org.neo4j.cypher.internal.compiler.v2_3.planner
 
 import org.mockito.Mockito._
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{Match, Query, SingleQuery, Where, _}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
-import org.neo4j.cypher.internal.compiler.v2_3.{LabelId, PropertyKeyId, RelTypeId}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3._
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{Match, Query, SingleQuery, Where, _}
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class SimpleTokenResolverTest extends CypherFunSuite {
 
@@ -49,7 +48,7 @@ class SimpleTokenResolverTest extends CypherFunSuite {
             Seq(),
             Some(Where(Equals(Property(Identifier("n"), pkToken), StringLiteral("Resolved"))))
           ),
-          Return(false, ReturnItems(true, Seq()), None, None, None)
+          Return(false, ReturnItems(true, Seq()), None, None, None, _)
         ))) =>
             pkToken.name should equal("name")
             pkToken.id should equal(Some(PropertyKeyId(12)))
@@ -72,7 +71,7 @@ class SimpleTokenResolverTest extends CypherFunSuite {
             Seq(),
             Some(Where(Equals(Property(Identifier("n"), pkToken), StringLiteral("Unresolved"))))
           ),
-          Return(false, ReturnItems(true, Seq()), None, None, None)
+          Return(false, ReturnItems(true, Seq()), None, None, None, _)
         ))) =>
             pkToken.name should equal("name")
             pkToken.id should equal(None)
@@ -95,7 +94,7 @@ class SimpleTokenResolverTest extends CypherFunSuite {
           Seq(),
           Some(Where(HasLabels(Identifier("n"), Seq(labelToken))))
         ),
-        Return(false, ReturnItems(true, Seq()), None, None, None)
+        Return(false, ReturnItems(true, Seq()), None, None, None, _)
       ))) =>
         labelToken.name should equal("Resolved")
         labelToken.id should equal(Some(LabelId(12)))
@@ -118,7 +117,7 @@ class SimpleTokenResolverTest extends CypherFunSuite {
           Seq(),
           Some(Where(HasLabels(Identifier("n"), Seq(labelToken))))
         ),
-        Return(false, ReturnItems(true, Seq()), None, None, None)
+        Return(false, ReturnItems(true, Seq()), None, None, None, _)
       ))) =>
         labelToken.name should equal("Unresolved")
         labelToken.id should equal(None)
@@ -139,13 +138,13 @@ class SimpleTokenResolverTest extends CypherFunSuite {
           false,
           Pattern(Seq(EveryPath(RelationshipChain(
             NodePattern(None, Seq(), None, false),
-            RelationshipPattern(None, false, Seq(relTypeToken), None, None, Direction.OUTGOING),
+            RelationshipPattern(None, false, Seq(relTypeToken), None, None, SemanticDirection.OUTGOING),
             NodePattern(None, Seq(), None, false)
           )))),
           Seq(),
           None
         ),
-        Return(false, ReturnItems(true, Seq()), None, None, None)
+        Return(false, ReturnItems(true, Seq()), None, None, None, _)
       ))) =>
         relTypeToken.name should equal("RESOLVED")
         relTypeToken.id should equal(Some(RelTypeId(12)))
@@ -166,13 +165,13 @@ class SimpleTokenResolverTest extends CypherFunSuite {
           false,
           Pattern(Seq(EveryPath(RelationshipChain(
             NodePattern(None, Seq(), None, false),
-            RelationshipPattern(None, false, Seq(relTypeToken), None, None, Direction.OUTGOING),
+            RelationshipPattern(None, false, Seq(relTypeToken), None, None, SemanticDirection.OUTGOING),
             NodePattern(None, Seq(), None, false)
           )))),
           Seq(),
           None
         ),
-        Return(false, ReturnItems(true, Seq()), None, None, None)
+        Return(false, ReturnItems(true, Seq()), None, None, None, _)
       ))) =>
         relTypeToken.name should equal("UNRESOLVED")
         relTypeToken.id should equal(None)

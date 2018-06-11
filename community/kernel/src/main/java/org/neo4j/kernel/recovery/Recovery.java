@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,11 +20,11 @@
 package org.neo4j.kernel.recovery;
 
 import java.io.IOException;
-import java.util.Iterator;
 
 import org.neo4j.helpers.collection.Visitor;
+import org.neo4j.kernel.impl.transaction.CommittedTransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.log.LogPosition;
-import org.neo4j.kernel.impl.transaction.log.LogVersionedStoreChannel;
+import org.neo4j.kernel.impl.transaction.log.TransactionCursor;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
 /**
@@ -37,24 +37,28 @@ public class Recovery extends LifecycleAdapter
     {
         void recoveryRequired( LogPosition recoveryPosition );
 
-        void logRecovered( LogPosition endPosition );
+        void transactionRecovered( long txId );
 
-        void recoveryCompleted();
+        void recoveryCompleted( int numberOfRecoveredTransactions );
     }
 
     public interface SPI
     {
         void forceEverything();
 
-        Visitor<LogVersionedStoreChannel,IOException> getRecoverer();
-
-        Iterator<LogVersionedStoreChannel> getLogFiles( long fromVersion ) throws IOException;
+        TransactionCursor getTransactions( LogPosition position ) throws IOException;
 
         LogPosition getPositionToRecoverFrom() throws IOException;
+
+        Visitor<CommittedTransactionRepresentation,Exception> startRecovery();
+
+        void allTransactionsRecovered( CommittedTransactionRepresentation lastRecoveredTransaction,
+                LogPosition positionAfterLastRecoveredTransaction ) throws Exception;
     }
 
     private final SPI spi;
     private final Monitor monitor;
+    private int numberOfRecoveredTransactions;
 
     private boolean recoveredLog = false;
 
@@ -67,25 +71,36 @@ public class Recovery extends LifecycleAdapter
     @Override
     public void init() throws Throwable
     {
-        LogPosition recoveryPosition = spi.getPositionToRecoverFrom();
-        if ( LogPosition.UNSPECIFIED.equals( recoveryPosition ) )
+        LogPosition recoveryFromPosition = spi.getPositionToRecoverFrom();
+        if ( LogPosition.UNSPECIFIED.equals( recoveryFromPosition ) )
         {
             return;
         }
-        Iterator<LogVersionedStoreChannel> logFiles = spi.getLogFiles( recoveryPosition.getLogVersion() );
-        monitor.recoveryRequired( recoveryPosition );
-        Visitor<LogVersionedStoreChannel,IOException> recoverer = spi.getRecoverer();
-        while ( logFiles.hasNext() )
+        monitor.recoveryRequired( recoveryFromPosition );
+
+        LogPosition recoveryToPosition;
+        CommittedTransactionRepresentation lastTransaction = null;
+        Visitor<CommittedTransactionRepresentation,Exception> recoveryVisitor = spi.startRecovery();
+        try ( TransactionCursor transactionsToRecover = spi.getTransactions( recoveryFromPosition ) )
         {
-            try ( LogVersionedStoreChannel toRecover = logFiles.next() )
+            while ( transactionsToRecover.next() )
             {
-                toRecover.position( recoveryPosition.getByteOffset() );
-                recoverer.visit( toRecover );
-                recoveryPosition = LogPosition.start( recoveryPosition.getLogVersion() + 1 );
+                lastTransaction = transactionsToRecover.get();
+                long txId = lastTransaction.getCommitEntry().getTxId();
+                recoveryVisitor.visit( lastTransaction );
+                monitor.transactionRecovered( txId );
+                numberOfRecoveredTransactions++;
             }
+            recoveryToPosition = transactionsToRecover.position();
         }
+
+        if ( lastTransaction != null )
+        {
+            // There were transactions recovered
+            spi.allTransactionsRecovered( lastTransaction, recoveryToPosition );
+        }
+
         recoveredLog = true;
-        monitor.logRecovered( recoveryPosition );
         spi.forceEverything();
     }
 
@@ -95,7 +110,8 @@ public class Recovery extends LifecycleAdapter
         // This is here as by now all other services have reacted to the recovery process
         if ( recoveredLog )
         {
-            monitor.recoveryCompleted();
+            spi.forceEverything();
+            monitor.recoveryCompleted( numberOfRecoveredTransactions );
         }
     }
 }

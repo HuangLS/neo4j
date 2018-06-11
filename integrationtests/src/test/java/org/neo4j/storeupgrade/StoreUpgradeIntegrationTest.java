@@ -1,21 +1,21 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
  *
  * Neo4j is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.storeupgrade;
 
@@ -27,11 +27,14 @@ import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -43,6 +46,8 @@ import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Exceptions;
+import org.neo4j.helpers.collection.Iterables;
+import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.io.fs.FileUtils;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.NeoStoreDataSource;
@@ -52,10 +57,12 @@ import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.ha.HighlyAvailableGraphDatabase;
 import org.neo4j.kernel.impl.AbstractNeo4jTestCase;
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.ha.ClusterManager;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.counts.CountsTracker;
 import org.neo4j.kernel.impl.storemigration.StoreFile;
-import org.neo4j.kernel.impl.storemigration.StoreUpgrader.UpgradingStoreVersionNotFoundException;
+import org.neo4j.kernel.impl.storemigration.StoreUpgrader;
+import org.neo4j.kernel.lifecycle.LifecycleException;
 import org.neo4j.register.Register.DoubleLongRegister;
 import org.neo4j.register.Registers;
 import org.neo4j.server.Bootstrapper;
@@ -65,7 +72,6 @@ import org.neo4j.server.configuration.Configurator;
 import org.neo4j.server.database.Database;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.TestGraphDatabaseFactory;
-import org.neo4j.test.ha.ClusterManager;
 import org.neo4j.tooling.GlobalGraphOperations;
 
 import static org.hamcrest.Matchers.is;
@@ -73,78 +79,74 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
 import static org.neo4j.consistency.store.StoreAssertions.assertConsistentStore;
 import static org.neo4j.helpers.collection.Iterables.concat;
 import static org.neo4j.helpers.collection.Iterables.count;
-import static org.neo4j.test.ha.ClusterManager.allSeesAllAsAvailable;
-import static org.neo4j.test.ha.ClusterManager.clusterOfSize;
+import static org.neo4j.kernel.impl.ha.ClusterManager.allSeesAllAsAvailable;
+import static org.neo4j.kernel.impl.ha.ClusterManager.clusterOfSize;
 
 @RunWith( Enclosed.class )
 public class StoreUpgradeIntegrationTest
 {
+    // NOTE: the zip files must contain the database files and NOT the graph.db folder itself!!!
+    private static final List<Store[]> STORES19 = Collections.singletonList(
+            new Store[]{new Store( "0.A.0-db.zip",
+                    4 /* node count */,
+                    4 /* last txId */,
+                    selectivities(),
+                    indexCounts()
+            )} );
+    private static final List<Store[]> STORES20 = Arrays.asList(
+            new Store[]{new Store( "/upgrade/0.A.1-db.zip",
+                    1071 /* node count */,
+                    18 /* last txId */,
+                    selectivities(),
+                    indexCounts()
+            )},
+            new Store[]{new Store( "0.A.1-db2.zip",
+                    180 /* node count */,
+                    35 /* last txId */,
+                    selectivities( 1.0, 1.0, 1.0, 1.0 ),
+                    indexCounts( counts( 0, 1, 1, 1 ), counts( 0, 38, 38, 38 ),
+                            counts( 0, 1, 1, 1 ), counts( 0, 133, 133, 133 ) )
+            )} );
+    private static final List<Store[]> STORES21 = Arrays.asList(
+            new Store[]{new Store( "0.A.3-empty.zip",
+                    0 /* node count */,
+                    1 /* last txId */,
+                    selectivities(),
+                    indexCounts()
+            )},
+            new Store[]{new Store( "0.A.3-data.zip",
+                    174 /* node count */,
+                    30 /* last txId */,
+                    selectivities( 1.0, 1.0, 1.0 ),
+                    indexCounts( counts( 0, 38, 38, 38 ), counts( 0, 1, 1, 1 ), counts( 0, 133, 133, 133 ) )
+            )} );
+    private static final List<Store[]> STORES22 = Arrays.asList(
+            new Store[]{new Store( "0.A.5-empty.zip",
+                    0 /* node count */,
+                    1 /* last txId */,
+                    selectivities(),
+                    indexCounts()
+            )},
+            new Store[]{new Store( "0.A.5-data.zip",
+                    174 /* node count */,
+                    30 /* last txId */,
+                    selectivities( 1.0, 1.0, 1.0 ),
+                    indexCounts( counts( 0, 38, 38, 38 ), counts( 0, 1, 1, 1 ), counts( 0, 133, 133, 133 ) )
+            )} );
+
     @RunWith( Parameterized.class )
     public static class StoreUpgradeTest
     {
         @Parameterized.Parameter( 0 )
         public Store store;
 
-        // NOTE: the zip files must contain the database files and NOT the graph.db folder itself!!!
         @Parameterized.Parameters( name = "{0}" )
         public static Collection<Store[]> stores()
         {
-            return Arrays.asList(
-                    // 1.9 stores
-                    new Store[]{new Store( "0.A.0-db.zip",
-                            4 /* node count */,
-                            4 /* last txId */,
-                            selectivities(),
-                            indexCounts()
-                    )},
-
-                    // 2.0 stores
-                    new Store[]{new Store( "/upgrade/0.A.1-db.zip",
-                            1071 /* node count */,
-                            18 /* last txId */,
-                            selectivities(),
-                            indexCounts()
-                    )},
-                    new Store[]{new Store( "0.A.1-db2.zip",
-                            180 /* node count */,
-                            35 /* last txId */,
-                            selectivities( 1.0, 1.0, 1.0, 1.0 ),
-                            indexCounts( counts( 0, 1, 1, 1 ), counts( 0, 38, 38, 38 ),
-                                    counts( 0, 1, 1, 1 ), counts( 0, 133, 133, 133 ) )
-                    )},
-
-                    // 2.1
-                    new Store[]{new Store( "0.A.3-empty.zip",
-                            0 /* node count */,
-                            1 /* last txId */,
-                            selectivities(),
-                            indexCounts()
-                    )},
-                    new Store[]{new Store( "0.A.3-data.zip",
-                            174 /* node count */,
-                            30 /* last txId */,
-                            selectivities( 1.0, 1.0, 1.0 ),
-                            indexCounts( counts( 0, 38, 38, 38 ), counts( 0, 1, 1, 1 ), counts( 0, 133, 133, 133 ) )
-                    )},
-
-                    // 2.2
-                    new Store[]{new Store( "0.A.5-empty.zip",
-                            0 /* node count */,
-                            1 /* last txId */,
-                            selectivities(),
-                            indexCounts()
-                    )},
-                    new Store[]{new Store( "0.A.5-data.zip",
-                            174 /* node count */,
-                            30 /* last txId */,
-                            selectivities( 1.0, 1.0, 1.0 ),
-                            indexCounts( counts( 0, 38, 38, 38 ), counts( 0, 1, 1, 1 ), counts( 0, 133, 133, 133 ) )
-                    )}
-            );
+            return IteratorUtil.asCollection( Iterables.concat( STORES19, STORES20, STORES21, STORES22 ) );
         }
 
         @Rule
@@ -234,9 +236,8 @@ public class StoreUpgradeIntegrationTest
             // start the cluster with the db migrated from the old instance
             File haDir = new File( dir.getParentFile(), "ha-stuff" );
             FileUtils.deleteRecursively( haDir );
-            ClusterManager clusterManager = new ClusterManager(
-                    new ClusterManager.Builder( haDir ).withSeedDir( dir ).withProvider( clusterOfSize( 2 ) )
-            );
+            ClusterManager clusterManager = new ClusterManager.Builder( haDir )
+                    .withSeedDir( dir ).withProvider( clusterOfSize( 2 ) ).build();
 
             clusterManager.start();
 
@@ -253,7 +254,7 @@ public class StoreUpgradeIntegrationTest
             }
             finally
             {
-                clusterManager.shutdown();
+                clusterManager.safeShutdown();
             }
 
             assertConsistentStore( new File( master.getStoreDir() ) );
@@ -284,9 +285,64 @@ public class StoreUpgradeIntegrationTest
             }
             catch ( RuntimeException ex )
             {
-                assertTrue( Exceptions.contains( ex, StoreFile.NODE_STORE.storeFileName(),
-                        UpgradingStoreVersionNotFoundException.class ) );
+                assertTrue( ex.getCause() instanceof LifecycleException );
+                Throwable realException = ex.getCause().getCause();
+                assertTrue( Exceptions.contains( realException, StoreFile.NODE_STORE.storeFileName(),
+                        StoreUpgrader.UnexpectedUpgradingStoreVersionException.class ) );
             }
+        }
+    }
+
+    @RunWith( Parameterized.class )
+    public static class StoreUpgrade22Test
+    {
+        @Parameterized.Parameter( 0 )
+        public Store store;
+
+        @Parameterized.Parameters( name = "{0}" )
+        public static Collection<Store[]> stores()
+        {
+            return IteratorUtil.asCollection( Iterables.concat( STORES21, STORES22 ) );
+        }
+
+        @Rule
+        public TargetDirectory.TestDirectory testDir = TargetDirectory.testDirForTest( getClass() );
+
+        @Test
+        public void shouldBeAbleToUpgradeAStoreWithoutIdFilesAsBackups() throws Throwable
+        {
+            File dir = store.prepareDirectory( testDir.graphDbDir() );
+
+            // remove id files
+            File[] idFiles = dir.listFiles( new FilenameFilter()
+            {
+                @Override
+                public boolean accept( File dir, String name )
+                {
+                    return name.endsWith( ".id" );
+                }
+            } );
+
+            for ( File idFile : idFiles )
+            {
+                assertTrue( idFile.delete() );
+            }
+
+            GraphDatabaseFactory factory = new TestGraphDatabaseFactory();
+            GraphDatabaseBuilder builder = factory.newEmbeddedDatabaseBuilder( dir );
+            builder.setConfig( GraphDatabaseSettings.allow_store_upgrade, "true" );
+            GraphDatabaseService db = builder.newGraphDatabase();
+            try
+            {
+                checkInstance( store, (GraphDatabaseAPI) db );
+
+            }
+            finally
+            {
+                db.shutdown();
+            }
+
+            assertConsistentStore( dir );
         }
     }
 
@@ -339,7 +395,7 @@ public class StoreUpgradeIntegrationTest
     {
         CountsTracker counts = db.getDependencyResolver()
                 .resolveDependency( NeoStoreDataSource.class )
-                .getNeoStore().getCounts();
+                .getNeoStores().getCounts();
         ThreadToStatementContextBridge bridge = db.getDependencyResolver()
                 .resolveDependency( ThreadToStatementContextBridge.class );
 
@@ -442,12 +498,12 @@ public class StoreUpgradeIntegrationTest
             assertThat( indexCount, is( store.indexes() ) );
 
             // check last committed tx
-            NeoStore neoStore = db.getDependencyResolver()
+            NeoStores neoStores = db.getDependencyResolver()
                     .resolveDependency( NeoStoreDataSource.class )
-                    .getNeoStore();
-            long lastCommittedTxId = neoStore.getLastCommittedTransactionId();
+                    .getNeoStores();
+            long lastCommittedTxId = neoStores.getMetaDataStore().getLastCommittedTransactionId();
 
-            CountsTracker counts = neoStore.getCounts();
+            CountsTracker counts = neoStores.getCounts();
             assertEquals( lastCommittedTxId, counts.txId() );
 
             assertThat( lastCommittedTxId, is( store.lastTxId ) );
@@ -514,5 +570,4 @@ public class StoreUpgradeIntegrationTest
         }
         throw new IllegalStateException( "Index did not become ONLINE within reasonable time" );
     }
-
 }

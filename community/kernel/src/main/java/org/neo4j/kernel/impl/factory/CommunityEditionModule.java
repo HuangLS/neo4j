@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,48 +26,46 @@ import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Service;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
+import org.neo4j.kernel.CommunityIdTypeConfigurationProvider;
 import org.neo4j.kernel.DatabaseAvailability;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.IdGeneratorFactory;
+import org.neo4j.kernel.IdTypeConfigurationProvider;
 import org.neo4j.kernel.KernelData;
-import org.neo4j.kernel.KernelHealth;
 import org.neo4j.kernel.NeoStoreDataSource;
 import org.neo4j.kernel.Version;
 import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.api.CommitProcessFactory;
-import org.neo4j.kernel.impl.api.ReadOnlyTransactionCommitProcess;
 import org.neo4j.kernel.impl.api.SchemaWriteGuard;
-import org.neo4j.kernel.impl.api.TransactionCommitProcess;
-import org.neo4j.kernel.impl.api.TransactionRepresentationCommitProcess;
-import org.neo4j.kernel.impl.api.TransactionRepresentationStoreApplier;
-import org.neo4j.kernel.impl.api.index.IndexUpdatesValidator;
 import org.neo4j.kernel.impl.api.index.RemoveOrphanConstraintIndexesOnStartup;
+import org.neo4j.kernel.impl.constraints.ConstraintSemantics;
+import org.neo4j.kernel.impl.constraints.StandardConstraintSemantics;
 import org.neo4j.kernel.impl.core.DefaultLabelIdCreator;
 import org.neo4j.kernel.impl.core.DefaultPropertyTokenCreator;
 import org.neo4j.kernel.impl.core.DefaultRelationshipTypeCreator;
-import org.neo4j.kernel.impl.core.LabelTokenHolder;
-import org.neo4j.kernel.impl.core.PropertyKeyTokenHolder;
+import org.neo4j.kernel.impl.core.DelegatingLabelTokenHolder;
+import org.neo4j.kernel.impl.core.DelegatingPropertyKeyTokenHolder;
+import org.neo4j.kernel.impl.core.DelegatingRelationshipTypeTokenHolder;
 import org.neo4j.kernel.impl.core.ReadOnlyTokenCreator;
-import org.neo4j.kernel.impl.core.RelationshipTypeTokenHolder;
 import org.neo4j.kernel.impl.core.TokenCreator;
 import org.neo4j.kernel.impl.locking.Locks;
 import org.neo4j.kernel.impl.locking.ResourceTypes;
+import org.neo4j.kernel.impl.locking.SimpleStatementLocksFactory;
+import org.neo4j.kernel.impl.locking.StatementLocksFactory;
 import org.neo4j.kernel.impl.locking.community.CommunityLockManger;
 import org.neo4j.kernel.impl.logging.LogService;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.id.IdReuseEligibility;
 import org.neo4j.kernel.impl.storemigration.ConfigMapUpgradeConfiguration;
 import org.neo4j.kernel.impl.transaction.TransactionHeaderInformationFactory;
-import org.neo4j.kernel.impl.transaction.log.TransactionAppender;
 import org.neo4j.kernel.impl.transaction.state.DataSourceManager;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreInjectedTransactionValidator;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.neo4j.kernel.lifecycle.LifecycleListener;
 import org.neo4j.kernel.lifecycle.LifecycleStatus;
 import org.neo4j.udc.UsageData;
 import org.neo4j.udc.UsageDataKeys;
+
 
 /**
  * This implementation of {@link org.neo4j.kernel.impl.factory.EditionModule} creates the implementations of services
@@ -78,7 +76,7 @@ public class CommunityEditionModule
 {
     public CommunityEditionModule( PlatformModule platformModule )
     {
-        org.neo4j.kernel.impl.util.Dependencies deps = platformModule.dependencies;
+        org.neo4j.kernel.impl.util.Dependencies dependencies = platformModule.dependencies;
         Config config = platformModule.config;
         LogService logging = platformModule.logging;
         FileSystemAbstraction fileSystem = platformModule.fileSystem;
@@ -88,21 +86,23 @@ public class CommunityEditionModule
         LifeSupport life = platformModule.life;
         GraphDatabaseFacade graphDatabaseFacade = platformModule.graphDatabaseFacade;
 
-        lockManager = deps.satisfyDependency( createLockManager( config, logging ) );
+        lockManager = dependencies.satisfyDependency( createLockManager( config, logging ) );
+        statementLocksFactory = createStatementLocksFactory( lockManager, config, logging );
 
-        idGeneratorFactory = deps.satisfyDependency( createIdGeneratorFactory( fileSystem ) );
+        idTypeConfigurationProvider = createIdTypeConfigurationProvider( config );
+        idGeneratorFactory = dependencies.satisfyDependency( createIdGeneratorFactory( fileSystem, idTypeConfigurationProvider ) );
 
-        propertyKeyTokenHolder = life.add( deps.satisfyDependency( new PropertyKeyTokenHolder(
+        propertyKeyTokenHolder = life.add( dependencies.satisfyDependency( new DelegatingPropertyKeyTokenHolder(
                 createPropertyKeyCreator( config, dataSourceManager, idGeneratorFactory ) ) ) );
-        labelTokenHolder = life.add( deps.satisfyDependency(new LabelTokenHolder( createLabelIdCreator( config,
+        labelTokenHolder = life.add( dependencies.satisfyDependency(new DelegatingLabelTokenHolder( createLabelIdCreator( config,
                 dataSourceManager, idGeneratorFactory ) ) ));
-        relationshipTypeTokenHolder = life.add( deps.satisfyDependency(new RelationshipTypeTokenHolder(
+        relationshipTypeTokenHolder = life.add( dependencies.satisfyDependency(new DelegatingRelationshipTypeTokenHolder(
                 createRelationshipTypeCreator( config, dataSourceManager, idGeneratorFactory ) ) ));
 
-        life.add( deps.satisfyDependency(
-                createKernelData( fileSystem, pageCache, storeDir, config, graphDatabaseFacade ) ) );
+        dependencies.satisfyDependency(
+                createKernelData( fileSystem, pageCache, storeDir, config, graphDatabaseFacade, life ) );
 
-        commitProcessFactory = createCommitProcessFactory();
+        commitProcessFactory = new CommunityCommitProcessFactory();
 
         headerInformationFactory = createHeaderInformationFactory();
 
@@ -112,9 +112,28 @@ public class CommunityEditionModule
 
         upgradeConfiguration = new ConfigMapUpgradeConfiguration( config );
 
-        registerRecovery( config.get( GraphDatabaseFacadeFactory.Configuration.editionName), life, deps );
+        constraintSemantics = createSchemaRuleVerifier();
 
-        publishEditionInfo( deps.resolveDependency( UsageData.class ) );
+        eligibleForIdReuse = IdReuseEligibility.ALWAYS;
+
+        registerRecovery( config.get( GraphDatabaseFacadeFactory.Configuration.editionName), life, dependencies );
+
+        publishEditionInfo( dependencies.resolveDependency( UsageData.class ) );
+    }
+
+    protected IdTypeConfigurationProvider createIdTypeConfigurationProvider( Config config )
+    {
+        return new CommunityIdTypeConfigurationProvider();
+    }
+
+    protected ConstraintSemantics createSchemaRuleVerifier()
+    {
+        return new StandardConstraintSemantics();
+    }
+
+    protected StatementLocksFactory createStatementLocksFactory( Locks locks, Config config, LogService logService )
+    {
+        return new SimpleStatementLocksFactory( locks );
     }
 
     private void publishEditionInfo( UsageData sysInfo )
@@ -146,30 +165,7 @@ public class CommunityEditionModule
             // Not Advanced
         }
         return UsageDataKeys.Edition.community;
-    }
 
-    public static CommitProcessFactory createCommitProcessFactory()
-    {
-        return new CommitProcessFactory()
-        {
-            @Override
-            public TransactionCommitProcess create( TransactionAppender appender,
-                                                    KernelHealth kernelHealth, NeoStore neoStore,
-                                                    TransactionRepresentationStoreApplier storeApplier,
-                                                    NeoStoreInjectedTransactionValidator txValidator,
-                                                    IndexUpdatesValidator indexUpdatesValidator,
-                                                    Config config )
-            {
-                if ( config.get( GraphDatabaseSettings.read_only ) )
-                {
-                    return new ReadOnlyTransactionCommitProcess();
-                }
-                else
-                {
-                    return new TransactionRepresentationCommitProcess( appender, storeApplier, indexUpdatesValidator );
-                }
-            }
-        };
     }
 
     protected SchemaWriteGuard createSchemaWriteGuard()
@@ -223,15 +219,15 @@ public class CommunityEditionModule
         }
     }
 
-    protected KernelData createKernelData( FileSystemAbstraction fileSystem, PageCache pageCache, File storeDir, Config config,
-            GraphDatabaseAPI graphAPI )
+    protected KernelData createKernelData( FileSystemAbstraction fileSystem, PageCache pageCache, File storeDir,
+            Config config, GraphDatabaseAPI graphAPI, LifeSupport life )
     {
-        return new DefaultKernelData( fileSystem, pageCache, storeDir, config, graphAPI );
+        return life.add( new DefaultKernelData( fileSystem, pageCache, storeDir, config, graphAPI ) );
     }
 
-    protected IdGeneratorFactory createIdGeneratorFactory( FileSystemAbstraction fs )
+    protected IdGeneratorFactory createIdGeneratorFactory( FileSystemAbstraction fs, IdTypeConfigurationProvider idTypeConfigurationProvider )
     {
-        return new DefaultIdGeneratorFactory( fs );
+        return new DefaultIdGeneratorFactory( fs, idTypeConfigurationProvider );
     }
 
     public static Locks createLockManager( Config config, LogService logging )

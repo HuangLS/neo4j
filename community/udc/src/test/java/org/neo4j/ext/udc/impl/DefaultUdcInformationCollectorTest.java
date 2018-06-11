@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -135,6 +135,12 @@ public class DefaultUdcInformationCollectorTest
             idsInUse.put( IdType.RELATIONSHIP, 200l );
             idsInUse.put( IdType.LABEL_TOKEN, 300l );
             idsInUse.put( IdType.PROPERTY, 400l );
+        }
+
+        @Override
+        public IdGenerator open( File filename, IdType idType, long highId )
+        {
+            return open( filename, 0, idType, highId );
         }
 
         @Override

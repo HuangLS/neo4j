@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,14 +20,18 @@
 package org.neo4j.kernel.impl.core;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.graphdb.ConstraintViolationException;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.NotFoundException;
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.helpers.ThisShouldNotHappenError;
 import org.neo4j.kernel.api.EntityType;
+import org.neo4j.kernel.api.ReadOperations;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.StatementTokenNameLookup;
 import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
@@ -36,6 +40,9 @@ import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.schema.IllegalTokenNameException;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.operations.KeyReadOperations;
+
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
+import org.act.temporalProperty.query.range.TimeRangeQuery;
 
 import static java.lang.String.format;
 
@@ -192,6 +199,81 @@ public class GraphPropertiesProxy implements GraphProperties
             throw new ThisShouldNotHappenError( "Jake",
                     "Property key retrieved through kernel API should exist.", e );
         }
+    }
+
+    @Override
+    public Map<String, Object> getProperties( String... names )
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            Map<String, Object> properties = new HashMap<>();
+            ReadOperations readOperations = statement.readOperations();
+            for ( String name : names )
+            {
+                int propertyKeyId = readOperations.propertyKeyGetForName( name );
+                Object value = readOperations.graphGetProperty( propertyKeyId );
+                if ( value != null )
+                {
+                    properties.put( name, value );
+                }
+            }
+            return properties;
+        }
+    }
+
+    @Override
+    public Map<String, Object> getAllProperties()
+    {
+        try ( Statement statement = actions.statement() )
+        {
+            Map<String, Object> properties = new HashMap<>();
+            ReadOperations readOperations = statement.readOperations();
+            PrimitiveIntIterator propertyKeys = readOperations.graphGetPropertyKeys();
+            while ( propertyKeys.hasNext() )
+            {
+                int propertyKeyId = propertyKeys.next();
+                properties.put( readOperations.propertyKeyGetName( propertyKeyId ),
+                        readOperations.graphGetProperty( propertyKeyId ) );
+            }
+            return properties;
+        }
+        catch ( PropertyKeyIdNotFoundKernelException e )
+        {
+            throw new ThisShouldNotHappenError( "Rickard",
+                    "Property key retrieved through kernel API should exist.", e );
+        }
+    }
+
+    @Override
+    public Object getTemporalProperty(String key, int time) {
+        //TODO TGraph: can graph have temporal property? current not implement
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public Object getTemporalProperty(String key, int startTime, int endTime, TimeRangeQuery callBack) {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, int start, int end, long indexId )
+    {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public void setTemporalProperty(String key, int time, Object value) {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public void setTemporalProperty(String key, int start, int end, Object value) {
+        throw new TGraphNoImplementationException();
+    }
+
+    @Override
+    public void removeTemporalProperty(String key) {
+        throw new TGraphNoImplementationException();
     }
 
     @Override

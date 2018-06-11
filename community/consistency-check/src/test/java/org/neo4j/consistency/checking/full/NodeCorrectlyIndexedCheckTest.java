@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -221,8 +221,7 @@ public class NodeCorrectlyIndexedCheckTest
                 }
 
                 @Override
-                public PrimitiveLongIterator rangeSeekByNumber( Number lower, boolean includeLower,
-                                                                Number upper, boolean includeUpper )
+                public PrimitiveLongIterator rangeSeekByNumberInclusive( Number lower, Number upper )
                 {
                     throw new UnsupportedOperationException();
                 }
@@ -311,6 +310,12 @@ public class NodeCorrectlyIndexedCheckTest
 
         @Override
         public void force() throws IOException
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void flush() throws IOException
         {
             throw new UnsupportedOperationException();
         }

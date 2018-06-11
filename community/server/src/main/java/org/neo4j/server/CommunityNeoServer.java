@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,7 +34,6 @@ import org.neo4j.server.database.LifecycleManagingDatabase.GraphFactory;
 import org.neo4j.server.modules.AuthorizationModule;
 import org.neo4j.server.modules.DBMSModule;
 import org.neo4j.server.modules.ManagementApiModule;
-import org.neo4j.server.modules.NDPModule;
 import org.neo4j.server.modules.Neo4jBrowserModule;
 import org.neo4j.server.modules.RESTApiModule;
 import org.neo4j.server.modules.SecurityRulesModule;
@@ -86,12 +85,11 @@ public class CommunityNeoServer extends AbstractNeoServer
         return Arrays.asList(
                 new DBMSModule( webServer ),
                 new RESTApiModule( webServer, database, getConfig(), getDependencyResolver(), logProvider ),
-                new NDPModule( getConfig(), getDependencyResolver(), keyStoreInfo ),
                 new ManagementApiModule( webServer, getConfig() ),
                 new ThirdPartyJAXRSModule( webServer, getConfig(), logProvider, this ),
                 new WebAdminModule( webServer, getConfig() ),
                 new Neo4jBrowserModule( webServer ),
-                new AuthorizationModule( webServer, authManager, getConfig(), logProvider ),
+                new AuthorizationModule( webServer, authManager, logProvider, getConfig(), getUriWhitelist() ),
                 new SecurityRulesModule( webServer, getConfig(), logProvider ) );
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,11 +27,7 @@ import java.io.File;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
-import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.api.ReadOperations;
-import org.neo4j.kernel.impl.store.NeoStore;
-import org.neo4j.kernel.impl.store.StoreFactory;
-import org.neo4j.kernel.impl.store.id.IdGeneratorImpl;
 import org.neo4j.kernel.impl.transaction.command.Command.NodeCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.NodeCountsCommand;
 import org.neo4j.kernel.impl.transaction.log.LogPosition;
@@ -91,48 +87,6 @@ public class KernelRecoveryTest
                     checkPoint( new LogPosition(0, 250) )
                 )
         );
-    }
-
-    @Test
-    public void shouldBeAbleToApplyRecoveredTransactionsEvenIfIdGeneratorOpenedFine() throws Exception
-    {
-        // GIVEN
-        EphemeralFileSystemAbstraction fs = fsRule.get();
-        GraphDatabaseService db = newDB( fs );
-        long node1 = createNode( db );
-        long node2 = createNode( db );
-        deleteNode( db, node2 );
-        EphemeralFileSystemAbstraction crashedFs = fs.snapshot();
-        db.shutdown();
-        repairIdGenerator( crashedFs,
-                new File( storeDir, NeoStore.DEFAULT_NAME + StoreFactory.NODE_STORE_NAME + ".id" ) );
-
-        // WHEN
-        db = newDB( crashedFs );
-        try ( Transaction tx = db.beginTx() )
-        {
-            // THEN we have this silly check, although the actual assertion is that recovery didn't blow up
-            db.getNodeById( node1 );
-            tx.success();
-        }
-        finally
-        {
-            db.shutdown();
-        }
-    }
-
-    private void deleteNode( GraphDatabaseService db, long node )
-    {
-        try ( Transaction tx = db.beginTx() )
-        {
-            db.getNodeById( node ).delete();
-            tx.success();
-        }
-    }
-
-    private void repairIdGenerator( FileSystemAbstraction fs, File file )
-    {
-        IdGeneratorImpl.createGenerator( fs, file, 1, false );
     }
 
     private GraphDatabaseService newDB( EphemeralFileSystemAbstraction fs )

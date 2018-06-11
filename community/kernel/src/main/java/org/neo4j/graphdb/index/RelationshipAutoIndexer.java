@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,10 @@ package org.neo4j.graphdb.index;
 
 import org.neo4j.graphdb.Relationship;
 
+/**
+ * @deprecated this feature will be removed in a future release, please consider using schema indexes instead
+ */
+@Deprecated
 public interface RelationshipAutoIndexer extends AutoIndexer<Relationship>
 {
     ReadableRelationshipIndex getAutoIndex();

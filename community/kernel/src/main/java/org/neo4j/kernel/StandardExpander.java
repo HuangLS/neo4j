@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -311,8 +311,7 @@ public abstract class StandardExpander implements Expander, PathExpander
         {
             Map<String, Exclusion> exclude = new HashMap<String, Exclusion>();
             exclude.put( type.name(), Exclusion.ALL );
-            return new ExcludingExpander( Exclusion.include( direction ),
-                    exclude );
+            return new ExcludingExpander( Exclusion.include( direction ), exclude );
         }
 
         @Override

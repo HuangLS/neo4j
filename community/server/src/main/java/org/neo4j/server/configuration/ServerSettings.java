@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,28 +27,28 @@ import org.neo4j.graphdb.config.Setting;
 import org.neo4j.graphdb.factory.Description;
 import org.neo4j.helpers.Function;
 import org.neo4j.helpers.HostnamePort;
-import org.neo4j.helpers.Settings;
+import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.kernel.configuration.ConfigurationMigrator;
 import org.neo4j.kernel.configuration.Internal;
 import org.neo4j.kernel.configuration.Migrator;
 
-import static org.neo4j.helpers.Settings.ANY;
-import static org.neo4j.helpers.Settings.BOOLEAN;
-import static org.neo4j.helpers.Settings.DURATION;
-import static org.neo4j.helpers.Settings.EMPTY;
-import static org.neo4j.helpers.Settings.FALSE;
-import static org.neo4j.helpers.Settings.HOSTNAME_PORT;
-import static org.neo4j.helpers.Settings.INTEGER;
-import static org.neo4j.helpers.Settings.NO_DEFAULT;
-import static org.neo4j.helpers.Settings.PATH;
-import static org.neo4j.helpers.Settings.STRING;
-import static org.neo4j.helpers.Settings.STRING_LIST;
-import static org.neo4j.helpers.Settings.TRUE;
-import static org.neo4j.helpers.Settings.illegalValueMessage;
-import static org.neo4j.helpers.Settings.matches;
-import static org.neo4j.helpers.Settings.min;
-import static org.neo4j.helpers.Settings.port;
-import static org.neo4j.helpers.Settings.setting;
+import static org.neo4j.kernel.configuration.Settings.ANY;
+import static org.neo4j.kernel.configuration.Settings.BOOLEAN;
+import static org.neo4j.kernel.configuration.Settings.DURATION;
+import static org.neo4j.kernel.configuration.Settings.EMPTY;
+import static org.neo4j.kernel.configuration.Settings.FALSE;
+import static org.neo4j.kernel.configuration.Settings.HOSTNAME_PORT;
+import static org.neo4j.kernel.configuration.Settings.INTEGER;
+import static org.neo4j.kernel.configuration.Settings.NO_DEFAULT;
+import static org.neo4j.kernel.configuration.Settings.PATH;
+import static org.neo4j.kernel.configuration.Settings.STRING;
+import static org.neo4j.kernel.configuration.Settings.STRING_LIST;
+import static org.neo4j.kernel.configuration.Settings.TRUE;
+import static org.neo4j.kernel.configuration.Settings.illegalValueMessage;
+import static org.neo4j.kernel.configuration.Settings.matches;
+import static org.neo4j.kernel.configuration.Settings.min;
+import static org.neo4j.kernel.configuration.Settings.port;
+import static org.neo4j.kernel.configuration.Settings.setting;
 
 @Description("Settings used by the server configuration")
 public interface ServerSettings
@@ -85,7 +85,8 @@ public interface ServerSettings
     Setting<Long> webserver_limit_execution_time = setting(
             "org.neo4j.server.webserver.limit.executiontime", DURATION, NO_DEFAULT );
 
-    @Description( "Path to the statistics database file." )
+    @Deprecated
+    @Description( "Path to the statistics database file. RRDB has been deprecate, please use the Metrics plugin instead." )
     Setting<File> rrdb_location = setting( "org.neo4j.server.webadmin.rrdb.location", PATH, NO_DEFAULT );
 
     @Description( "Console engines for the legacy webadmin administration" )
@@ -177,19 +178,19 @@ public interface ServerSettings
     Setting<Boolean> auth_enabled = setting("dbms.security.auth_enabled", BOOLEAN, TRUE);
 
     @Internal
-    @Description("Enable Neo4j Data Protocol")
-    Setting<Boolean> ndp_enabled = setting( "xx.ndp.enabled", BOOLEAN, FALSE );
+    @Description("Enable Bolt")
+    Setting<Boolean> bolt_enabled = setting( "xx.bolt.enabled", BOOLEAN, FALSE );
 
     @Internal
-    @Description("Enable TLS for the Neo4j Data Protocol")
-    Setting<Boolean> ndp_tls_enabled = setting( "xx.ndp.tls.enabled", BOOLEAN, FALSE );
+    @Description("Enable TLS for Bolt")
+    Setting<Boolean> bolt_tls_enabled = setting( "xx.bolt.tls.enabled", BOOLEAN, FALSE );
 
     @Internal
-    @Description("Host and port for the Neo4j Data Protocol")
-    Setting<HostnamePort> ndp_socket_address = setting( "dbms.ndp.address", HOSTNAME_PORT, "localhost:7687" );
+    @Description("Host and port for Bolt")
+    Setting<HostnamePort> bolt_socket_address = setting( "dbms.bolt.address", HOSTNAME_PORT, "localhost:7687" );
 
     @Internal
-    @Description("Host and port for the Neo4j Data Protocol Websocket")
-    Setting<HostnamePort> ndp_ws_address = setting( "dbms.ndp.ws.address", HOSTNAME_PORT, "localhost:7688" );
+    @Description("Host and port for the Bolt Websocket")
+    Setting<HostnamePort> bolt_ws_address = setting( "dbms.bolt.ws.address", HOSTNAME_PORT, "localhost:7688" );
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -72,7 +72,7 @@ public enum LearnerState
                             InstanceId instanceId = new InstanceId( message );
                             PaxosInstance instance = context.getPaxosInstance( instanceId );
 
-                            Log log = context.getInternalLog( getClass() );
+                            Log log = context.getLog( getClass() );
 
                             // Skip if we already know about this
                             if ( instanceId.getId() <= context.getLastDeliveredInstanceId() )
@@ -143,14 +143,14 @@ public enum LearnerState
                                 else
                                 {
                                     // Found hole - we're waiting for this to be filled, i.e. timeout already set
-                                    context.getInternalLog( LearnerState.class ).debug( "*** HOLE! WAITING " +
+                                    context.getLog( LearnerState.class ).debug( "*** HOLE! WAITING " +
                                             "FOR " + (context.getLastDeliveredInstanceId() + 1) );
                                 }
                             }
                             else
                             {
                                 // Found hole - we're waiting for this to be filled, i.e. timeout already set
-                                context.getInternalLog( LearnerState.class ).debug( "*** GOT " + instanceId
+                                context.getLog( LearnerState.class ).debug( "*** GOT " + instanceId
                                         + ", WAITING FOR " + (context.getLastDeliveredInstanceId() + 1) );
 
                                 context.setTimeout( "learn", Message.timeout( LearnerMessage.learnTimedout,

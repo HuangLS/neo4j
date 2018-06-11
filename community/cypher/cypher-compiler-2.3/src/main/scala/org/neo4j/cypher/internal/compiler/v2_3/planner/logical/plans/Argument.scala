@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,8 @@
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans
 
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{CardinalityEstimation, PlannerQuery}
-import org.neo4j.cypher.internal.compiler.v2_3.symbols.CypherType
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.symbols.CypherType
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
 // Argument is used inside of an Apply to feed the row from the LHS of the Apply to the leaf of the RHS
 case class Argument(argumentIds: Set[IdName])(val solved: PlannerQuery with CardinalityEstimation)
@@ -29,6 +29,12 @@ case class Argument(argumentIds: Set[IdName])(val solved: PlannerQuery with Card
   extends LogicalLeafPlan with LogicalPlanWithoutExpressions {
 
   def availableSymbols = argumentIds
+
+
+  override def updateSolved(newSolved: PlannerQuery with CardinalityEstimation) =
+    copy(argumentIds)(newSolved)(typeInfo)
+
+  override def copyPlan(): LogicalPlan = this.copy(argumentIds)(solved)(typeInfo).asInstanceOf[this.type]
 
   override def dup(children: Seq[AnyRef]) = children.size match {
     case 1 =>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,10 +20,16 @@
 package org.neo4j.server.enterprise;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Pattern;
 
+import org.neo4j.graphdb.EnterpriseGraphDatabase;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.HighlyAvailableGraphDatabase;
 import org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory.Dependencies;
 import org.neo4j.logging.LogProvider;
@@ -42,15 +48,23 @@ import static org.neo4j.server.database.LifecycleManagingDatabase.lifecycleManag
 
 public class EnterpriseNeoServer extends AdvancedNeoServer
 {
-    public static final String SINGLE = "SINGLE";
     public static final String HA = "HA";
-    private static final GraphFactory ENTERPRISE_FACTORY = new GraphFactory()
+    private static final GraphFactory HA_FACTORY = new GraphFactory()
     {
         @Override
         public GraphDatabaseAPI newGraphDatabase( Config config, Dependencies dependencies )
         {
             File storeDir = config.get( ServerInternalSettings.legacy_db_location );
             return new HighlyAvailableGraphDatabase( storeDir, config.getParams(), dependencies );
+        }
+    };
+    private static final GraphFactory ENTERPRISE_FACTORY = new GraphFactory()
+    {
+        @Override
+        public GraphDatabaseAPI newGraphDatabase( Config config, Dependencies dependencies )
+        {
+            File storeDir = config.get( ServerInternalSettings.legacy_db_location );
+            return new EnterpriseGraphDatabase( storeDir, config.getParams(), dependencies );
         }
     };
 
@@ -61,8 +75,8 @@ public class EnterpriseNeoServer extends AdvancedNeoServer
 
     protected static Database.Factory createDbFactory( Config config )
     {
-        final String mode = config.get( EnterpriseServerSettings.mode ).toUpperCase();
-        return mode.equals( HA ) ? lifecycleManagingDatabase( ENTERPRISE_FACTORY ) : lifecycleManagingDatabase( COMMUNITY_FACTORY );
+        String mode = config.get( EnterpriseServerSettings.mode ).toUpperCase();
+        return lifecycleManagingDatabase( mode.equals( HA ) ? HA_FACTORY : ENTERPRISE_FACTORY );
     }
 
     @SuppressWarnings( "unchecked" )
@@ -85,5 +99,16 @@ public class EnterpriseNeoServer extends AdvancedNeoServer
         {
             return super.getServices();
         }
+    }
+
+    @Override
+    protected Pattern[] getUriWhitelist()
+    {
+        final List<Pattern> uriWhitelist = new ArrayList<>( Arrays.asList( super.getUriWhitelist() ) );
+        if ( !getConfig().get( HaSettings.ha_status_auth_enabled ) )
+        {
+            uriWhitelist.add( Pattern.compile( "/db/manage/server/ha.*" ) );
+        }
+        return uriWhitelist.toArray( new Pattern[uriWhitelist.size()] );
     }
 }

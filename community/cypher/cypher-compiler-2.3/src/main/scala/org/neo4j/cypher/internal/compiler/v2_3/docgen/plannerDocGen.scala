@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,16 +19,14 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.docgen
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
-import org.neo4j.cypher.internal.compiler.v2_3.perty._
-import org.neo4j.cypher.internal.compiler.v2_3.perty.helpers.HasType
-import org.neo4j.cypher.internal.compiler.v2_3.perty.recipe.{RecipeAppender, Pretty}
 import org.neo4j.cypher.internal.compiler.v2_3.planner._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.perty._
+import org.neo4j.cypher.internal.frontend.v2_3.perty.recipe.{Pretty, RecipeAppender}
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 
 import scala.annotation.tailrec
-
 import scala.reflect.runtime.universe.TypeTag
 
 case object plannerDocGen extends CustomDocGen[Any] {
@@ -76,8 +74,8 @@ case object plannerDocGen extends CustomDocGen[Any] {
 
   implicit class patternRelationshipConverter(patRel: PatternRelationship) extends Converter {
     def unquote = {
-      val leftEnd = if (patRel.dir == Direction.INCOMING) "<-[" else "-["
-      val rightEnd = if (patRel.dir == Direction.OUTGOING) "]->" else "]-"
+      val leftEnd = if (patRel.dir == SemanticDirection.INCOMING) "<-[" else "-["
+      val rightEnd = if (patRel.dir == SemanticDirection.OUTGOING) "]->" else "]-"
 
       group(
         "(" :: pretty(patRel.left) :: ")" :: leftEnd ::
@@ -127,7 +125,7 @@ case object plannerDocGen extends CustomDocGen[Any] {
           qg.shortestPathPatterns.toSeq.sorted(ShortestPathPattern.byRelName).map(pretty[ShortestPathPattern])
       ))
 
-      val optionalMatches = qg.optionalMatches.toSeq.sorted(QueryGraph.byCoveredIds).map(pretty[QueryGraph])
+      val optionalMatches = qg.optionalMatches.sorted(QueryGraph.byCoveredIds).map(pretty[QueryGraph])
       val optional =
         if (optionalMatches.isEmpty) nothing
         else section("OPTIONAL")(block("", open = "{ ", close = " }")(sepList(optionalMatches)))

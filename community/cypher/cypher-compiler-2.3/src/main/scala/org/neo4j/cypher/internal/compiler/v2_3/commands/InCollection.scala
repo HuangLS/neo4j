@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,11 +21,12 @@ package org.neo4j.cypher.internal.compiler.v2_3.commands
 
 import org.neo4j.cypher.internal.compiler.v2_3._
 import expressions.{Closure, Expression}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.Predicate
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.CollectionSupport
 import pipes.QueryState
 import collection.Seq
 
-abstract class InCollection(collection: Expression, id: String, predicate: Predicate)
+abstract class InCollection(collectionExpression: Expression, id: String, predicate: Predicate)
   extends Predicate
   with CollectionSupport
   with Closure {
@@ -35,22 +36,27 @@ abstract class InCollection(collection: Expression, id: String, predicate: Predi
   def seqMethod[U](f: Seq[U]): CollectionPredicate[U]
 
   def isMatch(m: ExecutionContext)(implicit state: QueryState): Option[Boolean] = {
-    val seq = makeTraversable(collection(m)).toSeq
+    val list = collectionExpression(m)
 
-    seqMethod(seq)(item => predicate.isMatch(m.newWith(id -> item)))
+    if (list == null) None
+    else {
+      val seq = makeTraversable(list).toSeq
+
+      seqMethod(seq)(item => predicate.isMatch(m.newWith(id -> item)))
+    }
   }
 
   def name: String
 
-  override def toString() = name + "(" + id + " in " + collection + " where " + predicate + ")"
+  override def toString() = name + "(" + id + " in " + collectionExpression + " where " + predicate + ")"
 
   def containsIsNull = predicate.containsIsNull
 
-  override def children = Seq(collection, predicate)
+  override def children = Seq(collectionExpression, predicate)
 
-  def arguments: scala.Seq[Expression] = Seq(collection)
+  def arguments: scala.Seq[Expression] = Seq(collectionExpression)
 
-  def symbolTableDependencies = symbolTableDependencies(collection, predicate, id)
+  def symbolTableDependencies = symbolTableDependencies(collectionExpression, predicate, id)
 }
 
 case class AllInCollection(collection: Expression, symbolName: String, inner: Predicate)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -36,7 +36,9 @@ import org.neo4j.kernel.impl.factory.GraphDatabaseFacade;
 import org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory;
 import org.neo4j.kernel.impl.factory.PlatformModule;
 import org.neo4j.kernel.lifecycle.LifeSupport;
+import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.neo4j.test.TargetDirectory;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -66,7 +68,8 @@ public class GraphDatabaseFacadeFactoryTest
         try
         {
             // When
-            db.newFacade( dir.graphDbDir(), Collections.<String,String>emptyMap(), deps, mockFacade );
+            db.newFacade( dir.graphDbDir(), Collections.<String,String>emptyMap(), deps, mockFacade,
+                    OperationalMode.single );
             fail( "Should have thrown " + RuntimeException.class );
         }
         catch ( RuntimeException exception )
@@ -88,7 +91,8 @@ public class GraphDatabaseFacadeFactoryTest
         try
         {
             // When
-            db.newFacade( dir.graphDbDir(), Collections.<String,String>emptyMap(), deps, mockFacade );
+            db.newFacade( dir.graphDbDir(), Collections.<String,String>emptyMap(), deps, mockFacade,
+                    OperationalMode.single );
             fail( "Should have thrown " + RuntimeException.class );
         }
         catch ( RuntimeException exception )
@@ -105,7 +109,8 @@ public class GraphDatabaseFacadeFactoryTest
         {
             @Override
             protected PlatformModule createPlatform( File storeDir, Map<String,String> params,
-                    Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade )
+                    Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade,
+                    OperationalMode operationalMode )
             {
                 final LifeSupport lifeMock = mock( LifeSupport.class );
                 doThrow( startupError ).when( lifeMock ).start();
@@ -116,10 +121,10 @@ public class GraphDatabaseFacadeFactoryTest
                     {
                         return invocationOnMock.getArguments()[0];
                     }
-                } ).when( lifeMock ).add( any() );
+                } ).when( lifeMock ).add( any( Lifecycle.class ) );
 
 
-                return new PlatformModule( storeDir, params, dependencies, graphDatabaseFacade )
+                return new PlatformModule( storeDir, params, dependencies, graphDatabaseFacade, operationalMode )
                 {
                     @Override
                     public LifeSupport createLife()

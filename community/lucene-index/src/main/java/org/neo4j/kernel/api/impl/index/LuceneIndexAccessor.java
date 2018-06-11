@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,11 @@
 package org.neo4j.kernel.api.impl.index;
 
 import org.apache.lucene.document.Fieldable;
+import org.apache.lucene.index.IndexNotFoundException;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ReferenceManager;
+import org.apache.lucene.search.SearcherFactory;
+import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 
 import java.io.Closeable;
@@ -52,11 +55,12 @@ import static org.neo4j.kernel.api.impl.index.DirectorySupport.deleteDirectoryCo
 abstract class LuceneIndexAccessor implements IndexAccessor
 {
     protected final LuceneDocumentStructure documentStructure;
-    protected final ReferenceManager<IndexSearcher> searcherManager;
+    protected final LuceneReferenceManager<IndexSearcher> searcherManager;
+    private final boolean readOnly;
     protected final ReservingLuceneIndexWriter writer;
 
     private final Directory dir;
-    private final File dirFile;
+    private final File indexFolder;
     private final int bufferSizeLimit;
     private final TaskCoordinator taskCoordinator = new TaskCoordinator( 10, TimeUnit.MILLISECONDS );
 
@@ -70,38 +74,127 @@ abstract class LuceneIndexAccessor implements IndexAccessor
         }
     };
 
+    // we need this wrapping in order to test the index accessor since the ReferenceManager is not mock friendly
+    public interface LuceneReferenceManager<G> extends Closeable
+    {
+        G acquire();
+
+        boolean maybeRefresh() throws IOException;
+
+        void release( G reference ) throws IOException;
+
+        class Wrap<G> implements LuceneReferenceManager<G>
+        {
+            private final ReferenceManager<G> delegate;
+
+            Wrap( ReferenceManager<G> delegate )
+            {
+
+                this.delegate = delegate;
+            }
+
+            @Override
+            public G acquire()
+            {
+                return delegate.acquire();
+            }
+
+            @Override
+            public boolean maybeRefresh() throws IOException
+            {
+                return delegate.maybeRefresh();
+            }
+
+            @Override
+            public void release( G reference ) throws IOException
+            {
+                delegate.release( reference );
+            }
+
+            @Override
+            public void close() throws IOException
+            {
+                delegate.close();
+            }
+        }
+    }
 
     LuceneIndexAccessor( LuceneDocumentStructure documentStructure,
-                         IndexWriterFactory<ReservingLuceneIndexWriter> indexWriterFactory,
-                         DirectoryFactory dirFactory, File dirFile, int bufferSizeLimit ) throws IOException
+            boolean readOnly,
+            IndexWriterFactory<ReservingLuceneIndexWriter> indexWriterFactory,
+            DirectoryFactory dirFactory, File indexFolder,
+            int bufferSizeLimit ) throws IOException
     {
         this.documentStructure = documentStructure;
-        this.dirFile = dirFile;
+        this.readOnly = readOnly;
+        this.indexFolder = indexFolder;
         this.bufferSizeLimit = bufferSizeLimit;
-        this.dir = dirFactory.open( dirFile );
-        this.writer = indexWriterFactory.create( dir );
-        this.searcherManager = writer.createSearcherManager();
+        this.dir = dirFactory.open( indexFolder );
+        if ( readOnly )
+        {
+            this.writer = null;
+            searcherManager = createReadOnlySearchManager();
+        }
+        else
+        {
+            this.writer = indexWriterFactory.create( dir );
+            this.searcherManager = new LuceneReferenceManager.Wrap<>( writer.createSearcherManager() );
+        }
+    }
+
+    private LuceneReferenceManager.Wrap<IndexSearcher> createReadOnlySearchManager() throws IOException
+    {
+        try
+        {
+            return new LuceneReferenceManager.Wrap<>( new SearcherManager( dir, new SearcherFactory() ) );
+        }
+        catch ( IndexNotFoundException e )
+        {
+            throw new IllegalStateException( "Index creation is not supported in read only mode.", e );
+        }
+    }
+
+    // test only
+    LuceneIndexAccessor( LuceneDocumentStructure documentStructure, boolean readOnly, ReservingLuceneIndexWriter writer,
+            LuceneReferenceManager<IndexSearcher> searcherManager,
+            Directory dir, File indexFolder, int bufferSizeLimit )
+    {
+        this.documentStructure = documentStructure;
+        this.readOnly = readOnly;
+        this.writer = writer;
+        this.searcherManager = searcherManager;
+        this.dir = dir;
+        this.indexFolder = indexFolder;
+        this.bufferSizeLimit = bufferSizeLimit;
     }
 
     @Override
     public IndexUpdater newUpdater( IndexUpdateMode mode )
     {
+        if ( readOnly )
+        {
+            throw new UnsupportedOperationException( "Index update is unsupported in read only mode." );
+        }
         switch ( mode )
         {
-            case ONLINE:
-                return new LuceneIndexUpdater( false );
+        case ONLINE:
+            return new LuceneIndexUpdater( false );
 
-            case RECOVERY:
-                return new LuceneIndexUpdater( true );
+        case BATCHED:
+            return new LuceneIndexUpdater( true );
 
-            default:
-                throw new ThisShouldNotHappenError( "Stefan", "Unsupported update mode" );
+        default:
+            throw new ThisShouldNotHappenError( "Stefan", "Unsupported update mode" );
         }
     }
 
     @Override
     public void drop() throws IOException
     {
+        if ( readOnly )
+        {
+            throw new UnsupportedOperationException( "Index drop is unsupported in read only mode." );
+        }
         taskCoordinator.cancel();
         closeIndexResources();
         try
@@ -118,8 +211,22 @@ abstract class LuceneIndexAccessor implements IndexAccessor
     @Override
     public void force() throws IOException
     {
+        if ( readOnly )
+        {
+            return;
+        }
         writer.commitAsOnline();
-        searcherManager.maybeRefresh();
+        refreshSearcherManager();
+    }
+
+    @Override
+    public void flush() throws IOException
+    {
+        if ( readOnly )
+        {
+            return;
+        }
+        refreshSearcherManager();
     }
 
     @Override
@@ -127,12 +234,6 @@ abstract class LuceneIndexAccessor implements IndexAccessor
     {
         closeIndexResources();
         dir.close();
-    }
-
-    private void closeIndexResources() throws IOException
-    {
-        writer.close();
-        searcherManager.close();
     }
 
     @Override
@@ -152,21 +253,32 @@ abstract class LuceneIndexAccessor implements IndexAccessor
         return makeNewReader( searcher, closeable, token );
     }
 
-    protected IndexReader makeNewReader( IndexSearcher searcher, Closeable closeable, CancellationRequest cancellation )
-    {
-        return new LuceneIndexAccessorReader( searcher, documentStructure, closeable, cancellation, bufferSizeLimit );
-    }
-
     @Override
     public BoundedIterable<Long> newAllEntriesReader()
     {
-        return new LuceneAllEntriesIndexAccessorReader( new LuceneAllDocumentsReader( searcherManager ), documentStructure );
+        return new LuceneAllEntriesIndexAccessorReader( new LuceneAllDocumentsReader( searcherManager ),
+                documentStructure );
     }
 
     @Override
     public ResourceIterator<File> snapshotFiles() throws IOException
     {
-        return new LuceneSnapshotter().snapshot( this.dirFile, writer );
+        LuceneSnapshotter snapshotter = new LuceneSnapshotter();
+        return readOnly ? snapshotter.snapshot( indexFolder, dir ) : snapshotter.snapshot( this.indexFolder, writer );
+    }
+
+    protected IndexReader makeNewReader( IndexSearcher searcher, Closeable closeable, CancellationRequest cancellation )
+    {
+        return new LuceneIndexAccessorReader( searcher, documentStructure, closeable, cancellation, bufferSizeLimit );
+    }
+
+    private void closeIndexResources() throws IOException
+    {
+        if ( writer != null )
+        {
+            writer.close();
+        }
+        searcherManager.close();
     }
 
     private void addRecovered( long nodeId, Object value ) throws IOException, IndexCapacityExceededException
@@ -203,11 +315,11 @@ abstract class LuceneIndexAccessor implements IndexAccessor
 
     private class LuceneIndexUpdater implements IndexUpdater
     {
-        private final boolean inRecovery;
+        private final boolean isBatched;
 
-        private LuceneIndexUpdater( boolean inRecovery )
+        private LuceneIndexUpdater( boolean inBatched )
         {
-            this.inRecovery = inRecovery;
+            this.isBatched = inBatched;
         }
 
         @Override
@@ -251,31 +363,31 @@ abstract class LuceneIndexAccessor implements IndexAccessor
         {
             switch ( update.getUpdateMode() )
             {
-                case ADDED:
-                    if ( inRecovery )
-                    {
-                        addRecovered( update.getNodeId(), update.getValueAfter() );
-                    }
-                    else
-                    {
-                        add( update.getNodeId(), update.getValueAfter() );
-                    }
-                    break;
-                case CHANGED:
-                    change( update.getNodeId(), update.getValueAfter() );
-                    break;
-                case REMOVED:
-                    LuceneIndexAccessor.this.remove( update.getNodeId() );
-                    break;
-                default:
-                    throw new UnsupportedOperationException();
+            case ADDED:
+                if ( isBatched )
+                {
+                    addRecovered( update.getNodeId(), update.getValueAfter() );
+                }
+                else
+                {
+                    add( update.getNodeId(), update.getValueAfter() );
+                }
+                break;
+            case CHANGED:
+                change( update.getNodeId(), update.getValueAfter() );
+                break;
+            case REMOVED:
+                LuceneIndexAccessor.this.remove( update.getNodeId() );
+                break;
+            default:
+                throw new UnsupportedOperationException();
             }
         }
 
         @Override
         public void close() throws IOException, IndexEntryConflictException
         {
-            if ( !inRecovery )
+            if ( !isBatched )
             {
                 refreshSearcherManager();
             }

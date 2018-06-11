@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,6 +35,7 @@ import org.neo4j.cluster.ClusterSettings;
 import org.neo4j.cluster.InstanceId;
 import org.neo4j.com.ComException;
 import org.neo4j.function.Predicate;
+import org.neo4j.helpers.Clock;
 import org.neo4j.helpers.NamedThreadFactory;
 import org.neo4j.helpers.collection.FilteringIterator;
 import org.neo4j.kernel.configuration.Config;
@@ -43,10 +44,18 @@ import org.neo4j.kernel.ha.com.master.Slave;
 import org.neo4j.kernel.ha.com.master.SlavePriorities;
 import org.neo4j.kernel.ha.com.master.SlavePriority;
 import org.neo4j.kernel.ha.com.master.Slaves;
-import org.neo4j.kernel.impl.util.CappedOperation;
+import org.neo4j.kernel.impl.util.CappedLogger;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.neo4j.logging.Log;
 
+/**
+ * Pushes transactions committed on master to one or more slaves. Number of slaves receiving each transactions
+ * is controlled by {@link HaSettings#tx_push_factor}. Which slaves receives transactions is controlled by
+ * {@link HaSettings#tx_push_strategy}.
+ *
+ * An attempt is made to push each transaction to the wanted number of slaves, but if it isn't possible
+ * and a timeout is hit, propagation will still be considered as successful and occurrence will be logged.
+ */
 public class TransactionPropagator implements Lifecycle
 {
     public interface Configuration
@@ -93,8 +102,11 @@ public class TransactionPropagator implements Lifecycle
             {
                 switch ( config.get( HaSettings.tx_push_strategy ) )
                 {
-                    case fixed:
-                        return SlavePriorities.fixed();
+                    case fixed_descending:
+                        return SlavePriorities.fixedDescending();
+
+                    case fixed_ascending:
+                        return SlavePriorities.fixedAscending();
 
                     case round_robin:
                         return SlavePriorities.roundRobin();
@@ -137,19 +149,8 @@ public class TransactionPropagator implements Lifecycle
     private final Configuration config;
     private final Slaves slaves;
     private final CommitPusher pusher;
-    private final CappedOperation<ReplicationContext> slaveCommitFailureLogger =
-            new CappedOperation<ReplicationContext>(
-                    CappedOperation.time( 5, TimeUnit.SECONDS ),
-                    CappedOperation.differentItemClasses() )
-            {
-                @Override
-                protected void triggered( ReplicationContext context )
-                {
-                    log.error( "Slave " + context.slave.getServerId() + ": Replication commit threw" +
-                               (context.throwable instanceof ComException ? " communication" : "") +
-                               " exception:", context.throwable );
-                }
-            };
+    private final CappedLogger slaveCommitFailureLogger;
+    private final CappedLogger pushedToTooFewSlaveLogger;
 
     public TransactionPropagator( Configuration config, Log log, Slaves slaves, CommitPusher pusher )
     {
@@ -157,6 +158,8 @@ public class TransactionPropagator implements Lifecycle
         this.log = log;
         this.slaves = slaves;
         this.pusher = pusher;
+        slaveCommitFailureLogger = new CappedLogger( log ).setTimeLimit( 5, TimeUnit.SECONDS, Clock.SYSTEM_CLOCK );
+        pushedToTooFewSlaveLogger = new CappedLogger( log ).setTimeLimit( 5, TimeUnit.SECONDS, Clock.SYSTEM_CLOCK );
     }
 
     @Override
@@ -267,8 +270,8 @@ public class TransactionPropagator implements Lifecycle
             // We did the best we could, have we committed successfully on enough slaves?
             if ( !(successfulReplications >= replicationFactor) )
             {
-                log.warn( "Transaction %s couldn't commit on enough slaves, desired %s, but could only commit at ",
-                        txId, replicationFactor, successfulReplications );
+                pushedToTooFewSlaveLogger.info( "Transaction " + txId + " couldn't commit on enough slaves, desired " +
+                        replicationFactor + ", but could only commit at " + successfulReplications );
             }
         }
         catch ( Throwable t )
@@ -311,7 +314,9 @@ public class TransactionPropagator implements Lifecycle
         catch ( ExecutionException e )
         {
             context.throwable = e.getCause();
-            slaveCommitFailureLogger.event( context );
+            slaveCommitFailureLogger.error( "Slave " + context.slave.getServerId() + ": Replication commit threw" +
+                                            (context.throwable instanceof ComException ? " communication" : "") +
+                                            " exception:", context.throwable );
             return false;
         }
         catch ( CancellationException e )

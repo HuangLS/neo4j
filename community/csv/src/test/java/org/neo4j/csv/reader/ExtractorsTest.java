@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,6 +25,7 @@ import org.neo4j.csv.reader.Extractors.IntExtractor;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
 public class ExtractorsTest
@@ -205,6 +206,21 @@ public class ExtractorsTest
 
         // THEN
         assertEquals( "", extractor.value() );
+    }
+
+    @Test
+    public void shouldExtractNullForEmptyQuotedStringIfConfiguredTo() throws Exception
+    {
+        // GIVEN
+        Extractors extractors = new Extractors( ';', true );
+        Extractor<String> extractor = extractors.string();
+
+        // WHEN
+        extractor.extract( new char[0], 0, 0, true );
+        String extracted = extractor.value();
+
+        // THEN
+        assertNull( extracted );
     }
 
     private String toString( long[] values, char delimiter )

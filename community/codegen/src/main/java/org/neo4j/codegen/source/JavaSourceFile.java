@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -45,5 +45,22 @@ class JavaSourceFile extends SimpleJavaFileObject
     public CharSequence getCharContent( boolean ignoreEncodingErrors ) throws IOException
     {
         return content;
+    }
+
+    /**
+     * Reads characters into an array.
+     *
+     * @param pos The position of this file to start reading from
+     * @param cbuf Destination buffer
+     * @param off Offset at which to start storing characters
+     * @param len Maximum number of characters to read (> 0)
+     * @return The number of characters read (0 if no characters remain)
+     * @see java.io.Reader#read(char[], int, int)
+     */
+    public int read( int pos, char[] cbuf, int off, int len )
+    {
+        len = Math.min( content.length() - pos, len );
+        content.getChars( pos, pos + len, cbuf, off );
+        return len;
     }
 }

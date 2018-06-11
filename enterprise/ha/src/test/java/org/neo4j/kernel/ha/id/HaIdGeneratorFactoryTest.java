@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,24 +24,33 @@ import org.junit.Test;
 
 import java.io.File;
 
+import org.neo4j.com.ComException;
 import org.neo4j.com.RequestContext;
 import org.neo4j.com.Response;
+import org.neo4j.graphdb.TransientTransactionFailureException;
 import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
+import org.neo4j.kernel.CommunityIdTypeConfigurationProvider;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.ha.DelegateInvocationHandler;
 import org.neo4j.kernel.ha.com.RequestContextFactory;
 import org.neo4j.kernel.ha.com.master.Master;
+import org.neo4j.kernel.ha.id.HaIdGeneratorFactory.IdRangeIterator;
 import org.neo4j.kernel.impl.store.id.IdGenerator;
+import org.neo4j.kernel.impl.store.id.IdGeneratorImpl;
 import org.neo4j.kernel.impl.store.id.IdRange;
 import org.neo4j.logging.NullLogProvider;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.neo4j.kernel.ha.id.HaIdGeneratorFactory.VALUE_REPRESENTING_NULL;
 
 public class HaIdGeneratorFactoryTest
 {
@@ -52,7 +61,7 @@ public class HaIdGeneratorFactoryTest
         IdAllocation firstResult = new IdAllocation( new IdRange( new long[]{}, 42, 123 ), 123, 0 );
         Response<IdAllocation> response = response( firstResult );
         when( master.allocateIds( any( RequestContext.class ), any( IdType.class ) ) ).thenReturn( response );
-        
+
         // WHEN
         IdGenerator gen = switchToSlave();
 
@@ -72,7 +81,7 @@ public class HaIdGeneratorFactoryTest
         IdAllocation secondResult = new IdAllocation( new IdRange( new long[]{}, 1042, 223 ), 1042 + 223, 0 );
         Response<IdAllocation> response = response( firstResult, secondResult );
         when( master.allocateIds( any( RequestContext.class ), any( IdType.class ) ) ).thenReturn( response );
-        
+
         // WHEN
         IdGenerator gen = switchToSlave();
 
@@ -152,12 +161,88 @@ public class HaIdGeneratorFactoryTest
         // THEN
         assertEquals ( highIdFromUpdatedRecord, gen.getHighId() );
     }
-    
+
+    @Test
+    public void shouldDeleteIdGeneratorsAsPartOfSwitchingToSlave() throws Exception
+    {
+        // GIVEN we're in master mode. We do that to allow HaIdGeneratorFactory to open id generators at all
+        fac.switchToMaster();
+        File idFile = new File( "my.id" );
+        // ... opening an id generator as master
+        fac.create( idFile, 10, true );
+        IdGenerator idGenerator = fac.open( idFile, 10, IdType.NODE, 10 );
+        assertTrue( fs.fileExists( idFile ) );
+        idGenerator.close();
+
+        // WHEN switching to slave
+        fac.switchToSlave();
+
+        // THEN the .id file underneath should be deleted
+        assertFalse( "Id file should've been deleted by now", fs.fileExists( idFile ) );
+    }
+
+    @Test
+    public void shouldDeleteIdGeneratorsAsPartOfOpenAfterSwitchingToSlave() throws Exception
+    {
+        // GIVEN we're in master mode. We do that to allow HaIdGeneratorFactory to open id generators at all
+        fac.switchToSlave();
+        File idFile = new File( "my.id" );
+        // ... opening an id generator as master
+        fac.create( idFile, 10, true );
+
+        // WHEN
+        IdGenerator idGenerator = fac.open( idFile, 10, IdType.NODE, 10 );
+
+        // THEN
+        assertFalse( "Id file should've been deleted by now", fs.fileExists( idFile ) );
+    }
+
+    @Test( expected = TransientTransactionFailureException.class )
+    public void shouldTranslateComExceptionsIntoTransientTransactionFailures() throws Exception
+    {
+        when( master.allocateIds( any( RequestContext.class ), any( IdType.class ) ) ).thenThrow( new ComException() );
+        IdGenerator generator = switchToSlave();
+        generator.nextId();
+    }
+
+    @Test
+    public void shouldNotUseForbiddenMinusOneIdFromIdBatches() throws Exception
+    {
+        // GIVEN
+        long[] defragIds = {3, 5};
+        int size = 10;
+        long low = IdGeneratorImpl.INTEGER_MINUS_ONE - size/2;
+        IdRange idRange = new IdRange( defragIds, low, size );
+
+        // WHEN
+        IdRangeIterator iterartor = new IdRangeIterator( idRange );
+
+        // THEN
+        for ( long id : defragIds )
+        {
+            assertEquals( id, iterartor.next() );
+        }
+
+        int expectedRangeSize = size - 1; // due to the forbidden id
+        for ( long i = 0, expectedId = low; i < expectedRangeSize; i++, expectedId++ )
+        {
+            if ( expectedId == IdGeneratorImpl.INTEGER_MINUS_ONE )
+            {
+                expectedId++;
+            }
+
+            long id = iterartor.next();
+            assertNotEquals( IdGeneratorImpl.INTEGER_MINUS_ONE, id );
+            assertEquals( expectedId, id );
+        }
+        assertEquals( VALUE_REPRESENTING_NULL, iterartor.next() );
+    }
+
     private Master master;
     private DelegateInvocationHandler<Master> masterDelegate;
     private EphemeralFileSystemAbstraction fs;
     private HaIdGeneratorFactory fac;
-    
+
     @Before
     public void before()
     {
@@ -165,9 +250,9 @@ public class HaIdGeneratorFactoryTest
         masterDelegate = new DelegateInvocationHandler<>( Master.class );
         fs = new EphemeralFileSystemAbstraction();
         fac  = new HaIdGeneratorFactory( masterDelegate, NullLogProvider.getInstance(),
-                mock( RequestContextFactory.class ), fs );
+                mock( RequestContextFactory.class ), fs, new CommunityIdTypeConfigurationProvider() );
     }
-    
+
     @SuppressWarnings( "unchecked" )
     private Response<IdAllocation> response( IdAllocation firstValue, IdAllocation... additionalValues )
     {

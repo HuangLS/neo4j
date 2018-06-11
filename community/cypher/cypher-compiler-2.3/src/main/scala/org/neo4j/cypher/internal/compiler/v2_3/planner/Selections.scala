@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.plannerQuery.ExpressionConverters._
-import org.neo4j.cypher.internal.compiler.v2_3.perty.PageDocFormatting
-import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.IdName
+import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, LogicalPlan}
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.perty.PageDocFormatting
 import org.neo4j.helpers.ThisShouldNotHappenError
 
 case class Predicate(dependencies: Set[IdName], expr: Expression) extends PageDocFormatting { // with ToPrettyString[Predicate] {
@@ -60,6 +60,10 @@ case class Selections(predicates: Set[Predicate] = Set.empty) extends PageDocFor
   def predicatesGivenForRequiredSymbol(allowed: Set[IdName], required: IdName): Seq[Expression] = predicates.collect {
     case p@Predicate(_, predicate) if p.hasDependenciesMetForRequiredSymbol(allowed, required) => predicate
   }.toSeq
+
+  def unsolvedPredicates(plan: LogicalPlan): Seq[Expression] =
+    scalarPredicatesGiven(plan.availableSymbols)
+      .filterNot(predicate => plan.solved.exists(_.graph.selections.contains(predicate)))
 
   def scalarPredicatesGiven(ids: Set[IdName]): Seq[Expression] = predicatesGiven(ids).filterNot(containsPatternPredicates)
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,6 +33,12 @@ public class ArtificialClock implements Clock
     public long currentTimeMillis()
     {
         return NANOSECONDS.toMillis( currentTimeNanos );
+    }
+
+    @Override
+    public long nanoTime()
+    {
+        return currentTimeNanos;
     }
 
     public Progressor progressor( long time, TimeUnit unit )

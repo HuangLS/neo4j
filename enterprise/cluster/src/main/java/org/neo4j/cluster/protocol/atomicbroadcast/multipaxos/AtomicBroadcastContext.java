@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,16 +20,16 @@
 package org.neo4j.cluster.protocol.atomicbroadcast.multipaxos;
 
 import org.neo4j.cluster.protocol.ConfigurationContext;
+import org.neo4j.cluster.protocol.LoggingContext;
 import org.neo4j.cluster.protocol.TimeoutsContext;
 import org.neo4j.cluster.protocol.atomicbroadcast.AtomicBroadcastListener;
 import org.neo4j.cluster.protocol.atomicbroadcast.Payload;
-import org.neo4j.kernel.impl.logging.LogService;
 
 /**
  * Context for AtomicBroadcast statemachine.
  */
 public interface AtomicBroadcastContext
-    extends TimeoutsContext, ConfigurationContext, LogService
+    extends TimeoutsContext, ConfigurationContext, LoggingContext
 {
     void addAtomicBroadcastListener( AtomicBroadcastListener listener );
     void removeAtomicBroadcastListener( AtomicBroadcastListener listener );

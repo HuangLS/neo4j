@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -121,6 +121,10 @@ public interface Status
         MarkedAsFailed( ClientError, "Transaction was marked as both successful and failed. Failure takes precedence" +
                 " and so this transaction was rolled back although it may have looked like it was going to be " +
                 "committed" ),
+        Outdated( TransientError, "Transaction has seen state which has been invalidated by applied updates while " +
+                "transaction was active. Transaction may succeed if retried." ),
+        LockClientStopped( TransientError, "Transaction terminated, no more locks can be acquired." ),
+        Terminated( TransientError, "Explicitly terminated by the user." )
         ;
 
 
@@ -162,9 +166,18 @@ public interface Status
         PlannerUnsupportedWarning( ClientNotification, "This query is not supported by the COST planner." ),
         RuntimeUnsupportedWarning( ClientNotification, "This query is not supported by the compiled runtime." ),
         DeprecationWarning( ClientNotification, "This feature is deprecated and will be removed in future versions." ),
-        JoinHintUnfulfillableWarning( ClientNotification, "The database was unable to plan hinted hash join." ),
+        JoinHintUnfulfillableWarning( ClientNotification, "The database was unable to plan a hinted join." ),
         JoinHintUnsupportedWarning( ClientNotification, "Queries with join hints are not supported by the RULE planner." ),
-        ;
+        DynamicPropertyWarning( ClientNotification, "Queries using dynamic properties will use neither index seeks " +
+                                                    "nor index scans for those properties" ),
+        EagerWarning(ClientNotification, "The execution plan for this query contains the Eager operator, " +
+                                         "which forces all dependent data to be materialized in main memory " +
+                                         "before proceeding"),
+        IndexMissingWarning( ClientNotification, "Adding a schema index may speed up this query." ),
+        LabelMissingWarning( ClientNotification, "The provided label is not in the database." ),
+        RelTypeMissingWarning( ClientNotification, "The provided relationship type is not in the database." ),
+        PropertyNameMissingWarning( ClientNotification, "The provided property name is not in the database" ),
+        UnboundedPatternWarning( ClientNotification, "The provided pattern is unbounded, consider adding an upper limit to the number of node hops."  );
 
         private final Code code;
 
@@ -407,7 +420,7 @@ public interface Status
     enum Classification
     {
         /** The Client sent a bad request - changing the request might yield a successful outcome. */
-        ClientError( TransactionEffect.NONE, PublishingPolicy.PUBLISHABLE,
+        ClientError( TransactionEffect.ROLLBACK, PublishingPolicy.PUBLISHABLE,
                 "The Client sent a bad request - changing the request might yield a successful outcome."),
         /** There are notifications about the request sent by the client.*/
         ClientNotification( TransactionEffect.NONE, PublishingPolicy.PUBLISHABLE,

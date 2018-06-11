@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,19 +23,19 @@ import org.neo4j.graphdb.config.Setting;
 import org.neo4j.graphdb.factory.Description;
 import org.neo4j.helpers.Function;
 import org.neo4j.helpers.HostnamePort;
-import org.neo4j.helpers.Settings;
+import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.kernel.configuration.Internal;
 
-import static org.neo4j.helpers.Settings.ANY;
-import static org.neo4j.helpers.Settings.FALSE;
-import static org.neo4j.helpers.Settings.HOSTNAME_PORT;
-import static org.neo4j.helpers.Settings.INTEGER;
-import static org.neo4j.helpers.Settings.STRING;
-import static org.neo4j.helpers.Settings.TRUE;
-import static org.neo4j.helpers.Settings.illegalValueMessage;
-import static org.neo4j.helpers.Settings.matches;
-import static org.neo4j.helpers.Settings.min;
-import static org.neo4j.helpers.Settings.setting;
+import static org.neo4j.kernel.configuration.Settings.ANY;
+import static org.neo4j.kernel.configuration.Settings.FALSE;
+import static org.neo4j.kernel.configuration.Settings.HOSTNAME_PORT;
+import static org.neo4j.kernel.configuration.Settings.INTEGER;
+import static org.neo4j.kernel.configuration.Settings.STRING;
+import static org.neo4j.kernel.configuration.Settings.TRUE;
+import static org.neo4j.kernel.configuration.Settings.illegalValueMessage;
+import static org.neo4j.kernel.configuration.Settings.matches;
+import static org.neo4j.kernel.configuration.Settings.min;
+import static org.neo4j.kernel.configuration.Settings.setting;
 
 @Description( "Usage Data Collector configuration settings" )
 public class UdcSettings

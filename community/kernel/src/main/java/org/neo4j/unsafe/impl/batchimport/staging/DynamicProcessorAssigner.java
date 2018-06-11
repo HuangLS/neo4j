@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,6 @@ import java.util.Map;
 
 import org.neo4j.helpers.Pair;
 import org.neo4j.unsafe.impl.batchimport.Configuration;
-import org.neo4j.unsafe.impl.batchimport.EntityStoreUpdaterStep;
 import org.neo4j.unsafe.impl.batchimport.stats.Keys;
 
 import static java.lang.Math.max;
@@ -40,7 +39,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
  * <li>Constantly figures out bottleneck steps and assigns more processors those.</li>
  * <li>Constantly figures out if there are steps that are way faster than the second fastest step and
  * removes processors from those steps.</li>
- * <li>Also manages I/O threads, see {@link IoQueue}, in this aspect proxied by {@link EntityStoreUpdaterStep}.
  * <li>At all times keeps the total number of processors assigned to steps to a total of less than or equal to
  * {@link Configuration#maxNumberOfProcessors()}.</li>
  * </ul>

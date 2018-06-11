@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,6 +33,7 @@ public class RelationshipConversion implements RelationshipVisitor<RuntimeExcept
     RelationshipIterator iterator;
     Statement statement;
     private Relationship next;
+    private boolean closed;
 
     public RelationshipConversion( NodeProxy.NodeActions actions )
     {
@@ -48,7 +49,12 @@ public class RelationshipConversion implements RelationshipVisitor<RuntimeExcept
     @Override
     public boolean hasNext()
     {
-        return iterator.hasNext();
+        boolean hasNext = iterator.hasNext();
+        if ( !hasNext )
+        {
+            close();
+        }
+        return hasNext;
     }
 
     @Override
@@ -73,6 +79,10 @@ public class RelationshipConversion implements RelationshipVisitor<RuntimeExcept
     @Override
     public void close()
     {
-        statement.close();
+        if ( !closed )
+        {
+            statement.close();
+            closed = true;
+        }
     }
 }

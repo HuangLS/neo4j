@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,8 +28,6 @@ import org.neo4j.helpers.collection.Visitable;
 
 public class InvocationTracer<C> implements InvocationHandler, AutoCloseable
 {
-    private static final String LINE_SEPARATOR = System.getProperty( "line.separator" );
-
     private final String generatorInfo;
 
     private final String generatedClassPackage;
@@ -230,6 +228,6 @@ public class InvocationTracer<C> implements InvocationHandler, AutoCloseable
 
     private static void formatln( Appendable output ) throws IOException
     {
-        output.append( LINE_SEPARATOR );
+        output.append( System.lineSeparator() );
     }
 }

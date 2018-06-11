@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -150,6 +150,7 @@ public class GraphMock
         when( container.getProperty( anyString() ) ).thenAnswer( properties );
         when( container.getProperty( anyString(), any() ) ).thenAnswer( properties );
         when( container.getPropertyKeys() ).thenReturn( properties );
+        when( container.getAllProperties() ).thenReturn( properties.getProperties() );
         return container;
     }
 }

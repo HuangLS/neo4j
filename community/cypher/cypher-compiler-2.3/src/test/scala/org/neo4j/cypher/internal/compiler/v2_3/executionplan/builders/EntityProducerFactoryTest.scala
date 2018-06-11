@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,13 +20,14 @@
 package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
 import org.mockito.Mockito._
-import org.neo4j.cypher.internal.compiler.v2_3.{IndexHintException, ExecutionContext}
+import org.neo4j.cypher.internal.compiler.v2_3.ExecutionContext
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Literal
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryStateHelper
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
 import org.neo4j.cypher.internal.compiler.v2_3.spi.{PlanContext, QueryContext}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.kernel.api.index.IndexDescriptor
+import org.neo4j.cypher.internal.frontend.v2_3.IndexHintException
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class EntityProducerFactoryTest extends CypherFunSuite {
   var planContext: PlanContext = null
@@ -46,14 +47,14 @@ class EntityProducerFactoryTest extends CypherFunSuite {
     when(planContext.getIndexRule(label, prop)).thenReturn(None)
 
     //WHEN
-    intercept[IndexHintException](factory.nodeByIndexHint(planContext -> SchemaIndex("id", label, prop, AnyIndex, None)))
+    intercept[IndexHintException](factory.nodeByIndexHint(readOnly = true)(planContext -> SchemaIndex("id", label, prop, AnyIndex, None)))
   }
 
   test("calls_the_right_methods") {
     //GIVEN
     val label: String = "label"
     val prop: String = "prop"
-    val index: IndexDescriptor = new IndexDescriptor(123,456)
+    val index: IndexDescriptor = IndexDescriptor(123,456)
     val value = 42
     val queryContext: QueryContext = mock[QueryContext]
     when(planContext.getIndexRule(label, prop)).thenReturn(Some(index))
@@ -62,7 +63,7 @@ class EntityProducerFactoryTest extends CypherFunSuite {
     val state = QueryStateHelper.emptyWith(query = queryContext)
 
     //WHEN
-    val func = factory.nodeByIndexHint(planContext -> SchemaIndex("id", label, prop, AnyIndex, Some(SingleQueryExpression(Literal(value)))))
+    val func = factory.nodeByIndexHint(readOnly = true)(planContext -> SchemaIndex("id", label, prop, AnyIndex, Some(SingleQueryExpression(Literal(value)))))
     func(context, state) should equal(indexResult)
   }
 
@@ -86,9 +87,9 @@ class EntityProducerFactoryTest extends CypherFunSuite {
     //GIVEN
     val labelName = "Label"
     val propertyKey = "prop"
-    val index: IndexDescriptor = new IndexDescriptor(123, 456)
+    val index: IndexDescriptor = IndexDescriptor(123, 456)
     when(planContext.getIndexRule(labelName, propertyKey)).thenReturn(Some(index))
-    val producer = factory.nodeByIndexHint(planContext -> SchemaIndex("x", labelName, propertyKey, AnyIndex, Some(SingleQueryExpression(Literal(Seq(1,2,3))))))
+    val producer = factory.nodeByIndexHint(readOnly = true)(planContext -> SchemaIndex("x", labelName, propertyKey, AnyIndex, Some(SingleQueryExpression(Literal(Seq(1,2,3))))))
     val queryContext: QueryContext = mock[QueryContext]
     val state = QueryStateHelper.emptyWith(query = queryContext)
     when(queryContext.indexSeek(index, Array(1,2,3))).thenReturn(Iterator.empty)

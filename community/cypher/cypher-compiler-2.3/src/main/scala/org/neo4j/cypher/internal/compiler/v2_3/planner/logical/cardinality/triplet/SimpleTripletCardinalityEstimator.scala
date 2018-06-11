@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,12 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality.triplet
 
-import org.neo4j.cypher.internal.compiler.v2_3.RelTypeId
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality.{Unspecified, TokenSpec}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality.triplet.TripletQueryGraphCardinalityModel.NodeCardinalities
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, VarPatternLength, SimplePatternLength}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, Multiplier}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.GraphStatistics
+import org.neo4j.cypher.internal.frontend.v2_3.RelTypeId
 
 import scala.annotation.tailrec
 

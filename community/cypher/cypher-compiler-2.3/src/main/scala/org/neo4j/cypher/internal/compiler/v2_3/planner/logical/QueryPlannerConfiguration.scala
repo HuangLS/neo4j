@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,7 +28,12 @@ import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.steps.solveOption
 object QueryPlannerConfiguration {
   val default = QueryPlannerConfiguration(
     pickBestCandidate = pickBestPlanUsingHintsAndCost,
-    applySelections = selectPatternPredicates(selectCovered, pickBestPlanUsingHintsAndCost),
+    applySelections = Selector(pickBestPlanUsingHintsAndCost,
+      selectPatternPredicates,
+      triadicSelectionFinder,
+      selectCovered,
+      selectHasLabelWithJoin
+    ),
     projectAllEndpoints = projectEndpoints.all,
     optionalSolvers = Seq(
       applyOptional,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -149,5 +149,11 @@ class UnwindAcceptanceTest extends ExecutionEngineFunSuite with NewPlannerTestSu
         Map("X" -> 2, "Y" -> 4, "Z" -> 5, "ZS" -> List(5, 6), "YS" -> List(3, 4), "XS" -> List(1, 2)),
         Map("X" -> 2, "Y" -> 4, "Z" -> 6, "ZS" -> List(5, 6), "YS" -> List(3, 4), "XS" -> List(1, 2)))
     )
+  }
+
+  test("should unwind a long range without going OOM") {
+    val expectedResult = 20000000
+    val result = executeScalarWithAllPlanners[Long](s"unwind range(1,$expectedResult) as i return count(*) as c")
+    result should equal(expectedResult)
   }
 }

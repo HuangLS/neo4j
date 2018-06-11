@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,9 +26,11 @@ import java.io.ObjectOutput;
 import java.security.SecureRandom;
 import java.util.Random;
 
+import static org.neo4j.kernel.impl.store.MetaDataStore.versionStringToLong;
+
 public final class StoreId implements Externalizable
 {
-    public static final long CURRENT_STORE_VERSION = NeoStore.versionStringToLong( NeoStore.ALL_STORES_VERSION );
+    public static final long CURRENT_STORE_VERSION = versionStringToLong( MetaDataStore.ALL_STORES_VERSION );
 
     public static final StoreId DEFAULT = new StoreId( -1, -1, -1, -1 );
 

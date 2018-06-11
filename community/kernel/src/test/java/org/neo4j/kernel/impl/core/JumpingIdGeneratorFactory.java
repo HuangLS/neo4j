@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,14 +33,20 @@ import org.neo4j.test.impl.EphemeralIdGenerator;
 
 public class JumpingIdGeneratorFactory implements IdGeneratorFactory
 {
-    private final Map<IdType, IdGenerator> generators = new EnumMap<>( IdType.class );
-    private final IdGenerator forTheRest = new EphemeralIdGenerator( null );
+    private final Map<IdType,IdGenerator> generators = new EnumMap<>( IdType.class );
+    private final IdGenerator forTheRest = new EphemeralIdGenerator( null, null );
 
     private final int sizePerJump;
 
     public JumpingIdGeneratorFactory( int sizePerJump )
     {
         this.sizePerJump = sizePerJump;
+    }
+
+    @Override
+    public IdGenerator open( File filename, IdType idType, long highId )
+    {
+        return get( idType );
     }
 
     @Override

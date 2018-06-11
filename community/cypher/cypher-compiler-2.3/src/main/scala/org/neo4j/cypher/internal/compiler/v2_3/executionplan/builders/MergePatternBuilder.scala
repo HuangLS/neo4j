@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,9 +26,10 @@ import executionplan.{ExecutionPlanInProgress, Phase, PartiallySolvedQuery, Plan
 import mutation._
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.CollectionSupport
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
 import pipes._
 import spi.PlanContext
-import symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
 /*
 This class solves MERGE for patterns. It does this by creating an execution plan that uses normal pattern matching
@@ -44,7 +45,7 @@ case class MergePatternBuilder(matching: Phase) extends PlanBuilder with Collect
 
   def apply(plan: ExecutionPlanInProgress, ctx: PlanContext)(implicit pipeMonitor: PipeMonitor): ExecutionPlanInProgress = {
     def prepareMergeAction(symbols: SymbolTable, originalMerge: MergePatternAction): (SymbolTable, MergePatternAction) = {
-      val (newSymbols,updateActions) = MergePatternBuilder.createActions(symbols, originalMerge.actions)
+      val (newSymbols,updateActions) = MergePatternBuilder.createActions(symbols, originalMerge.actions ++ originalMerge.onCreate)
       val matchPipe = solveMatchQuery(symbols, originalMerge).pipe
       val preparedMerge = originalMerge.copy(maybeMatchPipe = Some(matchPipe), maybeUpdateActions = Some(updateActions))
       (newSymbols, preparedMerge)

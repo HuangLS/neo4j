@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -39,6 +39,11 @@ public interface Configuration
      */
     boolean multilineFields();
 
+    /**
+     * @return {@code true} for treating empty strings, i.e. {@code ""} as null, instead of an empty string.
+     */
+    boolean emptyQuotedStringsAsNull();
+
     static int KB = 1024, MB = KB * KB;
 
     class Default implements Configuration
@@ -57,6 +62,12 @@ public interface Configuration
 
         @Override
         public boolean multilineFields()
+        {
+            return false;
+        }
+
+        @Override
+        public boolean emptyQuotedStringsAsNull()
         {
             return false;
         }
@@ -89,6 +100,12 @@ public interface Configuration
         public boolean multilineFields()
         {
             return defaults.multilineFields();
+        }
+
+        @Override
+        public boolean emptyQuotedStringsAsNull()
+        {
+            return defaults.emptyQuotedStringsAsNull();
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -49,15 +49,16 @@ public class MasterClientResolver implements MasterClientFactory, ComExceptionHa
     private final InvalidEpochExceptionHandler invalidEpochHandler;
 
     @Override
-    public MasterClient instantiate( String hostNameOrIp, int port, Monitors monitors,
-                                     StoreId storeId, LifeSupport life )
+    public MasterClient instantiate( String destinationHostNameOrIp, int destinationPort, String originHostNameOrIp,
+            Monitors monitors, StoreId storeId, LifeSupport life )
     {
         if ( currentFactory == null )
         {
             assignDefaultFactory();
         }
 
-        MasterClient result = currentFactory.instantiate( hostNameOrIp, port, monitors, storeId, life );
+        MasterClient result = currentFactory.instantiate( destinationHostNameOrIp, destinationPort, originHostNameOrIp,
+                monitors, storeId, life );
         result.setComExceptionHandler( this );
         return result;
     }
@@ -80,6 +81,7 @@ public class MasterClientResolver implements MasterClientFactory, ComExceptionHa
     @Override
     public void handle( ComException exception )
     {
+        exception.traceComException( log, "MasterClientResolver.handle" );
         if ( exception instanceof IllegalProtocolVersionException )
         {
             log.info( "Handling " + exception + ", will pick new master client" );
@@ -94,6 +96,10 @@ public class MasterClientResolver implements MasterClientFactory, ComExceptionHa
             log.info( "Handling " + exception + ", will go to PENDING and ask for election" );
 
             invalidEpochHandler.handle();
+        }
+        else
+        {
+            log.debug( "Ignoring " + exception + "." );
         }
     }
 
@@ -140,13 +146,14 @@ public class MasterClientResolver implements MasterClientFactory, ComExceptionHa
         }
 
         @Override
-        public MasterClient instantiate( String hostNameOrIp, int port, Monitors monitors,
-                                         StoreId storeId, LifeSupport life )
+        public MasterClient instantiate( String destinationHostNameOrIp, int destinationPort, String originHostNameOrIp,
+                Monitors monitors, StoreId storeId, LifeSupport life )
         {
-            return life.add( new MasterClient210( hostNameOrIp, port, logProvider, storeId, readTimeoutSeconds,
-                    lockReadTimeout, maxConcurrentChannels, chunkSize, responseUnpacker,
-                    monitors.newMonitor( ByteCounterMonitor.class, MasterClient210.class ),
-                    monitors.newMonitor( RequestMonitor.class, MasterClient210.class ) ) );
+            return life.add(
+                    new MasterClient210( destinationHostNameOrIp, destinationPort, originHostNameOrIp, logProvider,
+                            storeId, readTimeoutSeconds, lockReadTimeout, maxConcurrentChannels, chunkSize,
+                            responseUnpacker, monitors.newMonitor( ByteCounterMonitor.class, MasterClient210.class ),
+                            monitors.newMonitor( RequestMonitor.class, MasterClient210.class ) ) );
         }
     }
 
@@ -159,12 +166,13 @@ public class MasterClientResolver implements MasterClientFactory, ComExceptionHa
         }
 
         @Override
-        public MasterClient instantiate( String hostNameOrIp, int port, Monitors monitors,
-                                         StoreId storeId, LifeSupport life )
+        public MasterClient instantiate( String destinationHostNameOrIp, int destinationPort, String originHostNameOrIp,
+                Monitors monitors, StoreId storeId, LifeSupport life )
         {
-            return life.add( new MasterClient214( hostNameOrIp, port, logProvider, storeId, readTimeoutSeconds,
-                    lockReadTimeout, maxConcurrentChannels, chunkSize, responseUnpacker,
-                    monitors.newMonitor( ByteCounterMonitor.class, MasterClient214.class ),
+            return life.add(
+                    new MasterClient214( destinationHostNameOrIp, destinationPort, originHostNameOrIp, logProvider,
+                            storeId, readTimeoutSeconds, lockReadTimeout, maxConcurrentChannels, chunkSize,
+                            responseUnpacker, monitors.newMonitor( ByteCounterMonitor.class, MasterClient214.class ),
                     monitors.newMonitor( RequestMonitor.class, MasterClient214.class ) ) );
         }
     }

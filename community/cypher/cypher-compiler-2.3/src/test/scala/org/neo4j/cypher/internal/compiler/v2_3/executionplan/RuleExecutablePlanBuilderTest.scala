@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,15 +20,14 @@
 package org.neo4j.cypher.internal.compiler.v2_3.executionplan
 
 import org.mockito.Mockito._
-import org.neo4j.cypher.internal.compiler.v2_3.ast.Statement
-import org.neo4j.cypher.internal.compiler.v2_3.parser.CypherParser
 import org.neo4j.cypher.internal.compiler.v2_3.pipes._
-import org.neo4j.cypher.internal.compiler.v2_3.planner.SemanticTable
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.cypher.internal.compiler.v2_3.tracing.rewriters.RewriterStepSequencer
-import org.neo4j.cypher.internal.compiler.v2_3.{Monitors, PreparedQuery, Scope, devNullLogger}
-import org.neo4j.kernel.api.index.IndexDescriptor
+import org.neo4j.cypher.internal.compiler.v2_3.{Monitors, PreparedQuery, devNullLogger}
+import org.neo4j.cypher.internal.frontend.v2_3.parser.CypherParser
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.{Scope, SemanticTable}
 
 class RuleExecutablePlanBuilderTest extends CypherFunSuite {
   val planContext: PlanContext = mock[PlanContext]
@@ -54,7 +53,7 @@ class RuleExecutablePlanBuilderTest extends CypherFunSuite {
 
     when(planContext.getOptLabelId("Person")).thenReturn(Some(1))
     when(planContext.getOptPropertyKeyId("name")).thenReturn(Some(1))
-    when(planContext.getIndexRule("Person", "name")).thenReturn(Some(new IndexDescriptor(1, 1)))
+    when(planContext.getIndexRule("Person", "name")).thenReturn(Some(IndexDescriptor(1, 1)))
     when(planContext.getUniquenessConstraint("Person", "name")).thenReturn(None)
 
     val pipe = buildExecutionPipe("LOAD CSV FROM 'file:///tmp/foo.csv' AS line MATCH (p:Person { name: line[0] }) RETURN p;")
@@ -67,7 +66,7 @@ class RuleExecutablePlanBuilderTest extends CypherFunSuite {
 
     when(planContext.getOptLabelId("Person")).thenReturn(Some(1))
     when(planContext.getOptPropertyKeyId("name")).thenReturn(Some(1))
-    when(planContext.getIndexRule("Person", "name")).thenReturn(Some(new IndexDescriptor(1, 1)))
+    when(planContext.getIndexRule("Person", "name")).thenReturn(Some(IndexDescriptor(1, 1)))
     when(planContext.getUniquenessConstraint("Person", "name")).thenReturn(None)
 
     val pipe = buildExecutionPipe("LOAD CSV FROM 'file:///tmp/foo.csv' AS line MATCH (p:Person { name: \"Foo Bar Baz\" }) RETURN p;")
@@ -107,6 +106,6 @@ class RuleExecutablePlanBuilderTest extends CypherFunSuite {
   private def buildExecutionPipe(q: String): Pipe = {
     val statement = parser.parse(q)
     val parsedQ = PreparedQuery(statement, q, Map.empty)(mock[SemanticTable], Set.empty, mock[Scope], devNullLogger)
-    planBuilder.producePlan(parsedQ, planContext).right.toOption.get.pipe
+    planBuilder.producePlan(parsedQ, planContext).pipe
   }
 }

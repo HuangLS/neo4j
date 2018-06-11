@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -94,7 +94,7 @@ public class UriToDatabaseMatcher
         @Override
         public String toString()
         {
-            return pattern.toString() + " => " + graphDatabaseName + System.getProperty( "line.separator" );
+            return pattern.toString() + " => " + graphDatabaseName + System.lineSeparator();
         }
     }
 }

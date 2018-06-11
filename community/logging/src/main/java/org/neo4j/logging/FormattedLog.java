@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -58,15 +58,6 @@ public class FormattedLog extends AbstractLog
     };
     static final TimeZone UTC = TimeZone.getTimeZone( "UTC" );
     static final Charset UTF_8 = Charset.forName( "UTF-8" );
-
-    public enum Level
-    {
-        DEBUG,
-        INFO,
-        WARN,
-        ERROR,
-        NONE
-    }
 
     /**
      * A Builder for a {@link FormattedLog}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,12 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, ReadsNodes, ReadsRelationships}
+import org.neo4j.cypher.internal.compiler.v2_3.ExecutionContext
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ReadsAllNodes, Effects, ReadsRelationships}
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments.ExpandExpression
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
-import org.neo4j.cypher.internal.compiler.v2_3.{ExecutionContext, InternalException}
-import org.neo4j.graphdb.{Direction, Node, Relationship}
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticDirection, InternalException}
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.graphdb.{Node, Relationship}
 
 import scala.collection.mutable
 
@@ -31,8 +32,8 @@ case class VarLengthExpandPipe(source: Pipe,
                                fromName: String,
                                relName: String,
                                toName: String,
-                               dir: Direction,
-                               projectedDir: Direction,
+                               dir: SemanticDirection,
+                               projectedDir: SemanticDirection,
                                types: LazyTypes,
                                min: Int,
                                max: Option[Int],
@@ -58,7 +59,7 @@ case class VarLengthExpandPipe(source: Pipe,
             }
           }
         }
-        val needsFlipping = if (dir == Direction.BOTH) projectedDir == Direction.INCOMING else dir != projectedDir
+        val needsFlipping = if (dir == SemanticDirection.BOTH) projectedDir == SemanticDirection.INCOMING else dir != projectedDir
         val projectedRels = if (needsFlipping) {
           rels.reverse
         } else {
@@ -104,7 +105,7 @@ case class VarLengthExpandPipe(source: Pipe,
 
   def symbols = source.symbols.add(toName, CTNode).add(relName, CTCollection(CTRelationship))
 
-  override def localEffects = Effects(ReadsNodes, ReadsRelationships)
+  override def localEffects = Effects(ReadsAllNodes, ReadsRelationships)
 
   def dup(sources: List[Pipe]): Pipe = {
     val (head :: Nil) = sources

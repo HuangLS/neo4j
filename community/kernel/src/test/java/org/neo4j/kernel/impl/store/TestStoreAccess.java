@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -55,7 +55,7 @@ public class TestStoreAccess
         snapshot.deleteFile( messages );
 
         PageCache pageCache = pageCacheRule.getPageCache( snapshot );
-        new StoreAccess( snapshot, pageCache, storeDir ).close();
+        new StoreAccess( snapshot, pageCache, storeDir ).initialize().close();
         assertTrue( "Store should be unclean", isUnclean( snapshot ) );
     }
 

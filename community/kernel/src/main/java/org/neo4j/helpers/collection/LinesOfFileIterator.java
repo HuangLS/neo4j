@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,6 +26,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
+/**
+ * @deprecated This class will be removed in the next major release.
+ */
+@Deprecated
 public class LinesOfFileIterator extends PrefetchingIterator<String> implements ClosableIterator<String>
 {
     private final BufferedReader reader;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,7 @@ import org.neo4j.server.NeoServer;
 import org.neo4j.server.advanced.AdvancedNeoServer;
 import org.neo4j.server.advanced.helpers.AdvancedServerBuilder;
 import org.neo4j.server.configuration.Configurator;
-import org.neo4j.server.configuration.ServerConfigFactory;
+import org.neo4j.server.configuration.BaseServerConfigLoader;
 import org.neo4j.test.CleanupRule;
 import org.neo4j.test.TargetDirectory;
 
@@ -52,7 +52,7 @@ public class ServerManagementTest
         String dbDirectory1 = baseDir.directory( "db1" ).getAbsolutePath();
         String dbDirectory2 = baseDir.directory( "db2" ).getAbsolutePath();
 
-        Config config = ServerConfigFactory.loadConfig( null,
+        Config config = new BaseServerConfigLoader().loadConfig( null,
                 AdvancedServerBuilder
                         .server()
                         .withDefaultDatabaseTuning()

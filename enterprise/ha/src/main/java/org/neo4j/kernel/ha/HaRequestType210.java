@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,9 @@
  */
 package org.neo4j.kernel.ha;
 
-import java.io.IOException;
-
 import org.jboss.netty.buffer.ChannelBuffer;
+
+import java.io.IOException;
 
 import org.neo4j.com.ObjectSerializer;
 import org.neo4j.com.Protocol;
@@ -173,7 +173,26 @@ public enum HaRequestType210 implements RequestType<Master>
         {
             return master.endLockSession( context, readBoolean( input ) );
         }
-    }, VOID_SERIALIZER ),
+    }, VOID_SERIALIZER )
+    {
+        @Override
+        public boolean responseShouldBeUnpacked()
+        {
+            /*
+            END_LOCK_SESSION request can be send in 3 cases:
+             1) transaction committed successfully
+             2) transaction rolled back successfully
+             3) transaction was terminated
+
+            Master's response for this call is an obligation to pull up to a specified txId.
+            Processing/unpacking of this response is not needed in all 3 cases:
+             1) committed transaction pulls transaction stream as part of COMMIT call
+             2) rolled back transaction does not care about reading any more
+             3) terminated transaction does not care about reading any more
+            */
+            return false;
+        }
+    },
 
     // ====
     HANDSHAKE( new TargetCaller<Master, HandshakeResult>()

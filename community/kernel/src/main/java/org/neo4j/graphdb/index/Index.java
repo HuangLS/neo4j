@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -78,6 +78,7 @@ public interface Index<T extends PropertyContainer> extends ReadableIndex<T>
      *
      * @param entity the entity ({@link Node} or {@link Relationship}) to
      * remove the this index.
+     * @param key the key associated with the index entry
      */
     void remove( T entity, String key );
 

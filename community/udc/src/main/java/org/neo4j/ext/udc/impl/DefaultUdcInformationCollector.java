@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,6 @@
  */
 package org.neo4j.ext.udc.impl;
 
-import com.sun.management.OperatingSystemMXBean;
-
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
@@ -35,6 +33,7 @@ import java.util.regex.Pattern;
 
 import org.neo4j.ext.udc.UdcSettings;
 import org.neo4j.graphdb.config.Setting;
+import org.neo4j.kernel.impl.util.OsBeanUtil;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
@@ -269,26 +268,7 @@ public class DefaultUdcInformationCollector implements UdcInformationCollector
 
     private long determineTotalMemory()
     {
-        java.lang.management.OperatingSystemMXBean operatingSystemMXBean = ManagementFactory.getOperatingSystemMXBean();
-        try
-        {
-            return ((OperatingSystemMXBean) operatingSystemMXBean).getTotalPhysicalMemorySize();
-        }
-        catch ( NoClassDefFoundError e )
-        {
-            // If not running on Oracle JDK
-
-            // Try IBM JDK method
-            try
-            {
-                return (Long)operatingSystemMXBean.getClass().getMethod( "getTotalPhysicalMemory" ).invoke( operatingSystemMXBean );
-            }
-            catch ( Throwable e1 )
-            {
-                // Give up
-                return -1;
-            }
-        }
+        return OsBeanUtil.getTotalPhysicalMemory();
     }
 
     private long determineHeapSize()

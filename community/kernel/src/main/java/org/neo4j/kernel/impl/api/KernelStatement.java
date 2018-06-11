@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,6 +27,7 @@ import org.neo4j.kernel.api.SchemaWriteOperations;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.TokenWriteOperations;
 import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
+import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.IndexReader;
@@ -36,11 +37,11 @@ import org.neo4j.kernel.api.txstate.LegacyIndexTransactionState;
 import org.neo4j.kernel.api.txstate.TransactionState;
 import org.neo4j.kernel.api.txstate.TxStateHolder;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
-import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.locking.StatementLocks;
 
 public class KernelStatement implements TxStateHolder, Statement
 {
-    protected final Locks.Client locks;
+    protected final StatementLocks statementLocks;
     protected final TxStateHolder txStateHolder;
     protected final IndexReaderFactory indexReaderFactory;
     protected final LabelScanStore labelScanStore;
@@ -52,11 +53,11 @@ public class KernelStatement implements TxStateHolder, Statement
     private boolean closed;
 
     public KernelStatement( KernelTransactionImplementation transaction, IndexReaderFactory indexReaderFactory,
-            LabelScanStore labelScanStore, TxStateHolder txStateHolder, Locks.Client locks,
+            LabelScanStore labelScanStore, TxStateHolder txStateHolder, StatementLocks statementLocks,
             StatementOperationParts operations, StoreStatement storeStatement )
     {
         this.transaction = transaction;
-        this.locks = locks;
+        this.statementLocks = statementLocks;
         this.indexReaderFactory = indexReaderFactory;
         this.txStateHolder = txStateHolder;
         this.labelScanStore = labelScanStore;
@@ -126,15 +127,17 @@ public class KernelStatement implements TxStateHolder, Statement
         {
             throw new NotInTransactionException( "The statement has been closed." );
         }
-        if ( transaction.shouldBeTerminated() )
+
+        Status terminationReason = transaction.getReasonIfTerminated();
+        if ( terminationReason != null )
         {
-            throw new TransactionTerminatedException();
+            throw new TransactionTerminatedException( terminationReason );
         }
     }
 
-    public Locks.Client locks()
+    public StatementLocks locks()
     {
-        return locks;
+        return statementLocks;
     }
 
     public IndexReader getIndexReader( IndexDescriptor descriptor ) throws IndexNotFoundKernelException

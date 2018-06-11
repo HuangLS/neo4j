@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,14 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.parser
 
-import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.StatementConverters
-import StatementConverters._
+import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.StatementConverters._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.TokenType.PropertyKey
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.{KeyToken, TokenType}
 import org.neo4j.cypher.internal.compiler.v2_3.commands.{MergeAst, expressions}
 import org.neo4j.cypher.internal.compiler.v2_3.mutation.PropertySetAction
+import org.neo4j.cypher.internal.compiler.v2_3.{AbstractPattern, On, OnAction, ParsedEntity}
+import org.neo4j.cypher.internal.frontend.v2_3.ast
+import org.neo4j.cypher.internal.frontend.v2_3.parser.{Expressions, ParserTest, Query}
 import org.parboiled.scala._
 
 class MergeTest extends ParserTest[ast.Merge, MergeAst] with Query with Expressions {

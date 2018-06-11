@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,9 +20,10 @@
 package org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import pipes.QueryState
-import symbols._
-import java.lang.Math
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.{CypherTypeException, InvalidArgumentException}
 
 abstract class MathFunction(arg: Expression) extends Expression with NumericHelper {
   def innerExpectedType = CTNumber
@@ -241,15 +242,29 @@ case class RandFunction() extends Expression {
 
 case class RangeFunction(start: Expression, end: Expression, step: Expression) extends Expression with NumericHelper {
   def apply(ctx: ExecutionContext)(implicit state: QueryState): Any = {
-    val startVal = asInt(start(ctx))
-    val inclusiveEndVal = asInt(end(ctx))
-    val stepVal = asInt(step(ctx))
-
-    if (stepVal == 0)
+    val stepVal = asLong(step(ctx))
+    if (stepVal == 0L)
       throw new InvalidArgumentException("step argument to range() cannot be zero")
 
-    val exclusiveEndVal = inclusiveEndVal + stepVal.signum
-    new Range(startVal, exclusiveEndVal, stepVal).toList
+    val startVal = asLong(start(ctx))
+    val inclusiveEndVal = asLong(end(ctx))
+    val check: (Long, Long) => Boolean = if (stepVal.signum > 0) _ <= _ else _ >= _
+
+    // due to the limitations of the scala collection library we need to implement iterator on long ranges manually:
+    // the scala one cannot be longer than MaxInt in length since it is an IndexedSeq which is indexed by Ints... :(
+    new Iterable[Long] {
+      override def iterator: Iterator[Long] = new Iterator[Long] {
+        private var current = startVal
+
+        override def hasNext: Boolean = check(current, inclusiveEndVal)
+
+        override def next(): Long = {
+          val c = current
+          current = current + stepVal
+          c
+        }
+      }
+    }
   }
 
   def arguments = Seq(start, end, step)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,8 +32,11 @@ public class RotationTimerFactoryTest
     @Test
     public void testTimer() throws Exception
     {
+        // GIVEN
+        FrozenClock clock = new FrozenClock( 10000, TimeUnit.MILLISECONDS );
+
         // WHEN
-        RotationTimerFactory timerFactory = new RotationTimerFactory( new FrozenClock(10000), 1000);
+        RotationTimerFactory timerFactory = new RotationTimerFactory( clock, 1000);
         RotationTimerFactory.RotationTimer timer = timerFactory.createTimer();
         RotationTimerFactory.RotationTimer anotherTimer = timerFactory.createTimer();
 

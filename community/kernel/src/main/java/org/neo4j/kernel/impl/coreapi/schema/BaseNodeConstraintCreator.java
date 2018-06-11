@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,11 +38,5 @@ public class BaseNodeConstraintCreator extends AbstractConstraintCreator impleme
     public ConstraintCreator assertPropertyIsUnique( String propertyKey )
     {
         return new NodePropertyUniqueConstraintCreator( actions, label, propertyKey );
-    }
-
-    @Override
-    public ConstraintCreator assertPropertyExists( String propertyKey )
-    {
-        return new NodePropertyExistsConstraintCreator( actions, label, propertyKey );
     }
 }

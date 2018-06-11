@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,7 +34,6 @@ import org.neo4j.shell.Output;
 public class CollectingOutput extends UnicastRemoteObject implements Output, Serializable, Iterable<String>
 {
     private static final long serialVersionUID = 1L;
-    private static final String lineSeparator = System.getProperty( "line.separator" );
 
     private transient StringWriter stringWriter = new StringWriter();
     private transient PrintWriter allLinesAsOne = new PrintWriter( stringWriter );
@@ -92,7 +91,7 @@ public class CollectingOutput extends UnicastRemoteObject implements Output, Ser
         int index = 0;
         while ( true )
         {
-            index = string.indexOf( lineSeparator, index );
+            index = string.indexOf( System.lineSeparator(), index );
             if ( index < 0 )
             {
                 ongoingLine += string;
@@ -103,7 +102,7 @@ public class CollectingOutput extends UnicastRemoteObject implements Output, Ser
             ongoingLine += part;
             println();
             
-            string = string.substring( index + lineSeparator.length(), string.length() );
+            string = string.substring( index + System.lineSeparator().length(), string.length() );
         }
     }
     

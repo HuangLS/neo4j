@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,29 +22,32 @@ package org.neo4j.cypher.internal.compiler.v2_3.pipes
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.ShortestPathExpression
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, ReadsNodes, ReadsRelationships}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.Predicate
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ReadsAllNodes, Effects, ReadsRelationships}
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.{CastSupport, CollectionSupport}
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments.LegacyExpression
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 import org.neo4j.graphdb.Path
 
 import scala.collection.JavaConverters._
 /**
  * Shortest pipe inserts a single shortest path between two already found nodes
  */
-case class ShortestPathPipe(source: Pipe, ast: ShortestPath)
+case class ShortestPathPipe(source: Pipe, shortestPathCommand: ShortestPath, predicates: Seq[Predicate] = Seq.empty)
                            (val estimatedCardinality: Option[Double] = None)(implicit pipeMonitor: PipeMonitor)
   extends PipeWithSource(source, pipeMonitor) with CollectionSupport with RonjaPipe {
-  private def pathName = ast.pathName
-  private val expression = ShortestPathExpression(ast)
+  private def pathName = shortestPathCommand.pathName
+  private val shortestPathExpression = ShortestPathExpression(shortestPathCommand, predicates)
 
-  protected def internalCreateResults(input:Iterator[ExecutionContext], state: QueryState) = input.flatMap(ctx => {
-    val result: Stream[Path] = expression(ctx)(state) match {
+  protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState) = input.flatMap(ctx => {
+    val result: Stream[Path] = shortestPathExpression(ctx)(state) match {
       case in: Stream[_] => CastSupport.castOrFail[Stream[Path]](in)
-      case null          => Stream()
-      case path: Path    => Stream(path)
+      case null => Stream()
+      case path: Path => Stream(path)
+      case in: Iterator[_] => CastSupport.castOrFail[Stream[Path]](in.toStream)
     }
 
-    ast.relIterator match {
+    shortestPathCommand.relIterator match {
       case Some(relName) =>
         result.map { (path: Path) => ctx.newWith2(pathName, path, relName, path.relationships().asScala.toSeq) }
       case None =>
@@ -54,21 +57,25 @@ case class ShortestPathPipe(source: Pipe, ast: ShortestPath)
 
   val symbols = {
     val withPath = source.symbols.add(pathName, CTPath)
-    ast.relIterator match {
+    shortestPathCommand.relIterator match {
       case None    => withPath
       case Some(x) => withPath.add(x, CTCollection(CTRelationship))
     }
   }
 
-  override def planDescriptionWithoutCardinality =
-    source.planDescription.andThen(this.id, "ShortestPath", identifiers)
+  override def planDescriptionWithoutCardinality = {
+    val args = predicates.map { p =>
+      LegacyExpression(p)
+    }
+    source.planDescription.andThen(this.id, "ShortestPath", identifiers, args:_*)
+  }
 
   def dup(sources: List[Pipe]): Pipe = {
     val (head :: Nil) = sources
     copy(source = head)(estimatedCardinality)
   }
 
-  override def localEffects = Effects(ReadsNodes, ReadsRelationships)
+  override def localEffects = Effects(ReadsAllNodes, ReadsRelationships)
 
   def withEstimatedCardinality(estimated: Double) = copy()(Some(estimated))
 }

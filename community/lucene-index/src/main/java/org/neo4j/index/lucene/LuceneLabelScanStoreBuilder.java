@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,17 +22,19 @@ package org.neo4j.index.lucene;
 import java.io.File;
 import java.io.IOException;
 
+import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.api.exceptions.index.IndexCapacityExceededException;
 import org.neo4j.kernel.api.impl.index.DirectoryFactory;
 import org.neo4j.kernel.api.impl.index.IndexWriterFactories;
 import org.neo4j.kernel.api.impl.index.LuceneLabelScanStore;
 import org.neo4j.kernel.api.impl.index.NodeRangeDocumentLabelScanStorageStrategy;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
-import org.neo4j.io.fs.FileSystemAbstraction;
-import org.neo4j.kernel.impl.store.NeoStore;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
-import org.neo4j.kernel.impl.transaction.state.SimpleNeoStoreSupplier;
+import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
+import org.neo4j.kernel.impl.transaction.state.SimpleNeoStoresSupplier;
 import org.neo4j.logging.LogProvider;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 import static org.neo4j.kernel.impl.api.scan.LabelScanStoreProvider.fullStoreLabelUpdateStream;
 
@@ -46,20 +48,26 @@ import static org.neo4j.kernel.impl.api.scan.LabelScanStoreProvider.fullStoreLab
 public class LuceneLabelScanStoreBuilder
 {
     private final File storeDir;
-    private final NeoStoreSupplier neoStoreSupplier;
+    private final NeoStoresSupplier neoStoresSupplier;
     private final FileSystemAbstraction fileSystem;
+    private final Config config;
+    private final OperationalMode operationalMode;
     private final LogProvider logProvider;
 
     private LuceneLabelScanStore labelScanStore = null;
 
     public LuceneLabelScanStoreBuilder( File storeDir,
-                                        NeoStore neoStore,
+                                        NeoStores neoStores,
                                         FileSystemAbstraction fileSystem,
+                                        Config config,
+                                        OperationalMode operationalMode,
                                         LogProvider logProvider )
     {
         this.storeDir = storeDir;
-        this.neoStoreSupplier = new SimpleNeoStoreSupplier( neoStore );
+        this.neoStoresSupplier = new SimpleNeoStoresSupplier( neoStores );
         this.fileSystem = fileSystem;
+        this.config = config;
+        this.operationalMode = operationalMode;
         this.logProvider = logProvider;
     }
 
@@ -74,8 +82,8 @@ public class LuceneLabelScanStoreBuilder
                     // <db>/schema/label/lucene
                     new File( new File( new File( storeDir, "schema" ), "label" ), "lucene" ),
                     fileSystem, IndexWriterFactories.tracking(),
-                    fullStoreLabelUpdateStream( neoStoreSupplier ),
-                    LuceneLabelScanStore.loggerMonitor( logProvider ) );
+                    fullStoreLabelUpdateStream( neoStoresSupplier ),
+                    config, operationalMode, LuceneLabelScanStore.loggerMonitor( logProvider ) );
 
             try
             {

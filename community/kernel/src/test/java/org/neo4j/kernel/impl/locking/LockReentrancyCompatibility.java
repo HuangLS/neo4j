@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.kernel.impl.locking;
 
 import org.junit.Ignore;
 import org.junit.Test;
+import org.neo4j.kernel.impl.locking.community.LockResourceId;
 
 import java.util.concurrent.Future;
 
@@ -39,20 +40,20 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
     public void shouldAcquireExclusiveIfClientIsOnlyOneHoldingShared() throws Exception
     {
         // When
-        clientA.acquireShared( NODE, 1l );
-        clientA.acquireExclusive( NODE, 1l );
+        clientA.acquireShared( NODE, 1L );
+        clientA.acquireExclusive( NODE, 1L );
 
         // Then shared locks should wait
-        Future<Object> clientBLock = acquireExclusive( clientB, NODE, 1l ).callAndAssertWaiting();
+        Future<Object> clientBLock = acquireExclusive( clientB, NODE, 1L ).callAndAssertWaiting();
 
         // And when
-        clientA.releaseExclusive( NODE, 1l );
+        clientA.releaseExclusive( NODE, 1L );
 
         // Then other thread should still wait
         assertWaiting( clientB, clientBLock );
 
         // But when
-        clientA.releaseShared( NODE, 1l );
+        clientA.releaseShared( NODE, 1L );
 
         // Then
         assertNotWaiting( clientB, clientBLock );
@@ -62,20 +63,20 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
     public void shouldRetainExclusiveLockAfterReleasingSharedLock() throws Exception
     {
         // When
-        clientA.acquireShared( NODE, 1l );
-        clientA.acquireExclusive( NODE, 1l );
+        clientA.acquireShared( NODE, 1L );
+        clientA.acquireExclusive( NODE, 1L );
 
         // Then shared locks should wait
-        Future<Object> clientBLock = acquireShared( clientB, NODE, 1l ).callAndAssertWaiting();
+        Future<Object> clientBLock = acquireShared( clientB, NODE, 1L ).callAndAssertWaiting();
 
         // And when
-        clientA.releaseShared( NODE, 1l );
+        clientA.releaseShared( NODE, 1L );
 
         // Then other thread should still wait
         assertWaiting( clientB, clientBLock );
 
         // But when
-        clientA.releaseExclusive( NODE, 1l );
+        clientA.releaseExclusive( NODE, 1L );
 
         // Then
         assertNotWaiting( clientB, clientBLock );
@@ -85,20 +86,20 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
     public void shouldRetainSharedLockWhenAcquiredAfterExclusiveLock() throws Exception
     {
         // When
-        clientA.acquireExclusive( NODE, 1l );
-        clientA.acquireShared( NODE, 1l );
+        clientA.acquireExclusive( NODE, 1L );
+        clientA.acquireShared( NODE, 1L );
 
         // Then this should wait
-        Future<Object> clientBLock = acquireExclusive( clientB, NODE, 1l ).callAndAssertWaiting();
+        Future<Object> clientBLock = acquireExclusive( clientB, NODE, 1L ).callAndAssertWaiting();
 
         // And when
-        clientA.releaseExclusive( NODE, 1l );
+        clientA.releaseExclusive( NODE, 1L );
 
         // Then other thread should still wait
         assertWaiting( clientB, clientBLock );
 
         // But when
-        clientA.releaseShared( NODE, 1l );
+        clientA.releaseShared( NODE, 1L );
 
         // Then
         assertNotWaiting( clientB, clientBLock );
@@ -108,22 +109,22 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
     public void sharedLocksShouldStack() throws Exception
     {
         // When
-        clientA.acquireShared( NODE, 1l );
-        clientA.acquireShared( NODE, 1l );
-        clientA.acquireShared( NODE, 1l );
+        clientA.acquireShared( NODE, 1L );
+        clientA.acquireShared( NODE, 1L );
+        clientA.acquireShared( NODE, 1L );
 
         // Then exclusive locks should wait
-        Future<Object> clientBLock = acquireExclusive( clientB, NODE, 1l ).callAndAssertWaiting();
+        Future<Object> clientBLock = acquireExclusive( clientB, NODE, 1L ).callAndAssertWaiting();
 
         // And when
-        clientA.releaseShared( NODE, 1l );
-        clientA.releaseShared( NODE, 1l );
+        clientA.releaseShared( NODE, 1L );
+        clientA.releaseShared( NODE, 1L );
 
         // Then other thread should still wait
         assertWaiting( clientB, clientBLock );
 
         // But when
-        clientA.releaseShared( NODE, 1l );
+        clientA.releaseShared( NODE, 1L );
 
         // Then
         assertNotWaiting( clientB, clientBLock );
@@ -133,22 +134,22 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
     public void exclusiveLocksShouldBeReentrantAndBlockOtherExclusiveLocks() throws Exception
     {
         // When
-        clientA.acquireExclusive( NODE, 1l );
-        clientA.acquireExclusive( NODE, 1l );
-        clientA.acquireExclusive( NODE, 1l );
+        clientA.acquireExclusive( NODE, 1L );
+        clientA.acquireExclusive( NODE, 1L );
+        clientA.acquireExclusive( NODE, 1L );
 
         // Then exclusive locks should wait
-        Future<Object> clientBLock = acquireExclusive( clientB, NODE, 1l ).callAndAssertWaiting();
+        Future<Object> clientBLock = acquireExclusive( clientB, NODE, 1L ).callAndAssertWaiting();
 
         // And when
-        clientA.releaseExclusive( NODE, 1l );
-        clientA.releaseExclusive( NODE, 1l );
+        clientA.releaseExclusive( NODE, 1L );
+        clientA.releaseExclusive( NODE, 1L );
 
         // Then other thread should still wait
         assertWaiting( clientB, clientBLock );
 
         // But when
-        clientA.releaseExclusive( NODE, 1l );
+        clientA.releaseExclusive( NODE, 1L );
 
         // Then
         assertNotWaiting( clientB, clientBLock );
@@ -158,22 +159,22 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
     public void exclusiveLocksShouldBeReentrantAndBlockOtherSharedLocks() throws Exception
     {
         // When
-        clientA.acquireExclusive( NODE, 1l );
-        clientA.acquireShared( NODE, 1l );
-        clientA.tryExclusiveLock( NODE, 1l );
+        clientA.acquireExclusive( NODE, 1L );
+        clientA.acquireShared( NODE, 1L );
+        clientA.tryExclusiveLock( NODE, 1L );
 
         // Then exclusive locks should wait
-        Future<Object> clientBLock = acquireShared( clientB, NODE, 1l ).callAndAssertWaiting();
+        Future<Object> clientBLock = acquireShared( clientB, NODE, 1L ).callAndAssertWaiting();
 
         // And when
-        clientA.releaseExclusive( NODE, 1l );
-        clientA.releaseShared( NODE, 1l );
+        clientA.releaseExclusive( NODE, 1L );
+        clientA.releaseShared( NODE, 1L );
 
         // Then other thread should still wait
         assertWaiting( clientB, clientBLock );
 
         // But when
-        clientA.releaseExclusive( NODE, 1l );
+        clientA.releaseExclusive( NODE, 1L );
 
         // Then
         assertNotWaiting( clientB, clientBLock );
@@ -183,20 +184,20 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
     public void sharedLocksShouldNotReplaceExclusiveLocks() throws Exception
     {
         // When
-        clientA.acquireExclusive( NODE, 1l );
-        clientA.acquireShared( NODE, 1l );
+        clientA.acquireExclusive( NODE, 1L );
+        clientA.acquireShared( NODE, 1L );
 
         // Then shared locks should wait
         Future<Object> clientBLock = acquireShared( clientB, NODE, 1l ).callAndAssertWaiting();
 
         // And when
-        clientA.releaseShared( NODE, 1l );
+        clientA.releaseShared( NODE, 1L );
 
         // Then other thread should still wait
         assertWaiting( clientB, clientBLock );
 
         // But when
-        clientA.releaseExclusive( NODE, 1l );
+        clientA.releaseExclusive( NODE, 1L );
 
         // Then
         assertNotWaiting( clientB, clientBLock );
@@ -217,7 +218,7 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
         Future<Object> exclusiveLockFuture = acquireExclusive( clientB, NODE, 1L ).callAndAssertWaiting();
 
         // and when
-        clientA.releaseAll();
+        clientA.releaseShared( NODE, 1L );
 
         // exclusive lock should be received
         assertNotWaiting( clientB, exclusiveLockFuture );
@@ -236,21 +237,20 @@ public class LockReentrancyCompatibility extends LockingCompatibilityTestSuite.C
 
     private static class LockIdentityExplorer implements Locks.Visitor
     {
-
         private Locks.ResourceType resourceType;
-        private long resourceId;
+        private LockResourceId resourceId;
         private long lockIdentityHashCode;
 
         public LockIdentityExplorer( Locks.ResourceType resourceType, long resourceId )
         {
             this.resourceType = resourceType;
-            this.resourceId = resourceId;
+            this.resourceId = new LockResourceId.Normal(resourceId);
         }
 
         @Override
-        public void visit( Locks.ResourceType resourceType, long resourceId, String description,
-                long estimatedWaitTime,
-                long lockIdentityHashCode )
+        public void visit(Locks.ResourceType resourceType, LockResourceId resourceId, String description,
+                          long estimatedWaitTime,
+                          long lockIdentityHashCode )
         {
             if ( this.resourceType.equals( resourceType ) && this.resourceId == resourceId )
             {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,21 +27,10 @@ import java.nio.channels.ReadableByteChannel;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.fs.StoreChannel;
 import org.neo4j.kernel.impl.transaction.log.IllegalLogFormatException;
-import org.neo4j.kernel.impl.transaction.log.ReadableLogChannel;
-
 import static org.neo4j.kernel.impl.transaction.log.entry.LogHeader.LOG_HEADER_SIZE;
 
 public class LogHeaderReader
 {
-    public static LogHeader readLogHeader( ReadableLogChannel channel ) throws IOException
-    {
-        long encodedLogVersions = channel.getLong();
-        byte logFormatVersion = decodeLogFormatVersion( encodedLogVersions );
-        long logVersion = decodeLogVersion( encodedLogVersions );
-        long previousCommittedTx = channel.getLong();
-        return new LogHeader( logFormatVersion, logVersion, previousCommittedTx );
-    }
-
     public static LogHeader readLogHeader( FileSystemAbstraction fileSystem, File file ) throws IOException
     {
         try ( StoreChannel channel = fileSystem.open( file, "r" ) )

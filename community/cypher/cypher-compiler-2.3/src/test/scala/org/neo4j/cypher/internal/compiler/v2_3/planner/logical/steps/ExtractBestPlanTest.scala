@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,23 +21,23 @@ package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.steps
 
 import org.mockito.Matchers._
 import org.mockito.Mockito._
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
-import org.neo4j.cypher.internal.compiler.v2_3.notification.{IndexHintUnfulfillableNotification, JoinHintUnfulfillableNotification}
+import org.neo4j.cypher.internal.compiler.v2_3.RecordingNotificationLogger
 import org.neo4j.cypher.internal.compiler.v2_3.planner._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.cypher.internal.compiler.v2_3.{IndexHintException, JoinHintException, RecordingNotificationLogger}
-import org.neo4j.graphdb.Direction
-import org.neo4j.kernel.api.index.IndexDescriptor
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.notification.{IndexHintUnfulfillableNotification, JoinHintUnfulfillableNotification}
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.{IndexHintException, JoinHintException, SemanticDirection}
 
 class ExtractBestPlanTest extends CypherFunSuite with LogicalPlanningTestSupport {
 
   private implicit val subQueryLookupTable = Map.empty[PatternExpression, QueryGraph]
 
-  private def newIndexHint(): Hint = { UsingIndexHint(ident("a"), LabelName("User")_, ident("name"))_ }
+  private def newIndexHint(): Hint = { UsingIndexHint(ident("a"), LabelName("User")_, PropertyKeyName("name")(pos))_ }
 
-  private def newJoinHint(): Hint = { UsingJoinHint(ident("a"))_ }
+  private def newJoinHint(): Hint = { UsingJoinHint(Seq(ident("a")))_ }
 
   private def newQueryWithIdxHint() = PlannerQuery(
     QueryGraph(
@@ -52,7 +52,7 @@ class ExtractBestPlanTest extends CypherFunSuite with LogicalPlanningTestSupport
   private def getPlanContext(hasIndex: Boolean): PlanContext = {
 
     val planContext = newMockedPlanContext
-    val indexDescriptor: Option[IndexDescriptor] = if (hasIndex) Option(new IndexDescriptor(0,0)) else None
+    val indexDescriptor: Option[IndexDescriptor] = if (hasIndex) Option(IndexDescriptor(0,0)) else None
 
     when(planContext.getIndexRule(anyString(),anyString())).thenReturn(indexDescriptor)
     when(planContext.getUniqueIndexRule(anyString(),anyString())).thenReturn(None)
@@ -80,7 +80,7 @@ class ExtractBestPlanTest extends CypherFunSuite with LogicalPlanningTestSupport
   }
 
   test("should throw when finding plan that does not solve all pattern relationships") {
-    val patternRel = PatternRelationship("r", ("a", "b"), Direction.OUTGOING, Seq.empty, VarPatternLength.unlimited)
+    val patternRel = PatternRelationship("r", ("a", "b"), SemanticDirection.OUTGOING, Seq.empty, VarPatternLength.unlimited)
     val query = PlannerQuery(
       QueryGraph(
         patternNodes = Set(IdName("a"), IdName("b")),
@@ -143,7 +143,8 @@ class ExtractBestPlanTest extends CypherFunSuite with LogicalPlanningTestSupport
       notificationLogger = notificationLogger)
 
     verifyBestPlan(greedyPlanTableWith(getSimpleLogicalPlanWithAandB()).uniquePlan, newQueryWithJoinHint()).availableSymbols should equal(Set(IdName("a"), IdName("b")))
-    notificationLogger.notifications should contain(JoinHintUnfulfillableNotification("a"))
+    val result = notificationLogger.notifications
+    result should contain(JoinHintUnfulfillableNotification(Array("a")))
   }
 
   test("should succeed when finding plan that contains fulfillable index hint") {

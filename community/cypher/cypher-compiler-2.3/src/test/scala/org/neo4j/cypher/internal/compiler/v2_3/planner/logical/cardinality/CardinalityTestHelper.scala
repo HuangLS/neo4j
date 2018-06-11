@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,16 +19,16 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.Identifier
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.MapSupport._
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.SemanticTableHelper
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.Cardinality.NumericCardinality
-import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{StrictnessMode, IdName}
+import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, StrictnessMode}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, QueryGraphProducer, Selectivity}
-import org.neo4j.cypher.internal.compiler.v2_3.planner.{LogicalPlanningTestSupport, QueryGraph, SemanticTable}
+import org.neo4j.cypher.internal.compiler.v2_3.planner.{LogicalPlanningTestSupport, QueryGraph}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.GraphStatistics
-import org.neo4j.cypher.internal.compiler.v2_3.{LabelId, PropertyKeyId, RelTypeId}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.ast.Identifier
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.{LabelId, PropertyKeyId, RelTypeId, SemanticTable}
 import org.scalatest.matchers.{MatchResult, Matcher}
 
 import scala.collection.mutable
@@ -41,10 +41,10 @@ trait CardinalityTestHelper extends QueryGraphProducer with CardinalityCustomMat
 
   def combiner: SelectivityCombiner = IndependenceCombiner
 
-  def not(number: Double) = Selectivity(number).negate.factor
-  def and(numbers: Double*) = combiner.andTogetherSelectivities(numbers.map(Selectivity.apply)).get.factor
-  def or(numbers: Double*) = combiner.orTogetherSelectivities(numbers.map(Selectivity.apply)).get.factor
-  def orTimes(times: Int, number: Double) = combiner.orTogetherSelectivities(1.to(times).map(_ => Selectivity(number))).get.factor
+  def not(number: Double) = Selectivity.of(number).getOrElse(Selectivity.ONE).negate.factor
+  def and(numbers: Double*) = combiner.andTogetherSelectivities(numbers.map(Selectivity.of(_).getOrElse(Selectivity.ONE))).get.factor
+  def or(numbers: Double*) = combiner.orTogetherSelectivities(numbers.map(Selectivity.of(_).getOrElse(Selectivity.ONE))).get.factor
+  def orTimes(times: Int, number: Double) = combiner.orTogetherSelectivities(1.to(times).map(_ => Selectivity.of(number).get)).get.factor
 
   def degree(above: Double, below: Double) = above / below
 
@@ -152,9 +152,9 @@ trait CardinalityTestHelper extends QueryGraphProducer with CardinalityCustomMat
           (labelName, propertyName) match {
             case (Some(lName), Some(pName)) =>
               val selectivity = knownIndexSelectivity.get((lName, pName))
-              selectivity.map(Selectivity.apply)
+              selectivity.map(Selectivity.of(_).getOrElse(Selectivity.ONE))
 
-            case _ => Some(Selectivity(0))
+            case _ => Some(Selectivity.ZERO)
           }
         }
 
@@ -164,9 +164,9 @@ trait CardinalityTestHelper extends QueryGraphProducer with CardinalityCustomMat
           (labelName, propertyName) match {
             case (Some(lName), Some(pName)) =>
               val selectivity = knownIndexPropertyExistsSelectivity.get((lName, pName))
-              selectivity.map(Selectivity.apply)
+              selectivity.map(s => Selectivity.of(s).get)
 
-            case _ => Some(Selectivity(0))
+            case _ => Some(Selectivity.ZERO)
           }
         }
 
@@ -242,9 +242,9 @@ trait CardinalityCustomMatchers {
       MatchResult(
         expected.size == other.size && expected.foldLeft(true) {
           case (acc, (key, value)) =>
+            import Cardinality._
             import org.scalautils.Tolerance._
             import org.scalautils.TripleEquals._
-            import Cardinality._
             acc && other.contains(key) && other(key) === value +- tolerance
         },
         s"""$other did not equal "$expected" wrt a tolerance of $tolerance""",

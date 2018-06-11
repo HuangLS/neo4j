@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -83,7 +83,9 @@ public class HostnamePort
     }
 
     /**
-     * The host part, or null if not given.
+     * The host part, or {@code null} if not given.
+     * 
+     * @return the host part, or {@code null} if not given
      */
     public String getHost()
     {
@@ -110,6 +112,8 @@ public class HostnamePort
     /**
      * The port range as two ints. If only one port given, then both ints have the same value.
      * If no port range is given, then the array has {0,0} as value.
+     * 
+     * @return the port range as two ints, which may have the same value; if no port range has been given both ints are {@code 0}
      */
     public int[] getPorts()
     {
@@ -118,6 +122,8 @@ public class HostnamePort
 
     /**
      * The first port, or 0 if no port was given.
+     * 
+     * @return the first port or {@code 0} if no port was given
      */
     public int getPort()
     {

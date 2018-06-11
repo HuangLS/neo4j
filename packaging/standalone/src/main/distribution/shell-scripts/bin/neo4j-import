@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -95,6 +95,10 @@ do
   LIBRARY_JARS="$LIBRARY_JARS":$jar
 done
 for jar in "$BASEDIR"/system/lib/*.jar
+do
+  LIBRARY_JARS="$LIBRARY_JARS":$jar
+done
+for jar in "$BASEDIR"/bin/*.jar
 do
   LIBRARY_JARS="$LIBRARY_JARS":$jar
 done

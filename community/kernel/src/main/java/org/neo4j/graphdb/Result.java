@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -115,6 +115,7 @@ public interface Result extends ResourceIterator<Map<String, Object>>
      *
      * @return {@code true} if there is more rows available in this result, {@code false} otherwise.
      */
+    @Override
     boolean hasNext();
 
     /**
@@ -122,6 +123,7 @@ public interface Result extends ResourceIterator<Map<String, Object>>
      *
      * @return the next row in this result.
      */
+    @Override
     Map<String, Object> next();
 
     /**
@@ -131,6 +133,7 @@ public interface Result extends ResourceIterator<Map<String, Object>>
      * It is thus safe (and even encouraged, for style and simplicity) to invoke this method even after consuming all
      * rows in the result through the {@link #next() next-method}.
      */
+    @Override
     void close();
 
     /**
@@ -177,6 +180,7 @@ public interface Result extends ResourceIterator<Map<String, Object>>
     void writeAsStringTo( PrintWriter writer );
 
     /** Removing rows from the result is not supported. */
+    @Override
     void remove();
 
     /**
@@ -196,7 +200,8 @@ public interface Result extends ResourceIterator<Map<String, Object>>
      * creation perspective.
      *
      * @param visitor the ResultVisitor instance that will see the results of the visit.
-     * @throws VisitationException if the {@linkplain ResultVisitor#visit(ResultRow) visit-method} throws such an
+     * @param <VisitationException> the type of the exception that might get thrown
+     * @throws VisitationException if the {@code visit(ResultRow)} method of {@link ResultVisitor} throws such an
      * exception.
      */
     <VisitationException extends Exception> void accept( ResultVisitor<VisitationException> visitor )
@@ -204,9 +209,10 @@ public interface Result extends ResourceIterator<Map<String, Object>>
 
     /**
      * Describes a row of a result. The contents of this object is only stable during the
-     * {@linkplain ResultVisitor#visit(ResultRow) visit} call. The data it contains can change between calls to
-     * {@linkplain ResultVisitor#visit(ResultRow) the visit method}. Instances of this type should thus not be saved
-     * for later, or shared with other threads, rather the content should be copied.
+     * call to the {@code visit(ResultRow)} method of {@link ResultVisitor}.
+     * The data it contains can change between calls to the {@code visit(ResultRow)} method.
+     * Instances of this type should thus not be saved
+     * for later use, or shared with other threads, rather the content should be copied.
      */
     interface ResultRow
     {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -97,12 +97,12 @@ class UnknownLabelException(labelName: String, cause: Throwable) extends CypherE
 
 class HintException(message: String, cause: Throwable)
   extends CypherException(message, cause) {
-  val status = Status.Schema.NoSuchIndex
+  val status = Status.Statement.ExecutionFailure
 }
 
 class IndexHintException(identifier: String, label: String, property: String, message: String, cause: Throwable)
   extends CypherException(s"$message\nLabel: `$label`\nProperty name: `$property`", cause) {
-  val status = Status.Statement.ExecutionFailure
+  val status = Status.Schema.NoSuchIndex
 }
 
 class JoinHintException(identifier: String, message: String, cause: Throwable)
@@ -135,9 +135,10 @@ class ArithmeticException(message: String, cause: Throwable) extends CypherExcep
   val status = Status.Statement.ArithmeticError
 }
 
-class IncomparableValuesException(lhs: String, rhs: String, cause: Throwable)
-  extends SyntaxException(s"Don't know how to compare that. Left: ${lhs}; Right: ${rhs}", cause) {
-  def this(lhs: String, rhs: String) = this(lhs, rhs, null)
+class IncomparableValuesException(details: Option[String], lhs: String, rhs: String, cause: Throwable)
+  extends SyntaxException(s"${details.getOrElse("Don't know how to compare that.")} Left: ${lhs}; Right: ${rhs}", cause) {
+  def this(lhs: String, rhs: String, cause: Throwable) = this(None, lhs, rhs, null)
+  def this(lhs: String, rhs: String) = this(None, lhs, rhs, null)
 }
 
 class PeriodicCommitInOpenTransactionException(cause: Throwable)

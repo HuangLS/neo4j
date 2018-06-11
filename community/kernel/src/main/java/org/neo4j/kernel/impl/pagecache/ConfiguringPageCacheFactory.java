@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,9 @@
  */
 package org.neo4j.kernel.impl.pagecache;
 
-import java.lang.management.ManagementFactory;
-import java.lang.reflect.Method;
-
+import org.neo4j.kernel.impl.util.OsBeanUtil;
 import org.neo4j.helpers.Service;
+import org.neo4j.io.ByteUnit;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.PageSwapperFactory;
@@ -66,8 +65,8 @@ public class ConfiguringPageCacheFactory
                     factory.setFileSystemAbstraction( fs );
                     if ( factory instanceof ConfigurablePageSwapperFactory )
                     {
-                        ConfigurablePageSwapperFactory cfactory = (ConfigurablePageSwapperFactory) factory;
-                        cfactory.configure( config );
+                        ConfigurablePageSwapperFactory configurableFactory = (ConfigurablePageSwapperFactory) factory;
+                        configurableFactory.configure( config );
                     }
                     return factory;
                 }
@@ -127,31 +126,16 @@ public class ConfiguringPageCacheFactory
     public void dumpConfiguration()
     {
         int cachePageSize = calculatePageSize( config, swapperFactory );
-        int maxPages = calculateMaxPages( config, cachePageSize );
-        long totalPhysicalMemory = totalPhysicalMemory();
-        String totalPhysicalMemMb = totalPhysicalMemory == -1? "?" : "" + totalPhysicalMemory / 1024 / 1024;
-        long maxVmUsageMb = Runtime.getRuntime().maxMemory() / 1024 / 1024;
-        long pageCacheMb = (maxPages * cachePageSize) / 1024 / 1024;
+        long maxPages = calculateMaxPages( config, cachePageSize );
+        long totalPhysicalMemory = OsBeanUtil.getTotalPhysicalMemory();
+        String totalPhysicalMemMb = (totalPhysicalMemory == OsBeanUtil.VALUE_UNAVAILABLE)
+                                    ? "?" : "" + ByteUnit.Byte.toMebiBytes( totalPhysicalMemory );
+        long maxVmUsageMb = ByteUnit.Byte.toMebiBytes( Runtime.getRuntime().maxMemory() );
+        long pageCacheMb = ByteUnit.Byte.toMebiBytes(maxPages * cachePageSize);
         String msg = "Physical mem: " + totalPhysicalMemMb + " MiB," +
                      " Heap size: " + maxVmUsageMb + " MiB," +
                      " Page cache size: " + pageCacheMb + " MiB.";
 
         log.info( msg );
-    }
-
-    public long totalPhysicalMemory()
-    {
-        try
-        {
-            Class<?> beanClass = Thread.currentThread().getContextClassLoader().loadClass(
-                    "com.sun.management.OperatingSystemMXBean" );
-            Method method = beanClass.getMethod( "getTotalPhysicalMemorySize" );
-            return (long) method.invoke( ManagementFactory.getOperatingSystemMXBean() );
-        }
-        catch ( Exception | LinkageError e )
-        {
-            // We tried, but at this point we actually have no idea.
-            return -1;
-        }
     }
 }

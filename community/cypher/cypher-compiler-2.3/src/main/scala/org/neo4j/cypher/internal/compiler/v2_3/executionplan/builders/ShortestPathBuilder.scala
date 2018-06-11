@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
-import org.neo4j.cypher.internal.compiler.v2_3.commands.ShortestPath
+import org.neo4j.cypher.internal.compiler.v2_3.commands.{Pattern, ShortestPath}
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{PlanBuilder, ExecutionPlanInProgress}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{PipeMonitor, ShortestPathPipe, Pipe}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
@@ -29,18 +29,21 @@ class ShortestPathBuilder extends PlanBuilder {
     val q = plan.query
     val p = plan.pipe
 
-    val item = q.patterns.filter(yesOrNo(p, _)).head
+    val item = q.patterns.filter(isShortestPathCommand(p, _)).head
     val shortestPath = item.token.asInstanceOf[ShortestPath]
+    val pathPredicates = q.where.collect {
+      case Unsolved(predicate) => predicate
+    }
 
-    val pipe = new ShortestPathPipe(p, shortestPath)()
+    val shortestPathPipe = new ShortestPathPipe(p, shortestPath, pathPredicates)()
 
-    plan.copy(pipe = pipe, query = q.copy(patterns = q.patterns.filterNot(_ == item) :+ item.solve))
+    plan.copy(pipe = shortestPathPipe, query = q.copy(patterns = q.patterns.filterNot(_ == item) :+ item.solve))
   }
 
   def canWorkWith(plan: ExecutionPlanInProgress, ctx: PlanContext)(implicit pipeMonitor: PipeMonitor) =
-    plan.query.patterns.exists(yesOrNo(plan.pipe, _))
+    plan.query.patterns.exists(isShortestPathCommand(plan.pipe, _))
 
-  private def yesOrNo(p: Pipe, token: QueryToken[_]): Boolean = token match {
+  private def isShortestPathCommand(p: Pipe, token: QueryToken[_]): Boolean = token match {
     case Unsolved(sp: ShortestPath) => sp.symbolDependenciesMet(p.symbols)
     case _ => false
   }

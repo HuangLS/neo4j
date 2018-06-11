@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,15 +23,14 @@ import org.neo4j.cypher.internal.compiler.v2_3.pipes.{EagerPipe, Pipe}
 
 object addEagernessIfNecessary extends (Pipe => Pipe) {
   private def wouldInterfere(from: Effects, to: Effects): Boolean = {
-    val nodesInterfere = from.contains(ReadsNodes) && to.contains(WritesNodes)
+    val nodesInterfere = nodesReadInterference(from, to)
     val relsInterfere = from.contains(ReadsRelationships) && to.contains(WritesRelationships)
 
-    val readWriteInterfereNodes = from.contains(WritesNodes) && to.contains(WritesNodes) && to.contains(ReadsNodes)
-    val readWriteInterfereRelationships = from.contains(WritesRelationships) && to.contains(WritesRelationships) &&
-      to.contains(ReadsRelationships)
+    val readWriteInterfereNodes = nodesWriteInterference(from, to)
+    val readWriteInterfereRelationships = relsWriteInterference(from, to)
 
     nodesInterfere || relsInterfere || readWriteInterfereNodes || readWriteInterfereRelationships ||
-      nodePropertiesInterfere(from, to) || relationshipPropertiesInterfere(from, to) || labelsInterfere(from, to)
+      nodePropertiesInterfere(from, to) || relationshipPropertiesInterfere(from, to)
   }
 
   def apply(toPipe: Pipe): Pipe = {
@@ -47,6 +46,56 @@ object addEagernessIfNecessary extends (Pipe => Pipe) {
     toPipe.dup(sources.toList)
   }
 
+  private def relsWriteInterference(from: Effects, to: Effects) = {
+    from.contains(WritesRelationships) && to.contains(WritesRelationships) && to.contains(ReadsRelationships) ||
+    from.contains(DeletesRelationship) && to.contains(ReadsRelationships)
+  }
+
+  private def nodesWriteInterference(from: Effects, to: Effects) = {
+    val fromWrites = from.effectsSet.collect {
+      case writes: WritesNodes => writes
+    }
+
+    val toReads = to.effectsSet.collect {
+      case reads: ReadsNodes => reads
+    }
+    val toWrites = to.effectsSet.collect {
+      case writes: WritesNodes => writes
+    }
+    val fromDeletes = from.effectsSet.collect {
+      case deletes@DeletesNode => deletes
+    }
+    (fromWrites.contains(WritesAnyNode) && toWrites.nonEmpty && toReads.nonEmpty) ||
+    (fromDeletes.nonEmpty && toReads.nonEmpty) ||
+    (fromWrites.nonEmpty && toWrites.nonEmpty && toReads.contains(ReadsAllNodes)) ||
+      (nodeLabelOverlap(toReads, fromWrites) && toWrites.nonEmpty)
+  }
+
+  private def nodesReadInterference(from: Effects, to: Effects) = {
+    val fromReads = from.effectsSet.collect {
+      case reads: ReadsNodes => reads
+    }
+
+    val toWrites = to.effectsSet.collect {
+      case writes: WritesNodes => writes
+    }
+
+    (fromReads.nonEmpty && toWrites.contains(WritesAnyNode)) ||
+      nodeLabelOverlap(fromReads, toWrites)
+  }
+
+  private def nodeLabelOverlap(reads: Set[ReadsNodes], writes: Set[WritesNodes]) = {
+    val fromLabels = reads.collect {
+      case ReadsNodesWithLabels(labels) => labels
+    }.flatten
+
+    val toLabels = writes.collect {
+      case WritesNodesWithLabels(labels) => labels
+    }.flatten
+
+    (fromLabels intersect toLabels).nonEmpty
+  }
+
   private def nodePropertiesInterfere(from: Effects, to: Effects): Boolean = {
     val propertyReads = from.effectsSet.collect {
       case property: ReadsNodeProperty => property
@@ -56,9 +105,14 @@ object addEagernessIfNecessary extends (Pipe => Pipe) {
       case property: WritesNodeProperty => property
     }
 
-    (propertyReads.nonEmpty && propertyWrites(WritesAnyNodeProperty)) ||
-      (propertyReads(ReadsAnyNodeProperty) && propertyWrites.nonEmpty) ||
-      propertyWrites.exists(x => propertyReads(ReadsNodeProperty(x.propertyName)))
+    propertyReads.exists {
+      case ReadsAnyNodeProperty => propertyWrites.nonEmpty
+      case ReadsGivenNodeProperty(prop) => propertyWrites(WritesGivenNodeProperty(prop))
+    } ||
+      propertyWrites.exists {
+        case WritesAnyNodeProperty => propertyReads.nonEmpty
+        case WritesGivenNodeProperty(prop) => propertyReads(ReadsGivenNodeProperty(prop))
+      }
   }
 
   private def relationshipPropertiesInterfere(from: Effects, to: Effects): Boolean = {
@@ -69,24 +123,13 @@ object addEagernessIfNecessary extends (Pipe => Pipe) {
     val propertyWrites = to.effectsSet.collect {
       case property: WritesRelationshipProperty => property
     }
-
-    (propertyReads.nonEmpty && propertyWrites(WritesAnyRelationshipProperty)) ||
-      (propertyReads(ReadsAnyRelationshipProperty) && propertyWrites.nonEmpty) ||
-      propertyWrites.exists(x => propertyReads(ReadsRelationshipProperty(x.propertyName)))
-  }
-
-
-  private def labelsInterfere(from: Effects, to: Effects): Boolean = {
-    val labelReads = from.effectsSet.collect {
-      case label: ReadsLabel => label
-    }
-
-    val labelWrites = to.effectsSet.collect {
-      case label: WritesLabel => label
-    }
-
-    (labelReads.nonEmpty && labelWrites(WritesAnyLabel)) ||
-      (labelReads(ReadsAnyLabel) && labelWrites.nonEmpty) ||
-      labelWrites.exists(x => labelReads(ReadsLabel(x.labelName)))
+    propertyReads.exists {
+      case ReadsAnyRelationshipProperty => propertyWrites.nonEmpty
+      case ReadsGivenRelationshipProperty(prop) => propertyWrites(WritesGivenRelationshipProperty(prop))
+    } ||
+      propertyWrites.exists {
+        case WritesAnyRelationshipProperty => propertyReads.nonEmpty
+        case WritesGivenRelationshipProperty(prop) => propertyReads(ReadsGivenRelationshipProperty(prop))
+      }
   }
 }

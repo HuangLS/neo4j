@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,15 +19,17 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality
 
+import java.math
 import java.math.RoundingMode
 
-import org.neo4j.cypher.internal.compiler.v2_3.{PrefixRange, LabelId}
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
+import org.neo4j.cypher.internal.compiler.v2_3.PrefixRange
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, _}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, Selectivity}
-import org.neo4j.cypher.internal.compiler.v2_3.planner.{Selections, SemanticTable}
+import org.neo4j.cypher.internal.compiler.v2_3.planner.Selections
 import org.neo4j.cypher.internal.compiler.v2_3.spi.GraphStatistics
 import org.neo4j.cypher.internal.compiler.v2_3.spi.GraphStatistics._
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticTable, LabelId}
 
 trait Expression2Selectivity {
   def apply(exp: Expression)(implicit semanticTable: SemanticTable, selections: Selections): Selectivity
@@ -42,7 +44,7 @@ case class ExpressionSelectivityCalculator(stats: GraphStatistics, combiner: Sel
 
     // WHERE false
     case False() =>
-      Selectivity(0)
+      Selectivity.ZERO
 
     // SubPredicate(sub, super)
     case partial: PartialPredicate[_] =>
@@ -52,9 +54,13 @@ case class ExpressionSelectivityCalculator(stats: GraphStatistics, combiner: Sel
     case AsPropertySeekable(seekable) =>
       calculateSelectivityForPropertyEquality(seekable.name, seekable.args.sizeHint, selections, seekable.propertyKey)
 
-    // WHERE x.prop LIKE ...
-    case AsStringRangeSeekable(seekable@PrefixRangeSeekable(PrefixRange(prefix), _, _, _)) =>
-      calculateSelectivityForPrefixRangeSeekable(seekable.name, selections, seekable.propertyKey, prefix)
+    // WHERE x.prop STARTS WITH ...
+    case AsStringRangeSeekable(seekable@PrefixRangeSeekable(PrefixRange(StringLiteral(prefix)), _, _, _)) =>
+      calculateSelectivityForPrefixRangeSeekable(seekable.name, selections, seekable.propertyKey, Some(prefix))
+
+    // WHERE x.prop STARTS WITH ...
+    case AsStringRangeSeekable(seekable@PrefixRangeSeekable(_:PrefixRange[_], _, _, _)) =>
+      calculateSelectivityForPrefixRangeSeekable(seekable.name, selections, seekable.propertyKey, None)
 
     // WHERE x.prop <, <=, >=, > that could benefit from an index
     case AsValueRangeSeekable(seekable@InequalityRangeSeekable(_, _, _)) =>
@@ -131,21 +137,30 @@ case class ExpressionSelectivityCalculator(stats: GraphStatistics, combiner: Sel
   private def calculateSelectivityForPrefixRangeSeekable(identifier: String,
                                                    selections: Selections,
                                                    propertyKey: PropertyKeyName,
-                                                   prefix: String)
+                                                   prefix: Option[String])
                                                   (implicit semanticTable: SemanticTable): Selectivity = {
     /*
      * c = DEFAULT_RANGE_SEEK_FACTOR
      * p = prefix length
      * f in (0,c) = (1 / p) * c
      * e in [0,1] = selectivity for equality comparison
+     * x in [0,1] = selectivity for property existence
      * s in (0,1) = (1 - e) * f
-     * return e + s in (0,1)
+     * return min(x, e + s in (0,1))
      */
-    val equality = java.math.BigDecimal.valueOf(calculateSelectivityForPropertyEquality(identifier, None, selections, propertyKey).factor)
-    val factor = java.math.BigDecimal.ONE.divide(java.math.BigDecimal.valueOf(prefix.length), 17, RoundingMode.HALF_UP)
-      .multiply(java.math.BigDecimal.valueOf(DEFAULT_RANGE_SEEK_FACTOR)).stripTrailingZeros()
+    val equality = math.BigDecimal.valueOf(calculateSelectivityForPropertyEquality(identifier, None, selections, propertyKey).factor)
+    val prefixLength = math.BigDecimal.valueOf(prefix match {
+      case Some(n) => n.length + 1
+      case None => DEFAULT_PREFIX_LENGTH
+    })
+    val factor = math.BigDecimal.ONE.divide(prefixLength, 17, RoundingMode.HALF_UP)
+      .multiply(math.BigDecimal.valueOf(DEFAULT_RANGE_SEEK_FACTOR)).stripTrailingZeros()
     val slack = BigDecimalCombiner.negate(equality).multiply(factor)
-    Selectivity(equality.add(slack).doubleValue())
+    val result = Selectivity.of(equality.add(slack).doubleValue()).get
+
+    //we know for sure we are no worse than a propertyExistence check
+    val existence = calculateSelectivityForPropertyExistence(identifier, selections, propertyKey)
+    if (existence < result) existence else result
   }
 
   private def calculateSelectivityForValueRangeSeekable(seekable: InequalityRangeSeekable,
@@ -153,10 +168,11 @@ case class ExpressionSelectivityCalculator(stats: GraphStatistics, combiner: Sel
                                                        (implicit semanticTable: SemanticTable): Selectivity = {
     val name = seekable.ident.name
     val propertyKeyName = seekable.expr.property.propertyKey
-    val equality = java.math.BigDecimal.valueOf(calculateSelectivityForPropertyEquality(name, None, selections, propertyKeyName).factor)
-    val factor = java.math.BigDecimal.valueOf(DEFAULT_RANGE_SEEK_FACTOR)
+    val equality = math.BigDecimal.valueOf(calculateSelectivityForPropertyEquality(name, None, selections, propertyKeyName).factor)
+    val factor = math.BigDecimal.valueOf(DEFAULT_RANGE_SEEK_FACTOR)
     val slack = BigDecimalCombiner.negate(equality).multiply(factor)
-    Selectivity(equality.add(slack).doubleValue())
+    val result = Selectivity.of(equality.add(slack).doubleValue()).getOrElse(Selectivity.ONE)
+    result
   }
 
   private def calculateSelectivityForPropertyExistence(identifier: String,
@@ -175,6 +191,7 @@ case class ExpressionSelectivityCalculator(stats: GraphStatistics, combiner: Sel
         }
     }
 
-    combiner.orTogetherSelectivities(indexPropertyExistsSelectivities).getOrElse(DEFAULT_PROPERTY_SELECTIVITY)
+    val result = combiner.orTogetherSelectivities(indexPropertyExistsSelectivities).getOrElse(DEFAULT_PROPERTY_SELECTIVITY)
+    result
   }
 }

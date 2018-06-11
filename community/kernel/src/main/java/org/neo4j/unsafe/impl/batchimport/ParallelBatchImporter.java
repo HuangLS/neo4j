@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,18 +19,16 @@
  */
 package org.neo4j.unsafe.impl.batchimport;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Format;
 import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.io.fs.FileSystemAbstraction;
+import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.api.CountsAccessor;
 import org.neo4j.kernel.impl.logging.LogService;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.Log;
 import org.neo4j.unsafe.impl.batchimport.cache.NodeLabelsCache;
 import org.neo4j.unsafe.impl.batchimport.cache.NodeRelationshipCache;
@@ -45,7 +43,7 @@ import org.neo4j.unsafe.impl.batchimport.staging.DynamicProcessorAssigner;
 import org.neo4j.unsafe.impl.batchimport.staging.ExecutionMonitor;
 import org.neo4j.unsafe.impl.batchimport.staging.Stage;
 import org.neo4j.unsafe.impl.batchimport.stats.StatsProvider;
-import org.neo4j.unsafe.impl.batchimport.store.BatchingNeoStore;
+import org.neo4j.unsafe.impl.batchimport.store.BatchingNeoStores;
 import org.neo4j.unsafe.impl.batchimport.store.io.IoMonitor;
 
 import static java.lang.System.currentTimeMillis;
@@ -73,8 +71,8 @@ public class ParallelBatchImporter implements BatchImporter
     private final LogService logService;
     private final Log log;
     private final ExecutionMonitor executionMonitor;
-    private final Monitors monitors;
     private final AdditionalInitialIds additionalInitialIds;
+    private final Config dbConfig;
 
     /**
      * Advanced usage of the parallel batch importer, for special and very specific cases. Please use
@@ -82,16 +80,16 @@ public class ParallelBatchImporter implements BatchImporter
      */
     public ParallelBatchImporter( File storeDir, FileSystemAbstraction fileSystem, Configuration config,
             LogService logService, ExecutionMonitor executionMonitor,
-            AdditionalInitialIds additionalInitialIds )
+            AdditionalInitialIds additionalInitialIds, Config dbConfig )
     {
         this.storeDir = storeDir;
         this.fileSystem = fileSystem;
         this.config = config;
         this.logService = logService;
+        this.dbConfig = dbConfig;
         this.log = logService.getInternalLogProvider().getLog( getClass() );
         this.executionMonitor = executionMonitor;
         this.additionalInitialIds = additionalInitialIds;
-        this.monitors = new Monitors();
     }
 
     /**
@@ -100,10 +98,10 @@ public class ParallelBatchImporter implements BatchImporter
      * optimal assignment of processors to bottleneck steps over time.
      */
     public ParallelBatchImporter( File storeDir, Configuration config, LogService logService,
-            ExecutionMonitor executionMonitor )
+            ExecutionMonitor executionMonitor, Config dbConfig )
     {
         this( storeDir, new DefaultFileSystemAbstraction(), config, logService,
-                withDynamicProcessorAssignment( executionMonitor, config ), EMPTY );
+                withDynamicProcessorAssignment( executionMonitor, config ), EMPTY, dbConfig );
     }
 
     @Override
@@ -119,14 +117,13 @@ public class ParallelBatchImporter implements BatchImporter
         boolean hasBadEntries = false;
         File badFile = new File( storeDir, Configuration.BAD_FILE_NAME );
         CountingStoreUpdateMonitor storeUpdateMonitor = new CountingStoreUpdateMonitor();
-        try ( BatchingNeoStore neoStore = new BatchingNeoStore( fileSystem, storeDir, config,
-              logService, monitors, additionalInitialIds );
-              OutputStream badOutput = new BufferedOutputStream( fileSystem.openAsOutputStream( badFile, false ) );
-              Collector badCollector = input.badCollector( badOutput );
+        try ( BatchingNeoStores neoStore =
+                      new BatchingNeoStores( fileSystem, storeDir, config, logService, additionalInitialIds, dbConfig );
               CountsAccessor.Updater countsUpdater = neoStore.getCountsStore().reset(
                     neoStore.getLastCommittedTransactionId() );
               InputCache inputCache = new InputCache( fileSystem, storeDir ) )
         {
+            Collector badCollector = input.badCollector();
             // Some temporary caches and indexes in the import
             IoMonitor writeMonitor = new IoMonitor( neoStore.getIoTracer() );
             IdMapper idMapper = input.idMapper();

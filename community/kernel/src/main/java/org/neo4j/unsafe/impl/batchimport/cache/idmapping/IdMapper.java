@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,7 +31,7 @@ import org.neo4j.unsafe.impl.batchimport.input.InputRelationship;
  * Maps node ids as specified by {@link InputNode#id()}, {@link InputRelationship#startNode()} and
  * {@link InputRelationship#endNode()} from an id of some unknown sort, coming directly from input, to actual node ids.
  */
-public interface IdMapper extends MemoryStatsVisitor.Home
+public interface IdMapper extends MemoryStatsVisitor.Visitable
 {
     /**
      * Maps an {@code inputId} to an actual node id.
@@ -54,7 +54,7 @@ public interface IdMapper extends MemoryStatsVisitor.Home
 
     /**
      * After all mappings have been {@link #put(Object, long, Group)} call this method to prepare for
-     * {@link #get(Object, Group) querying}.
+     * {@link #get(Object, Group)}.
      *
      * @param allIds put earlier, in the event of difficult collisions so that more information have to be read
      * from the input data again, data that normally isn't necessary and hence discarded.
@@ -66,7 +66,7 @@ public interface IdMapper extends MemoryStatsVisitor.Home
     /**
      * Returns an actual node id representing {@code inputId}. For this call to work {@link #prepare(InputIterable, Collector, ProgressListener)} must have
      * been called after all calls to {@link #put(Object, long, Group)} have been made,
-     * if {@link #needsPreparation()} returns {@code true}. Otherwise ids can be retrieved right after
+     * iff {@link #needsPreparation()} returns {@code true}. Otherwise ids can be retrieved right after
      * @link #put(Object, long) being put}
      *
      * @param inputId the input id to get the actual node id for.

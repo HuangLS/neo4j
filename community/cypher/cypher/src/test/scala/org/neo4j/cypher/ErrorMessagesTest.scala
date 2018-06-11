@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,21 @@
  */
 package org.neo4j.cypher
 
+import org.apache.commons.lang3.SystemUtils
 import org.hamcrest.CoreMatchers._
 import org.junit.Assert._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.StringHelper
-import org.neo4j.helpers.Platforms
+import org.neo4j.cypher.internal.frontend.v2_3.helpers.StringHelper
 
 class ErrorMessagesTest extends ExecutionEngineFunSuite with StringHelper {
+
+  test("fails on incorrect unicode literal") {
+    expectSyntaxError(
+      "RETURN '\\uH'",
+      "Invalid input 'H': expected four hexadecimal digits specifying a unicode character (line 1, column 11 (offset: 10))",
+      10
+    )
+  }
 
   test("fails when merging relationship with null property") {
     expectError("create (a) create (b) merge (a)-[r:X {p: null}]->(b) return r", "Cannot merge relationship using null property value for p")
@@ -380,7 +389,7 @@ class ErrorMessagesTest extends ExecutionEngineFunSuite with StringHelper {
     graph.createConstraint("Person", "id")
     expectError(
       "MATCH (n:Person) USING INDEX n:Person(id) WHERE n.id = 12 OR n.id = 14 RETURN n",
-      "Cannot use index hint in this context. Index hints are only supported for the following predicates in WHERE (either directly or as part of a top-level AND): equality comparison, inequality (range) comparison, LIKE pattern matching, IN condition or checking property existence. The comparison cannot be performed between two property values. Note that the label and property comparison must be specified on a non-optional node (line 1, column 18 (offset: 17))"
+      "Cannot use index hint in this context. Index hints are only supported for the following predicates in WHERE (either directly or as part of a top-level AND): equality comparison, inequality (range) comparison, STARTS WITH, IN condition or checking property existence. The comparison cannot be performed between two property values. Note that the label and property comparison must be specified on a non-optional node (line 1, column 18 (offset: 17))"
     )
   }
 
@@ -447,7 +456,7 @@ class ErrorMessagesTest extends ExecutionEngineFunSuite with StringHelper {
     assertThat(error.offset, equalTo(Some(fixPosition(query, expectedOffset)): Option[Int]))
   }
 
-  private def fixPosition(q: String, originalOffset: Int): Int = if (Platforms.platformIsWindows()) {
+  private def fixPosition(q: String, originalOffset: Int): Int = if (SystemUtils.IS_OS_WINDOWS) {
     val subString = q.replaceAll("\n\r", "\n").substring(0, originalOffset)
     val numberOfNewLines = subString.filter(_ == '\n').length
     originalOffset + numberOfNewLines

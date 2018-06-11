@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -65,7 +65,7 @@ public class DeadlockIT extends AbstractRestFunctionalTestBase
         otherThread.execute( writeToFirstAndSecond() );
 
         // and I wait for those locks to be pending
-        secondNodeLocked.await(10, TimeUnit.SECONDS);
+        assertTrue( secondNodeLocked.await( 10, TimeUnit.SECONDS ) );
         Thread.sleep( 1000 );
 
         // and I then try and lock node:Second in the first transaction

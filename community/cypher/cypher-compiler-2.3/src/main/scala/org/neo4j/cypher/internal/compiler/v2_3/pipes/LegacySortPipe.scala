@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -52,7 +52,7 @@ trait ExecutionContextComparer extends Comparer {
     case head :: tail => {
       val aVal = head(a)
       val bVal = head(b)
-      signum(compare(aVal, bVal)) match {
+      signum(compare(Some("ORDER BY"), aVal, bVal)) match {
         case 1 => !head.ascending
         case -1 => head.ascending
         case 0 => compareBy(a, b, tail)

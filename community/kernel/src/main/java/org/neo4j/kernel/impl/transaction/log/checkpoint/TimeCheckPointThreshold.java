@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,7 @@ package org.neo4j.kernel.impl.transaction.log.checkpoint;
 
 import org.neo4j.helpers.Clock;
 
-public class TimeCheckPointThreshold implements CheckPointThreshold
+public class TimeCheckPointThreshold extends AbstractCheckPointThreshold
 {
     private volatile long lastCheckPointedTransactionId;
     private volatile long nextCheckPointTime;
@@ -44,10 +44,16 @@ public class TimeCheckPointThreshold implements CheckPointThreshold
     }
 
     @Override
-    public boolean isCheckPointingNeeded( long lastCommittedTransactionId )
+    protected boolean thresholdReached( long lastCommittedTransactionId )
     {
         return lastCommittedTransactionId > lastCheckPointedTransactionId &&
                clock.currentTimeMillis() >= nextCheckPointTime;
+    }
+
+    @Override
+    protected String description()
+    {
+        return "time threshold";
     }
 
     @Override

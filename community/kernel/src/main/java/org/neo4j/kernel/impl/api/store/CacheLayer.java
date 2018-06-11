@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 /**
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,8 +40,6 @@ package org.neo4j.kernel.impl.api.store;
 
 import java.util.Iterator;
 
-import org.neo4j.collection.primitive.Primitive;
-import org.neo4j.collection.primitive.PrimitiveCollection;
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
@@ -60,9 +58,10 @@ import org.neo4j.kernel.api.exceptions.schema.SchemaRuleNotFoundException;
 import org.neo4j.kernel.api.exceptions.schema.TooManyLabelsException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.InternalIndexState;
+import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureSignature;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.impl.api.KernelStatement;
-import org.neo4j.kernel.impl.api.PropertyValueComparison;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.store.SchemaStorage;
@@ -72,7 +71,6 @@ import org.neo4j.kernel.impl.util.PrimitiveLongResourceIterator;
 
 import static org.neo4j.helpers.collection.Iterables.filter;
 import static org.neo4j.helpers.collection.Iterables.map;
-import static org.neo4j.kernel.impl.api.PropertyValueComparison.COMPARE_NUMBERS;
 import static org.neo4j.kernel.impl.api.PropertyValueComparison.COMPARE_STRINGS;
 
 /**
@@ -96,13 +94,15 @@ public class CacheLayer implements StoreReadLayer
                 }
             };
 
+    private final ProcedureCache procedureCache;
     private final SchemaCache schemaCache;
     private final DiskLayer diskLayer;
 
-    public CacheLayer( DiskLayer diskLayer, SchemaCache schemaCache )
+    public CacheLayer( DiskLayer diskLayer, SchemaCache schemaCache, ProcedureCache procedureCache )
     {
         this.diskLayer = diskLayer;
         this.schemaCache = schemaCache;
+        this.procedureCache = procedureCache;
     }
 
     @Override
@@ -266,16 +266,14 @@ public class CacheLayer implements StoreReadLayer
     }
 
     @Override
-    public PrimitiveLongIterator nodesGetFromIndexRangeSeekByNumber( KernelStatement state,
-                                                                     IndexDescriptor index,
-                                                                     Number lower, boolean includeLower,
-                                                                     Number upper, boolean includeUpper )
+    public PrimitiveLongIterator nodesGetFromInclusiveNumericIndexRangeSeek( KernelStatement state,
+            IndexDescriptor index,
+            Number lower,
+            Number upper )
             throws IndexNotFoundKernelException
 
     {
-        return COMPARE_NUMBERS.isEmptyRange( lower, includeLower, upper, includeUpper )
-            ? PrimitiveLongCollections.emptyIterator()
-            : diskLayer.nodesGetFromIndexRangeSeekByNumber( state, index, lower, includeLower, upper, includeUpper );
+        return diskLayer.nodesGetFromInclusiveNumericIndexRangeSeek( state, index, lower, upper );
     }
 
     @Override
@@ -330,6 +328,18 @@ public class CacheLayer implements StoreReadLayer
     public double indexUniqueValuesPercentage( IndexDescriptor descriptor ) throws IndexNotFoundKernelException
     {
         return diskLayer.indexUniqueValuesPercentage( descriptor );
+    }
+
+    @Override
+    public Iterator<ProcedureDescriptor> proceduresGetAll()
+    {
+        return procedureCache.getAll();
+    }
+
+    @Override
+    public ProcedureDescriptor procedureGet( ProcedureSignature.ProcedureName name )
+    {
+        return procedureCache.get( name );
     }
 
     @Override

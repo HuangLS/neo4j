@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -50,6 +50,7 @@ import org.neo4j.helpers.collection.MapUtil;
 import common.Neo4jAlgoTestCase;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -60,6 +61,42 @@ import static org.neo4j.graphdb.Direction.OUTGOING;
 @RunWith( Parameterized.class )
 public class TestAStar extends Neo4jAlgoTestCase
 {
+
+    @Test
+    public void pathToSelfReturnsZero()
+    {
+        // GIVEN
+        Node start = graph.makeNode( "start", "x", 0d, "y", 0d );
+
+        // WHEN
+        WeightedPath path = finder.findSinglePath( start, start );
+
+        // THEN
+        assertNotNull( path );
+        assertEquals( start, path.startNode() );
+        assertEquals( start, path.endNode() );
+        assertEquals( 0, path.length() );
+    }
+
+    @Test
+    public void allPathsToSelfReturnsZero()
+    {
+        // GIVEN
+        Node start = graph.makeNode( "start", "x", 0d, "y", 0d );
+
+        // WHEN
+        Iterable<WeightedPath> paths = finder.findAllPaths( start, start );
+
+        // THEN
+        for ( WeightedPath path : paths )
+        {
+            assertNotNull( path );
+            assertEquals( start, path.startNode() );
+            assertEquals( start, path.endNode() );
+            assertEquals( 0, path.length() );
+        }
+    }
+
     @Test
     public void wikipediaExample() throws Exception
     {

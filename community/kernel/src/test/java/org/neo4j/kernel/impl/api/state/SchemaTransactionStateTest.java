@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,11 @@
  */
 package org.neo4j.kernel.impl.api.state;
 
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -26,15 +31,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-
 import org.neo4j.helpers.collection.IteratorUtil;
+import org.neo4j.kernel.api.Neo4jTypes;
 import org.neo4j.kernel.api.cursor.PropertyItem;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.InternalIndexState;
+import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureSignature;
 import org.neo4j.kernel.api.txstate.TransactionState;
 import org.neo4j.kernel.impl.api.KernelStatement;
 import org.neo4j.kernel.impl.api.LegacyPropertyTrackers;
@@ -43,6 +46,7 @@ import org.neo4j.kernel.impl.api.StatementOperationsTestHelper;
 import org.neo4j.kernel.impl.api.store.StoreReadLayer;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
 import org.neo4j.kernel.impl.index.LegacyIndexStore;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.util.Cursors;
 
 import static org.junit.Assert.assertEquals;
@@ -52,11 +56,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
-
 import static org.neo4j.helpers.Exceptions.launderedException;
 import static org.neo4j.helpers.collection.Iterables.option;
 import static org.neo4j.helpers.collection.IteratorUtil.asSet;
 import static org.neo4j.helpers.collection.IteratorUtil.emptySetOf;
+import static org.neo4j.kernel.api.procedures.ProcedureSignature.procedureSignature;
 
 public class SchemaTransactionStateTest
 {
@@ -124,7 +128,7 @@ public class SchemaTransactionStateTest
         IndexDescriptor rule = txContext.indexCreate( state, labelId1, key1 );
 
         // THEN
-        assertEquals( InternalIndexState.POPULATING, txContext.indexGetState(state, rule) );
+        assertEquals( InternalIndexState.POPULATING, txContext.indexGetState( state, rule ) );
     }
 
     @Test
@@ -204,6 +208,21 @@ public class SchemaTransactionStateTest
         assertEquals( emptySetOf( IndexDescriptor.class ), asSet( rulesByLabel ) );
     }
 
+    @Test
+    public void shouldGetProcedureInCurrentTx() throws Throwable
+    {
+        // Given
+        ProcedureSignature signature = procedureSignature( "myproc" ).out( "field1", Neo4jTypes.NTInteger ).build();
+        txContext.procedureCreate( state, signature, "javascript", "emit(1);" );
+
+        // When
+        ProcedureDescriptor desc = txContext.procedureGet( state, signature.name() );
+
+        // Then
+        assertEquals( desc.language(), "javascript" );
+        assertEquals( desc.procedureBody(), "emit(1);" );
+    }
+
     private interface ExceptionExpectingFunction<E extends Exception>
     {
         void call() throws E;
@@ -249,7 +268,7 @@ public class SchemaTransactionStateTest
         when( store.indexesGetAll() ).then( asAnswer( Collections.<IndexDescriptor>emptyList() ) );
 
         txContext = new StateHandlingStatementOperations( store, mock( LegacyPropertyTrackers.class ),
-                mock( ConstraintIndexCreator.class ), mock( LegacyIndexStore.class ) );
+                mock( ConstraintIndexCreator.class ), mock( LegacyIndexStore.class ), mock(TemporalPropertyStoreAdapter.class ) );
 
         storeStatement = mock(StoreStatement.class);
         when (state.getStoreStatement()).thenReturn( storeStatement );

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,6 @@
 package org.neo4j.kernel.impl.api.store;
 
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import java.util.Set;
 
@@ -42,7 +41,7 @@ public class CacheLayerTest
 {
     private final DiskLayer diskLayer = mock( DiskLayer.class );
     private final SchemaCache schemaCache = mock( SchemaCache.class );
-    private final CacheLayer context = new CacheLayer( diskLayer, schemaCache );
+    private final CacheLayer context = new CacheLayer( diskLayer, schemaCache, new ProcedureCache() );
 
     @Test
     public void shouldLoadAllConstraintsFromCache() throws Exception
@@ -77,26 +76,6 @@ public class CacheLayerTest
 
         // When & Then
         assertThat( asSet( context.constraintsGetForLabelAndPropertyKey( labelId, propertyId ) ), equalTo( constraints ) );
-    }
-
-
-    @Test
-    public void shouldNotCallToDiskLayerOnEmptyRangeSeekByNumber() throws Exception
-    {
-        // Given
-        int labelId = 0, propertyId = 1;
-        IndexDescriptor index = new IndexDescriptor( labelId, propertyId );
-        KernelStatement statement = mock( KernelStatement.class );
-
-        // When
-        assertFalse(
-            context.nodesGetFromIndexRangeSeekByNumber( statement, index, 20, true, 10, false ).hasNext()
-        );
-
-        // Then
-        verifyZeroInteractions( schemaCache );
-        verifyZeroInteractions( statement );
-        verifyZeroInteractions( diskLayer );
     }
 
     @Test

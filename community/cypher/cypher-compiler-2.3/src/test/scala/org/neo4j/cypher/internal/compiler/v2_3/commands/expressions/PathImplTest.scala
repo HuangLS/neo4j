@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,9 +20,10 @@
 package org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 
 import java.lang.Iterable
+import java.util
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.graphdb.Traverser.Order
 import org.neo4j.graphdb._
 
@@ -116,6 +117,10 @@ class PathImplTest extends CypherFunSuite {
 
     def getPropertyKeys: Iterable[String] = null
 
+    def getProperties( keys: String* ): util.Map[String, AnyRef] = null
+
+    def getAllProperties: util.Map[String, AnyRef] = null
+
     override def toString: String = "Rel"
   }
 
@@ -167,6 +172,10 @@ class PathImplTest extends CypherFunSuite {
     def removeProperty(key: String): AnyRef = null
 
     def getPropertyKeys: Iterable[String] = null
+
+    def getProperties( keys: String* ): util.Map[String, AnyRef] = null
+
+    def getAllProperties: util.Map[String, AnyRef] = null
 
     override def toString: String = "Node"
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,7 @@ import org.neo4j.function.Consumer;
 import org.neo4j.function.Supplier;
 import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
+import org.neo4j.graphdb.security.URLAccessRule;
 import org.neo4j.helpers.Clock;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.io.fs.FileSystemAbstraction;
@@ -41,12 +42,16 @@ import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.extension.KernelExtensionFactory;
 import org.neo4j.kernel.extension.KernelExtensions;
 import org.neo4j.kernel.extension.UnsatisfiedDependencyStrategies;
+import org.neo4j.kernel.impl.api.LogRotationMonitor;
 import org.neo4j.kernel.impl.logging.LogService;
 import org.neo4j.kernel.impl.logging.StoreLogService;
 import org.neo4j.kernel.impl.pagecache.ConfiguringPageCacheFactory;
 import org.neo4j.kernel.impl.pagecache.PageCacheLifecycle;
+import org.neo4j.kernel.impl.security.URLAccessRules;
 import org.neo4j.kernel.impl.spi.KernelContext;
+import org.neo4j.kernel.impl.spi.SimpleKernelContext;
 import org.neo4j.kernel.impl.transaction.TransactionCounters;
+import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointerMonitor;
 import org.neo4j.kernel.impl.transaction.state.DataSourceManager;
 import org.neo4j.kernel.impl.util.JobScheduler;
 import org.neo4j.kernel.impl.util.Neo4jJobScheduler;
@@ -56,10 +61,12 @@ import org.neo4j.kernel.info.JvmMetadataRepository;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.kernel.monitoring.tracing.Tracers;
+import org.neo4j.logging.Level;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.udc.UsageData;
 import org.neo4j.udc.UsageDataKeys;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 /**
  * Platform module for {@link org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory}. This creates
@@ -93,6 +100,8 @@ public class PlatformModule
 
     public final KernelExtensions kernelExtensions;
 
+    public final URLAccessRule urlAccessRule;
+
     public final JobScheduler jobScheduler;
 
     public final AvailabilityGuard availabilityGuard;
@@ -100,7 +109,8 @@ public class PlatformModule
     public final TransactionCounters transactionMonitor;
 
     public PlatformModule( File storeDir, Map<String, String> params, final GraphDatabaseFacadeFactory.Dependencies externalDependencies,
-                                                  final GraphDatabaseFacade graphDatabaseFacade)
+            final GraphDatabaseFacade graphDatabaseFacade,
+            OperationalMode operationalMode )
     {
         dependencies = new org.neo4j.kernel.impl.util.Dependencies( new Supplier<DependencyResolver>()
         {
@@ -122,7 +132,7 @@ public class PlatformModule
         // Database system information, used by UDC
         dependencies.satisfyDependency( new UsageData() );
 
-        fileSystem = life.add( dependencies.satisfyDependency( createFileSystemAbstraction() ) );
+        fileSystem = dependencies.satisfyDependency( createFileSystemAbstraction() );
 
         // Component monitoring
         monitors = externalDependencies.monitors() == null ? new Monitors() : externalDependencies.monitors();
@@ -132,7 +142,7 @@ public class PlatformModule
 
         // If no logging was passed in from the outside then create logging and register
         // with this life
-        logging = life.add( dependencies.satisfyDependency( createLogService( externalDependencies.userLogProvider() ) ) );
+        logging = dependencies.satisfyDependency( createLogService( externalDependencies.userLogProvider() ) );
 
         config.setLogger( logging.getInternalLog( Config.class ) );
 
@@ -145,6 +155,10 @@ public class PlatformModule
         tracers = dependencies.satisfyDependency(
                 new Tracers( desiredImplementationName, logging.getInternalLog( Tracers.class ) ) );
         dependencies.satisfyDependency( tracers.pageCacheTracer );
+        dependencies.satisfyDependency( firstImplementor(
+                LogRotationMonitor.class, tracers.transactionTracer, LogRotationMonitor.NULL ) );
+        dependencies.satisfyDependency( firstImplementor(
+                CheckPointerMonitor.class, tracers.checkPointTracer, CheckPointerMonitor.NULL ) );
 
         pageCache = dependencies.satisfyDependency( createPageCache( fileSystem, config, logging, tracers ) );
         life.add( new PageCacheLifecycle( pageCache ) );
@@ -158,24 +172,13 @@ public class PlatformModule
         // Anyways please fix this.
         dataSourceManager = life.add( dependencies.satisfyDependency( new DataSourceManager() ) );
 
-        availabilityGuard = new AvailabilityGuard( Clock.SYSTEM_CLOCK );
+        availabilityGuard = dependencies.satisfyDependency( new AvailabilityGuard( Clock.SYSTEM_CLOCK,
+                logging.getInternalLog( AvailabilityGuard.class ) ) );
 
         transactionMonitor = dependencies.satisfyDependency( createTransactionCounters() );
 
-        KernelContext kernelContext = new KernelContext()
-        {
-            @Override
-            public FileSystemAbstraction fileSystem()
-            {
-                return PlatformModule.this.fileSystem;
-            }
-
-            @Override
-            public File storeDir()
-            {
-                return PlatformModule.this.storeDir;
-            }
-        };
+        KernelContext kernelContext = dependencies.satisfyDependency(
+                new SimpleKernelContext( this.fileSystem, this.storeDir, operationalMode ));
 
         kernelExtensions = dependencies.satisfyDependency( new KernelExtensions(
                 kernelContext,
@@ -183,14 +186,29 @@ public class PlatformModule
                 dependencies,
                 UnsatisfiedDependencyStrategies.fail() ) );
 
+        urlAccessRule = dependencies.satisfyDependency( URLAccessRules.combined( externalDependencies.urlAccessRules() ) );
+
         publishPlatformInfo( dependencies.resolveDependency( UsageData.class ) );
+    }
+
+    @SuppressWarnings( "unchecked" )
+    private <T> T firstImplementor( Class<T> type, Object... candidates )
+    {
+        for ( Object candidate : candidates )
+        {
+            if ( type.isInstance( candidate ) )
+            {
+                return (T) candidate;
+            }
+        }
+        return null;
     }
 
     private void publishPlatformInfo( UsageData sysInfo )
     {
         sysInfo.set( UsageDataKeys.version, Version.getKernel().getReleaseVersion() );
         sysInfo.set( UsageDataKeys.revision, Version.getKernel().getVersion() );
-        sysInfo.set( UsageDataKeys.operationalMode, UsageDataKeys.OperationalMode.ha );
+        sysInfo.set( UsageDataKeys.operationalMode, OperationalMode.ha );
     }
 
     public LifeSupport createLife()
@@ -206,7 +224,7 @@ public class PlatformModule
     protected LogService createLogService( LogProvider userLogProvider )
     {
         long internalLogRotationThreshold = config.get( GraphDatabaseSettings.store_internal_log_rotation_threshold );
-        int internalLogRotationDelay = config.get( GraphDatabaseSettings.store_internal_log_rotation_delay );
+        long internalLogRotationDelay = config.get( GraphDatabaseSettings.store_internal_log_rotation_delay );
         int internalLogMaxArchives = config.get( GraphDatabaseSettings.store_internal_log_max_archives );
 
         final StoreLogService.Builder builder =
@@ -227,8 +245,14 @@ public class PlatformModule
             }
         } );
 
+        for ( String debugContext : config.get( GraphDatabaseSettings.store_internal_debug_contexts ) )
+        {
+            builder.withLevel( debugContext, Level.DEBUG );
+        }
+        builder.withDefaultLevel( config.get( GraphDatabaseSettings.store_internal_log_level ) );
+
         File internalLog = config.get( GraphDatabaseSettings.store_internal_log_location );
-        LogService logService;
+        StoreLogService logService;
         try
         {
             if ( internalLog == null )

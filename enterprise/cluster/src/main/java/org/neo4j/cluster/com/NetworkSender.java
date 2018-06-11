@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,23 +19,6 @@
  */
 package org.neo4j.cluster.com;
 
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.channels.ClosedChannelException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
-
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
@@ -54,6 +37,23 @@ import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.serialization.ObjectEncoder;
 import org.jboss.netty.util.ThreadNameDeterminer;
 import org.jboss.netty.util.ThreadRenamingRunnable;
+
+import java.net.ConnectException;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.channels.ClosedChannelException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.neo4j.cluster.com.message.Message;
 import org.neo4j.cluster.com.message.MessageSender;
@@ -101,18 +101,18 @@ public class NetworkSender
 
     // Sending
     // One executor for each receiving instance, so that one blocking instance cannot block others receiving messages
-    private Map<URI, ExecutorService> senderExecutors = new HashMap<URI, ExecutorService>();
-    private Set<URI> failedInstances = new HashSet<URI>(); // Keeps track of what instances we have failed to open
+    private final Map<URI, ExecutorService> senderExecutors = new HashMap<URI, ExecutorService>();
+    private final Set<URI> failedInstances = new HashSet<URI>(); // Keeps track of what instances we have failed to open
     // connections to
     private ClientBootstrap clientBootstrap;
 
     private final Monitor monitor;
-    private Configuration config;
+    private final Configuration config;
     private final NetworkReceiver receiver;
-    private Log msgLog;
+    private final Log msgLog;
     private URI me;
 
-    private Map<URI, Channel> connections = new ConcurrentHashMap<URI, Channel>();
+    private final Map<URI, Channel> connections = new ConcurrentHashMap<URI, Channel>();
     private Iterable<NetworkChannelsListener> listeners = Listeners.newListeners();
 
     private volatile boolean paused;
@@ -163,6 +163,13 @@ public class NetworkSender
                 Executors.newFixedThreadPool( 2, daemon( "Cluster client worker", monitor ) ), 2 ) );
         clientBootstrap.setOption( "tcpNoDelay", true );
         clientBootstrap.setPipelineFactory( new NetworkNodePipelineFactory() );
+
+        msgLog.debug( "Started NetworkSender for " + toString( config ) );
+    }
+
+    private String toString( Configuration config )
+    {
+        return "defaultPort:" + config.defaultPort() + ", port:" + config.port();
     }
 
     @Override
@@ -188,7 +195,7 @@ public class NetworkSender
 
         channels.close().awaitUninterruptibly();
         clientBootstrap.releaseExternalResources();
-        msgLog.debug( "Shutting down NetworkSender complete" );
+        msgLog.debug( "Shutting down NetworkSender for " + toString( config ) + " complete" );
     }
 
     @Override
@@ -306,6 +313,10 @@ public class NetworkSender
                             {
                                 msgLog.debug( "Unable to write " + message + " to " + future.getChannel(),
                                         future.getCause() );
+                                closedChannel( future.getChannel() );
+
+                                // Try again
+                                send( message );
                             }
                         }
                     } );
@@ -392,32 +403,27 @@ public class NetworkSender
 
     private Channel openChannel( URI clusterUri )
     {
-        // TODO refactor the creation of InetSocketAddress'es into HostnamePort, so we can be rid of this defaultPort
-        // method and simplify code a couple of places
-        SocketAddress address = new InetSocketAddress( clusterUri.getHost(), clusterUri.getPort() == -1 ? config
-                .defaultPort() : clusterUri.getPort() );
+        SocketAddress destination = new InetSocketAddress( clusterUri.getHost(),
+                clusterUri.getPort() == -1 ? config.defaultPort() : clusterUri.getPort() );
+        // We must specify the origin address in case the server has multiple IPs per interface
+        SocketAddress origin = new InetSocketAddress( me.getHost(), 0 );
 
-        ChannelFuture channelFuture = clientBootstrap.connect( address );
+        msgLog.info( "Attempting to connect from " + origin + " to " + destination );
+        ChannelFuture channelFuture = clientBootstrap.connect( destination, origin );
+        channelFuture.awaitUninterruptibly( 5, TimeUnit.SECONDS );
 
-        try
+        if ( channelFuture.isSuccess() )
         {
-            if ( channelFuture.await( 5, TimeUnit.SECONDS ) && channelFuture.getChannel().isConnected() )
-            {
-                msgLog.info( me + " opened a new channel to " + address );
-                return channelFuture.getChannel();
-            }
+            Channel channel = channelFuture.getChannel();
+            msgLog.info( "Connected from " + channel.getLocalAddress() + " to " + channel.getRemoteAddress() );
+            return channel;
 
-            String msg = "Client could not connect to " + address;
-            throw new ChannelOpenFailedException( msg );
         }
-        catch ( InterruptedException e )
-        {
-            msgLog.warn( "Interrupted", e );
-            // Restore the interrupt status since we are not rethrowing InterruptedException
-            // We may be running in an executor and we could fail to be terminated
-            Thread.currentThread().interrupt();
-            throw new ChannelOpenFailedException( e );
-        }
+
+        Throwable cause = channelFuture.getCause();
+        msgLog.info( "Failed to connect to " + destination + " due to: " + cause );
+
+        throw new ChannelOpenFailedException( cause );
     }
 
     private class NetworkNodePipelineFactory

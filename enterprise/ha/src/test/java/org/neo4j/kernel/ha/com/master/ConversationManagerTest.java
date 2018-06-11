@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -110,16 +110,22 @@ public class ConversationManagerTest
 
 
     @Test
-    public void testConversationClean()
+    public void testConversationStop()
     {
         RequestContext requestContext = getRequestContext();
         conversationManager = getConversationManager();
+
+        Conversation conversation = mock( Conversation.class );
+        when( conversation.isActive() ).thenReturn( true );
+
         TimedRepository conversationStorage = mock( TimedRepository.class );
+        when( conversationStorage.end( requestContext ) ).thenReturn( conversation );
         conversationManager.conversations = conversationStorage;
 
-        conversationManager.remove( requestContext );
+        conversationManager.stop( requestContext );
 
-        verify( conversationStorage ).remove( requestContext );
+        verify( conversationStorage ).end( requestContext );
+        verify( conversation ).stop();
     }
 
     private RequestContext getRequestContext()
@@ -129,7 +135,7 @@ public class ConversationManagerTest
 
     private ConversationManager getConversationManager()
     {
-        return new ConversationManager( conversationSPI, config, 1000 );
+        return new ConversationManager( conversationSPI, config, 1000, 5000 );
     }
 
 }

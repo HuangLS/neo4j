@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,11 +25,11 @@ import org.neo4j.kernel.impl.transaction.log.LogFileInformation;
 
 public final class FileCountThreshold implements Threshold
 {
-    private final int maxNonEmptyLogs;
+    private final long maxNonEmptyLogs;
 
-    private int nonEmptyLogCount;
+    private long nonEmptyLogCount;
 
-    FileCountThreshold( int maxNonEmptyLogs )
+    FileCountThreshold( long maxNonEmptyLogs )
     {
         this.maxNonEmptyLogs = maxNonEmptyLogs;
     }

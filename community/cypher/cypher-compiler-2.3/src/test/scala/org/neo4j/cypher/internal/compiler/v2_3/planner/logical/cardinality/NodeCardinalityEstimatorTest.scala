@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,12 +20,12 @@
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality
 
 import org.mockito.Mockito
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{Expression, HasLabels, LabelName}
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{Expression, HasLabels, LabelName}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.Metrics.QueryGraphSolverInput
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.IdName
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, Selectivity}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{LogicalPlanningTestSupport2, Predicate, QueryGraph, Selections}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class NodeCardinalityEstimatorTest extends CypherFunSuite with LogicalPlanningTestSupport2 {
 
@@ -44,8 +44,8 @@ class NodeCardinalityEstimatorTest extends CypherFunSuite with LogicalPlanningTe
   val hasAnimalOnA: Expression = HasLabels(ident("a"), Seq(LabelName("Animal")_))_
   val hasPersonOnB: Expression = HasLabels(ident("b"), Seq(LabelName("Person")_))_
 
-  val personSelectivity = Selectivity(0.5)
-  val animalSelectivity = Selectivity(0.1)
+  val personSelectivity = Selectivity.of(0.5).get
+  val animalSelectivity = Selectivity.of(0.1).get
 
   test("should estimate node labels") {
     when( selectivityEstimator.apply(hasPersonOnA ) ).thenReturn( personSelectivity )
@@ -106,8 +106,8 @@ class NodeCardinalityEstimatorTest extends CypherFunSuite with LogicalPlanningTe
     val pred1 = mock[Expression]
     val pred2 = mock[Expression]
 
-    when( selectivityEstimator.apply( pred1 ) ).thenReturn( Selectivity( 0.5d ) )
-    when( selectivityEstimator.apply( pred2 ) ).thenReturn( Selectivity( 0.25d ) )
+    when( selectivityEstimator.apply( pred1 ) ).thenReturn( Selectivity.of( 0.5d ).get )
+    when( selectivityEstimator.apply( pred2 ) ).thenReturn( Selectivity.of( 0.25d ).get )
 
     val qg = QueryGraph
       .empty
@@ -122,7 +122,7 @@ class NodeCardinalityEstimatorTest extends CypherFunSuite with LogicalPlanningTe
     val (estimates, used) = estimator(qg)
 
     estimates should equal(Map(
-      IdName("a") -> allNodes * Selectivity( 0.5d ),
+      IdName("a") -> allNodes * Selectivity.of( 0.5d ).get,
       IdName("b") -> allNodes
     ))
 

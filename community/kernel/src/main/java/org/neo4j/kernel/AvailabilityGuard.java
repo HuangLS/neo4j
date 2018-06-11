@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,6 +29,7 @@ import org.neo4j.helpers.Clock;
 import org.neo4j.helpers.Format;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.collection.Iterables;
+import org.neo4j.logging.Log;
 
 import static org.neo4j.helpers.Listeners.notifyListeners;
 import static org.neo4j.helpers.collection.Iterables.join;
@@ -42,6 +43,10 @@ import static org.neo4j.helpers.collection.Iterables.join;
  */
 public class AvailabilityGuard
 {
+
+    public static final String DATABASE_AVAILABLE_MSG = "Fulfilling of requirement makes database available: ";
+    public static final String DATABASE_UNAVAILABLE_MSG = "Requirement makes database unavailable: ";
+
     public class UnavailableException extends Exception
     {
         public UnavailableException( String message )
@@ -109,10 +114,12 @@ public class AvailabilityGuard
     private final AtomicBoolean isShutdown = new AtomicBoolean( false );
     private Iterable<AvailabilityListener> listeners = Listeners.newListeners();
     private final Clock clock;
+    private final Log log;
 
-    public AvailabilityGuard( Clock clock )
+    public AvailabilityGuard( Clock clock, Log log )
     {
         this.clock = clock;
+        this.log = log;
     }
 
     /**
@@ -131,6 +138,7 @@ public class AvailabilityGuard
         {
             if ( requirementCount.getAndIncrement() == 0 && !isShutdown.get() )
             {
+                log.info( DATABASE_UNAVAILABLE_MSG + requirement.description() );
                 notifyListeners( listeners, new Listeners.Notification<AvailabilityListener>()
                 {
                     @Override
@@ -159,6 +167,7 @@ public class AvailabilityGuard
         {
             if ( requirementCount.getAndDecrement() == 1 && !isShutdown.get() )
             {
+                log.info( DATABASE_AVAILABLE_MSG + requirement.description() );
                 notifyListeners( listeners, new Listeners.Notification<AvailabilityListener>()
                 {
                     @Override
@@ -223,6 +232,17 @@ public class AvailabilityGuard
     public boolean isAvailable( long millis )
     {
         return availability( millis ) == Availability.AVAILABLE;
+    }
+
+    /**
+     * Checks if available. If not then an {@link UnavailableException} is thrown describing why.
+     * This methods doesn't wait like {@link #await(long)} does.
+     *
+     * @throws UnavailableException if not available.
+     */
+    public void checkAvailable() throws UnavailableException
+    {
+        await( 0 );
     }
 
     /**

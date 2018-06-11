@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -42,6 +42,7 @@ import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.TestHighlyAvailableGraphDatabaseFactory;
 import org.neo4j.graphdb.schema.IndexDefinition;
 import org.neo4j.graphdb.schema.Schema.IndexState;
+import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.api.exceptions.index.IndexCapacityExceededException;
@@ -59,16 +60,17 @@ import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.extension.KernelExtensionFactory;
 import org.neo4j.kernel.ha.HighlyAvailableGraphDatabase;
-import org.neo4j.kernel.ha.UpdatePullerClient;
+import org.neo4j.kernel.ha.UpdatePuller;
 import org.neo4j.kernel.ha.cluster.HighAvailabilityMemberState;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
+import org.neo4j.kernel.impl.ha.ClusterManager;
+import org.neo4j.kernel.impl.ha.ClusterManager.ManagedCluster;
 import org.neo4j.kernel.impl.spi.KernelContext;
 import org.neo4j.kernel.impl.storemigration.StoreMigrationParticipant;
-import org.neo4j.kernel.impl.storemigration.UpgradableDatabase;
 import org.neo4j.kernel.lifecycle.Lifecycle;
+import org.neo4j.logging.NullLogProvider;
+import org.neo4j.register.Register.DoubleLong;
 import org.neo4j.test.DoubleLatch;
-import org.neo4j.test.ha.ClusterManager;
-import org.neo4j.test.ha.ClusterManager.ManagedCluster;
 import org.neo4j.test.ha.ClusterRule;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -80,9 +82,8 @@ import static org.neo4j.helpers.collection.IteratorUtil.asSet;
 import static org.neo4j.helpers.collection.IteratorUtil.asUniqueSet;
 import static org.neo4j.helpers.collection.IteratorUtil.single;
 import static org.neo4j.io.fs.FileUtils.deleteRecursively;
-import static org.neo4j.register.Register.DoubleLong;
-import static org.neo4j.test.ha.ClusterManager.allSeesAllAsAvailable;
-import static org.neo4j.test.ha.ClusterManager.masterAvailable;
+import static org.neo4j.kernel.impl.ha.ClusterManager.allSeesAllAsAvailable;
+import static org.neo4j.kernel.impl.ha.ClusterManager.masterAvailable;
 
 public class SchemaIndexHaIT
 {
@@ -129,7 +130,7 @@ public class SchemaIndexHaIT
     {
         // GIVEN a cluster of 3
         ControlledGraphDatabaseFactory dbFactory = new ControlledGraphDatabaseFactory();
-        ManagedCluster cluster = clusterRule.factory( dbFactory ).startCluster(  );
+        ManagedCluster cluster = clusterRule.withDbFactory( dbFactory ).startCluster();
         HighlyAvailableGraphDatabase firstMaster = cluster.getMaster();
 
         // where the master gets some data created as well as an index
@@ -140,7 +141,7 @@ public class SchemaIndexHaIT
 
         // Pick a slave, pull the data and the index
         HighlyAvailableGraphDatabase aSlave = cluster.getAnySlave();
-        aSlave.getDependencyResolver().resolveDependency( UpdatePullerClient.class ).pullUpdates();
+        aSlave.getDependencyResolver().resolveDependency( UpdatePuller.class ).pullUpdates();
 
         // and await the index population to start. It will actually block as long as we want it to
         dbFactory.awaitPopulationStarted( aSlave );
@@ -181,7 +182,7 @@ public class SchemaIndexHaIT
         // GIVEN
         ControlledGraphDatabaseFactory dbFactory = new ControlledGraphDatabaseFactory( IS_MASTER );
 
-        ManagedCluster cluster = clusterRule.factory( dbFactory ).startCluster( );
+        ManagedCluster cluster = clusterRule.withDbFactory( dbFactory ).startCluster( );
 
         try
         {
@@ -245,7 +246,7 @@ public class SchemaIndexHaIT
         // GIVEN
         ControlledGraphDatabaseFactory dbFactory = new ControlledGraphDatabaseFactory();
 
-        ManagedCluster cluster = clusterRule.factory( dbFactory ).startCluster(  );
+        ManagedCluster cluster = clusterRule.withDbFactory( dbFactory ).startCluster();
         cluster.await( allSeesAllAsAvailable(), 120 );
 
         HighlyAvailableGraphDatabase slave = cluster.getAnySlave();
@@ -518,10 +519,9 @@ public class SchemaIndexHaIT
         }
 
         @Override
-        public StoreMigrationParticipant storeMigrationParticipant( FileSystemAbstraction fs, PageCache pageCache,
-                                                                    UpgradableDatabase upgradableDatabase )
+        public StoreMigrationParticipant storeMigrationParticipant( FileSystemAbstraction fs, PageCache pageCache )
         {
-            return delegate.storeMigrationParticipant( fs, pageCache, upgradableDatabase );
+            return delegate.storeMigrationParticipant( fs, pageCache );
         }
 
         @Override
@@ -539,7 +539,6 @@ public class SchemaIndexHaIT
 
     public static class ControllingIndexProviderFactory extends KernelExtensionFactory<IndexProviderDependencies>
     {
-
         private final Map<GraphDatabaseService, SchemaIndexProvider> perDbIndexProvider;
         private final Predicate<GraphDatabaseService> injectLatchPredicate;
 
@@ -557,13 +556,17 @@ public class SchemaIndexHaIT
             if(injectLatchPredicate.test( deps.db() ))
             {
                 ControlledSchemaIndexProvider provider = new ControlledSchemaIndexProvider(
-                        new LuceneSchemaIndexProvider( DirectoryFactory.PERSISTENT, context.storeDir() ) );
+                        new LuceneSchemaIndexProvider( new DefaultFileSystemAbstraction(),
+                                DirectoryFactory.PERSISTENT, context.storeDir(), NullLogProvider.getInstance(),
+                                deps.config(), context.operationalMode() ) );
                 perDbIndexProvider.put( deps.db(), provider );
                 return provider;
             }
             else
             {
-                return new LuceneSchemaIndexProvider( DirectoryFactory.PERSISTENT, context.storeDir() );
+                return new LuceneSchemaIndexProvider( new DefaultFileSystemAbstraction(),
+                        DirectoryFactory.PERSISTENT, context.storeDir(), NullLogProvider.getInstance(),
+                        deps.config(), context.operationalMode() );
             }
         }
     }

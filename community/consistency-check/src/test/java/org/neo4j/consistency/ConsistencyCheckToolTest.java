@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,91 +21,136 @@ package org.neo4j.consistency;
 
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.mockito.ArgumentCaptor;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Properties;
 
-import org.neo4j.consistency.checking.full.TaskExecutionOrder;
+import org.neo4j.consistency.ConsistencyCheckTool.ToolFailureException;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Transaction;
+import org.neo4j.graphdb.TransientDatabaseFailureException;
+import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
+import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.io.fs.FileSystemAbstraction;
-import org.neo4j.kernel.DefaultFileSystemAbstraction;
+import org.neo4j.kernel.GraphDatabaseDependencies;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.factory.CommunityFacadeFactory;
+import org.neo4j.kernel.impl.factory.GraphDatabaseFacade;
+import org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory;
+import org.neo4j.kernel.impl.factory.PlatformModule;
 import org.neo4j.kernel.impl.transaction.log.LogPosition;
 import org.neo4j.kernel.impl.transaction.log.PhysicalLogFile;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.kernel.recovery.Recovery;
+import org.neo4j.legacy.consistency.ConsistencyCheckTool.ExitHandle;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.test.EphemeralFileSystemRule;
+import org.neo4j.test.ImpermanentGraphDatabase;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.TestGraphDatabaseFactory;
+import org.neo4j.test.TestGraphDatabaseFactoryState;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.instanceOf;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeFalse;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.neo4j.consistency.ConsistencyCheckTool.USE_LEGACY_CHECKER;
 import static org.neo4j.graphdb.DynamicLabel.label;
+import static org.neo4j.helpers.ArrayUtil.concat;
 import static org.neo4j.test.EphemeralFileSystemRule.shutdownDbAction;
 
+@RunWith( Parameterized.class )
 public class ConsistencyCheckToolTest
 {
+    private final boolean useLegacyChecker;
+
+    @Parameters( name = "Experimental:{0}" )
+    public static Collection<Object[]> data()
+    {
+        Collection<Object[]> data = new ArrayList<>();
+        data.add( new Object[] { Boolean.FALSE } );
+        data.add( new Object[] { Boolean.TRUE } );
+        return data;
+    }
+
+    public ConsistencyCheckToolTest( boolean useLegacyChecker )
+    {
+        this.useLegacyChecker = useLegacyChecker;
+    }
+
     @Test
     public void runsConsistencyCheck() throws Exception
     {
         // given
+        assumeFalse( "This test runs with mocked ConsistencyCheckService, doesn't work with the legacy checker " +
+                "since it creates its own", useLegacyChecker );
         File storeDir = storeDirectory.directory();
         String[] args = {storeDir.getPath()};
         ConsistencyCheckService service = mock( ConsistencyCheckService.class );
         PrintStream systemError = mock( PrintStream.class );
 
         // when
-        newConsistencyCheckToolWith( service, systemError ).run( args );
+        runConsistencyCheckToolWith( service, systemError, args );
 
         // then
         verify( service ).runFullConsistencyCheck( eq( storeDir ), any( Config.class ),
-                any( ProgressMonitorFactory.class ), any( LogProvider.class ) );
+                any( ProgressMonitorFactory.class ), any( LogProvider.class ), any( FileSystemAbstraction.class ),
+                anyBoolean() );
     }
 
     @Test
     public void appliesDefaultTuningConfigurationForConsistencyChecker() throws Exception
     {
         // given
+        assumeFalse( "This test runs with mocked ConsistencyCheckService, doesn't work with the legacy checker " +
+                "since it creates its own", useLegacyChecker );
         File storeDir = storeDirectory.directory();
         String[] args = {storeDir.getPath()};
         ConsistencyCheckService service = mock( ConsistencyCheckService.class );
         PrintStream systemOut = mock( PrintStream.class );
 
         // when
-        newConsistencyCheckToolWith( service, systemOut ).run( args );
+        runConsistencyCheckToolWith( service, systemOut, args );
 
         // then
         ArgumentCaptor<Config> config = ArgumentCaptor.forClass( Config.class );
         verify( service ).runFullConsistencyCheck( eq( storeDir ), config.capture(),
-                any( ProgressMonitorFactory.class ), any( LogProvider.class ) );
+                any( ProgressMonitorFactory.class ), any( LogProvider.class ), any( FileSystemAbstraction.class ),
+                anyBoolean() );
         assertFalse( config.getValue().get( ConsistencyCheckSettings.consistency_check_property_owners ) );
-        assertEquals( TaskExecutionOrder.MULTI_PASS,
-                config.getValue().get( ConsistencyCheckSettings.consistency_check_execution_order ) );
     }
 
     @Test
     public void passesOnConfigurationIfProvided() throws Exception
     {
         // given
+        assumeFalse( "This test runs with mocked ConsistencyCheckService, doesn't work with the legacy checker " +
+                "since it creates its own", useLegacyChecker );
         File storeDir = storeDirectory.directory();
         File propertyFile = storeDirectory.file( "neo4j.properties" );
         Properties properties = new Properties();
@@ -117,12 +162,13 @@ public class ConsistencyCheckToolTest
         PrintStream systemOut = mock( PrintStream.class );
 
         // when
-        newConsistencyCheckToolWith( service, systemOut ).run( args );
+        runConsistencyCheckToolWith( service, systemOut, args );
 
         // then
         ArgumentCaptor<Config> config = ArgumentCaptor.forClass( Config.class );
         verify( service ).runFullConsistencyCheck( eq( storeDir ), config.capture(),
-                any( ProgressMonitorFactory.class ), any( LogProvider.class ) );
+                any( ProgressMonitorFactory.class ), any( LogProvider.class ), any( FileSystemAbstraction.class ),
+                anyBoolean() );
         assertTrue( config.getValue().get( ConsistencyCheckSettings.consistency_check_property_owners ) );
     }
 
@@ -137,7 +183,7 @@ public class ConsistencyCheckToolTest
         try
         {
             // when
-            newConsistencyCheckToolWith( service, systemError ).run( args );
+            runConsistencyCheckToolWith( service, systemError, args );
             fail( "should have thrown exception" );
         }
         catch ( ConsistencyCheckTool.ToolFailureException e )
@@ -155,12 +201,11 @@ public class ConsistencyCheckToolTest
         String[] args = {storeDirectory.directory().getPath(), "-config", propertyFile.getPath()};
         ConsistencyCheckService service = mock( ConsistencyCheckService.class );
         PrintStream systemOut = mock( PrintStream.class );
-        ConsistencyCheckTool ConsistencyCheckTool = newConsistencyCheckToolWith( service, systemOut );
 
         try
         {
             // when
-            ConsistencyCheckTool.run( args );
+            runConsistencyCheckToolWith( service, systemOut, args );
             fail( "should have thrown exception" );
         }
         catch ( ConsistencyCheckTool.ToolFailureException e )
@@ -183,15 +228,13 @@ public class ConsistencyCheckToolTest
         Recovery.Monitor listener = mock( Recovery.Monitor.class );
         monitors.addMonitorListener( listener );
 
-        ConsistencyCheckTool consistencyCheckTool =
-                newConsistencyCheckToolWith( monitors, mock( ConsistencyCheckTool.ExitHandle.class ), fs.get() );
-
         // When
-        consistencyCheckTool.run( "-recovery", storeDirectory.graphDbDir().getAbsolutePath() );
+        runConsistencyCheckToolWith( monitors, mock( ExitHandle.class ), fs.get(),
+                "-recovery", storeDirectory.graphDbDir().getAbsolutePath() );
 
         // Then
         verify( listener ).recoveryRequired( any( LogPosition.class ) );
-        verify( listener ).recoveryCompleted();
+        verify( listener ).recoveryCompleted( anyInt() );
     }
 
     @Test
@@ -205,11 +248,21 @@ public class ConsistencyCheckToolTest
         PhysicalLogFile.Monitor listener = mock( PhysicalLogFile.Monitor.class );
         monitors.addMonitorListener( listener );
 
-        ConsistencyCheckTool.ExitHandle exitHandle = mock( ConsistencyCheckTool.ExitHandle.class );
-        ConsistencyCheckTool consistencyCheckTool = newConsistencyCheckToolWith( monitors, exitHandle, fileSystem );
+        ExitHandle exitHandle = mock( ExitHandle.class );
+
+        doThrow( new TransientDatabaseFailureException( "Recovery required" ) ).when( exitHandle ).pull();
 
         // When
-        consistencyCheckTool.run( "-recovery=false", storeDir.getAbsolutePath() );
+        try
+        {
+            runConsistencyCheckToolWith( monitors, exitHandle, fileSystem,
+                    "-recovery=false", storeDir.getAbsolutePath() );
+            fail("Recovery should be required and exit pull should be called.");
+        }
+        catch ( TransientDatabaseFailureException ignored )
+        {
+            // expected
+        }
 
         // Then
         verifyZeroInteractions( listener );
@@ -250,27 +303,27 @@ public class ConsistencyCheckToolTest
         fs.snapshot( shutdownDbAction( db ) );
     }
 
-    private ConsistencyCheckTool newConsistencyCheckToolWith( Monitors monitors,
-            ConsistencyCheckTool.ExitHandle exitHandle, FileSystemAbstraction fileSystem ) throws IOException
+    private void runConsistencyCheckToolWith( Monitors monitors,
+            ExitHandle exitHandle, FileSystemAbstraction fileSystem, String... args )
+                    throws IOException, ToolFailureException
     {
-        GraphDatabaseFactory graphDbFactory = new TestGraphDatabaseFactory()
-        {
-            @Override
-            public GraphDatabaseService newEmbeddedDatabase( File storeDir )
-            {
-                return newImpermanentDatabase( storeDir );
-            }
-        }.setFileSystem( fileSystem ).setMonitors( monitors );
+        GraphDatabaseFactory graphDbFactory = new NonEphemeralImpermanentDatabaseFactory( fs.get() ).setMonitors( monitors );
 
-        return new ConsistencyCheckTool( mock( ConsistencyCheckService.class ),
-                graphDbFactory, fileSystem, mock( PrintStream.class ), exitHandle );
+        new ConsistencyCheckTool( mock( ConsistencyCheckService.class ),
+                graphDbFactory, fileSystem, mock( PrintStream.class ), exitHandle ).run( augment( args ) );
     }
 
-    private ConsistencyCheckTool newConsistencyCheckToolWith ( ConsistencyCheckService
-        consistencyCheckService, PrintStream systemError )
+    private String[] augment( String[] args )
     {
-        return new ConsistencyCheckTool( consistencyCheckService, new GraphDatabaseFactory(),
-                new DefaultFileSystemAbstraction(), systemError, ConsistencyCheckTool.ExitHandle.SYSTEM_EXIT );
+        return concat( "-" + USE_LEGACY_CHECKER + "=" + useLegacyChecker, args );
+    }
+
+    private void runConsistencyCheckToolWith ( ConsistencyCheckService
+        consistencyCheckService, PrintStream systemError, String... args ) throws ToolFailureException, IOException
+    {
+        new ConsistencyCheckTool( consistencyCheckService, new GraphDatabaseFactory(),
+                new DefaultFileSystemAbstraction(), systemError, ExitHandle.SYSTEM_EXIT )
+                .run( augment( args ) );
     }
 
     @Rule
@@ -278,4 +331,85 @@ public class ConsistencyCheckToolTest
 
     @Rule
     public EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
+
+    private static class NonEphemeralImpermanentFacadeFactory extends CommunityFacadeFactory
+    {
+        private final FileSystemAbstraction consistencyCheckerFileSystem;
+
+        NonEphemeralImpermanentFacadeFactory( FileSystemAbstraction consistencyCheckerFileSystem )
+        {
+            this.consistencyCheckerFileSystem = consistencyCheckerFileSystem;
+        }
+
+        @Override
+        protected PlatformModule createPlatform( File storeDir, Map<String, String> params,
+                Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade,
+                OperationalMode operationalMode )
+        {
+            params.put( Configuration.ephemeral.name(), "false" );
+            return new PlatformModule( storeDir, params, dependencies, graphDatabaseFacade, operationalMode )
+            {
+                @Override
+                protected FileSystemAbstraction createFileSystemAbstraction()
+                {
+                    return consistencyCheckerFileSystem;
+                }
+            };
+        }
+    }
+
+    private static class NonEphemeralImpermanentDatabaseCreator implements GraphDatabaseBuilder.DatabaseCreator
+    {
+        private final File storeDir;
+        private final TestGraphDatabaseFactoryState state;
+        private final FileSystemAbstraction consistencyCheckerFileSystem;
+
+        NonEphemeralImpermanentDatabaseCreator( File storeDir, TestGraphDatabaseFactoryState state,
+                FileSystemAbstraction consistencyCheckerFileSystem )
+        {
+            this.storeDir = storeDir;
+            this.state = state;
+            this.consistencyCheckerFileSystem = consistencyCheckerFileSystem;
+        }
+
+        @Override
+        public GraphDatabaseService newDatabase( Map<String,String> config )
+        {
+            return new ImpermanentGraphDatabase( storeDir, config, GraphDatabaseDependencies.newDependencies( state.databaseDependencies() ))
+            {
+                @Override
+                protected void create( File storeDir, Map<String, String> params, GraphDatabaseFacadeFactory
+                        .Dependencies dependencies )
+                {
+                    new NonEphemeralImpermanentFacadeFactory( consistencyCheckerFileSystem )
+                            .newFacade( storeDir, params, dependencies, this );
+                }
+            };
+        }
+    }
+
+    private static class NonEphemeralImpermanentDatabaseFactory extends TestGraphDatabaseFactory
+    {
+
+        private final FileSystemAbstraction consistencyCheckerFileSystem;
+
+        public NonEphemeralImpermanentDatabaseFactory( FileSystemAbstraction consistencyCheckerFileSystem )
+        {
+            this.consistencyCheckerFileSystem = consistencyCheckerFileSystem;
+        }
+
+        @Override
+        protected GraphDatabaseBuilder.DatabaseCreator createImpermanentDatabaseCreator( final File storeDir,
+                final TestGraphDatabaseFactoryState state )
+        {
+            return new NonEphemeralImpermanentDatabaseCreator( storeDir, state, consistencyCheckerFileSystem );
+        }
+
+        @Override
+        public GraphDatabaseService newEmbeddedDatabase( File storeDir )
+        {
+            return newImpermanentDatabase( storeDir );
+        }
+
+    }
 }

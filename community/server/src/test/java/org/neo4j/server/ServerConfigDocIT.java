@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -131,6 +131,18 @@ public class ServerConfigDocIT extends ExclusiveServerTestBase
     }
 
     @Test
+    public void shouldEnableWebadminByDefault() throws IOException
+    {
+        // Given
+        server = server().usingDatabaseDir( folder.directory( name.getMethodName() ).getAbsolutePath() ).build();
+        server.start();
+
+        // When & then
+        assertEquals( 200, new RestRequest().get( "http://localhost:7474/webadmin" ).getStatus() );
+        assertEquals( 200, new RestRequest().get( "http://localhost:7474/db/manage/server/console" ).getStatus() );
+    }
+
+    @Test
     public void shouldDisableWebadminWhenAskedTo() throws IOException
     {
         // Given
@@ -141,7 +153,31 @@ public class ServerConfigDocIT extends ExclusiveServerTestBase
 
         // When & then
         assertEquals( 404, new RestRequest().get( "http://localhost:7474/webadmin" ).getStatus() );
-        assertEquals( 404, new RestRequest().get( "http://localhost:7474/db/manage/monitor" ).getStatus() );
+        assertEquals( 404, new RestRequest().get( "http://localhost:7474/db/manage/server/console" ).getStatus() );
+    }
+
+    @Test
+    public void shouldEnableRRDbWhenAskedTo() throws IOException
+    {
+        // Given
+        server = server().withProperty( ServerInternalSettings.rrdb_enabled.name(), "true" )
+                .usingDatabaseDir( folder.directory( name.getMethodName() ).getAbsolutePath() )
+                .build();
+        server.start();
+
+        // When & then
+        assertEquals( 200, new RestRequest().get( "http://localhost:7474/db/manage/server/monitor" ).getStatus() );
+    }
+
+    @Test
+    public void shouldDisableRRDBByDefault() throws IOException
+    {
+        // Given
+        server = server().usingDatabaseDir( folder.directory( name.getMethodName() ).getAbsolutePath() ).build();
+        server.start();
+
+        // When & then
+        assertEquals( 404, new RestRequest().get( "http://localhost:7474/db/manage/server/monitor" ).getStatus() );
     }
 
     @Test

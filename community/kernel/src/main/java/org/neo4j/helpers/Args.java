@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -151,6 +151,8 @@ public class Args
 
     /**
      * Suitable for main( String[] args )
+     * @param flags list of possible flags (e.g -v or -skip-bad). A flag differs from an option in that it
+     * has no value after it. This list of flags is used for distinguishing between the two.
      * @param args the arguments to parse.
      */
     private Args( Function<String,Option<String>> optionParser, String[] flags, String[] args )
@@ -249,21 +251,57 @@ public class Args
         return value != null ? TimeUtil.parseTimeMillis.apply(value) : defaultValueInMillis;
     }
 
-    public Boolean getBoolean( String key, Boolean defaultValue )
+    /**
+     * Like calling {@link #getBoolean(String, Boolean)} with {@code false} for default value.
+     * This is the most common case, i.e. returns {@code true} if boolean argument was specified as:
+     * <ul>
+     * <li>--myboolean</li>
+     * <li>--myboolean=true</li>
+     * </ul>
+     * Otherwise {@code false.
+     * }
+     * @param key argument key.
+     * @return {@code true} if argument was specified w/o value, or w/ value {@code true}, otherwise {@code false}.
+     */
+    public boolean getBoolean( String key )
     {
-        String value = getSingleOptionOrNull( key );
-        return value != null ? Boolean.parseBoolean( value ) : defaultValue;
+        return getBoolean( key, false );
     }
 
-    public Boolean getBoolean( String key, Boolean defaultValueIfNotFound,
-            Boolean defaultValueIfNoValue )
+    /**
+     * Like calling {@link #getBoolean(String, Boolean, Boolean)} with {@code true} for
+     * {@code defaultValueIfNoValue}, i.e. specifying {@code --myarg} will interpret it as {@code true}.
+     */
+    public Boolean getBoolean( String key, Boolean defaultValueIfNotSpecified )
+    {
+        return getBoolean( key, defaultValueIfNotSpecified, Boolean.TRUE );
+    }
+
+    /**
+     * Parses a {@code boolean} argument. There are a couple of cases:
+     * <ul>
+     * <li>The argument isn't specified. In this case the value of {@code defaultValueIfNotSpecified}
+     * will be returned.</li>
+     * <li>The argument is specified without value, for example <pre>--myboolean</pre>. In this case
+     * the value of {@code defaultValueIfNotSpecified} will be returned.</li>
+     * <li>The argument is specified with value, for example <pre>--myboolean=true</pre>.
+     * In this case the actual value will be returned.</li>
+     * </ul>
+     *
+     * @param key argument key.
+     * @param defaultValueIfNotSpecified used if argument not specified.
+     * @param defaultValueIfSpecifiedButNoValue used if argument specified w/o value.
+     * @return argument boolean value depending on what was specified, see above.
+     */
+    public Boolean getBoolean( String key, Boolean defaultValueIfNotSpecified,
+            Boolean defaultValueIfSpecifiedButNoValue )
     {
         String value = getSingleOptionOrNull( key );
         if ( value != null )
         {
             return Boolean.parseBoolean( value );
         }
-        return this.map.containsKey( key ) ? defaultValueIfNoValue : defaultValueIfNotFound;
+        return this.map.containsKey( key ) ? defaultValueIfSpecifiedButNoValue : defaultValueIfNotSpecified;
     }
 
     public <T extends Enum<T>> T getEnum( Class<T> enumClass, String key, T defaultValue )
@@ -287,6 +325,11 @@ public class Args
     public List<String> orphans()
     {
         return new ArrayList<>( this.orphans );
+    }
+
+    public String[] orphansAsArray()
+    {
+        return orphans.toArray( new String[orphans.size()] );
     }
 
     public String[] asArgs()
@@ -493,9 +536,16 @@ public class Args
     }
 
     /**
-     * An option can be specified multiple times. This method will allow interpreting all values for
+     * An option can be specified multiple times; this method will allow interpreting all values for
      * the given key, returning a {@link Collection}. This is the only means of extracting multiple values
      * for any given option. All other methods revolve around zero or one value for an option.
+     *
+     * @param key Key of the option
+     * @param defaultValue Default value value of the option
+     * @param converter Converter to use
+     * @param validators Validators to use
+     * @param <T> The type of the option values
+     * @return The option values
      */
     @SafeVarargs
     public final <T> Collection<T> interpretOptions( String key, Function<String,T> defaultValue,
@@ -511,11 +561,18 @@ public class Args
     }
 
     /**
-     * An option can be specified multiple times. This method will allow interpreting all values for
+     * An option can be specified multiple times; this method will allow interpreting all values for
      * the given key, returning a {@link Collection}. This is the only means of extracting multiple values
      * for any given option. All other methods revolve around zero or one value for an option.
      * This is also the only means of extracting metadata about a options. Metadata can be supplied as part
      * of the option key, like --my-option:Metadata "my value".
+     *
+     * @param key Key of the option
+     * @param defaultValue Default value value of the option
+     * @param converter Converter to use
+     * @param validators Validators to use
+     * @param <T> The type of the option values
+     * @return The option values
      */
     @SafeVarargs
     public final <T> Collection<Option<T>> interpretOptionsWithMetadata( String key, Function<String,T> defaultValue,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -57,9 +57,9 @@ public class MasterServer extends Server<Master, Void>
     }
 
     @Override
-    protected void cleanConversation( RequestContext context )
+    protected void stopConversation( RequestContext context )
     {
-        conversationManager.remove( context );
+        conversationManager.stop( context );
     }
 
 }

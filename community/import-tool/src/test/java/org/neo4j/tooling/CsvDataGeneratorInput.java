@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,6 @@
  */
 package org.neo4j.tooling;
 
-import java.io.OutputStream;
-
 import org.neo4j.csv.reader.SourceTraceability;
 import org.neo4j.function.Function;
 import org.neo4j.unsafe.impl.batchimport.BatchImporter;
@@ -29,7 +27,6 @@ import org.neo4j.unsafe.impl.batchimport.InputIterator;
 import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdGenerator;
 import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMapper;
 import org.neo4j.unsafe.impl.batchimport.input.Collector;
-import org.neo4j.unsafe.impl.batchimport.input.Collectors;
 import org.neo4j.unsafe.impl.batchimport.input.Groups;
 import org.neo4j.unsafe.impl.batchimport.input.Input;
 import org.neo4j.unsafe.impl.batchimport.input.InputNode;
@@ -47,10 +44,11 @@ import org.neo4j.unsafe.impl.batchimport.input.csv.InputRelationshipDeserializat
 public class CsvDataGeneratorInput extends CsvDataGenerator<InputNode,InputRelationship> implements Input
 {
     private final IdType idType;
+    private final Collector badCollector;
 
     public CsvDataGeneratorInput( final Header nodeHeader, final Header relationshipHeader,
             Configuration config, long nodes, long relationships, final Groups groups, final IdType idType,
-            int numberOfLabels, int numberOfRelationshipTypes )
+            int numberOfLabels, int numberOfRelationshipTypes, Collector badCollector )
     {
         super( nodeHeader, relationshipHeader, config, nodes, relationships,
                 new Function<SourceTraceability,Deserialization<InputNode>>()
@@ -71,6 +69,7 @@ public class CsvDataGeneratorInput extends CsvDataGenerator<InputNode,InputRelat
                 },
                 numberOfLabels, numberOfRelationshipTypes );
         this.idType = idType;
+        this.badCollector = badCollector;
     }
 
     @Override
@@ -130,8 +129,8 @@ public class CsvDataGeneratorInput extends CsvDataGenerator<InputNode,InputRelat
     }
 
     @Override
-    public Collector badCollector( OutputStream out )
+    public Collector badCollector()
     {
-        return Collectors.badCollector( out, 0 );
+        return badCollector;
     }
 }

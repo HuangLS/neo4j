@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,13 +24,22 @@ import org.junit.Test;
 
 import java.io.File;
 
+import org.neo4j.io.fs.DefaultFileSystemAbstraction;
+import org.neo4j.io.fs.FileSystemAbstraction;
+import org.neo4j.kernel.impl.store.InvalidIdGeneratorException;
 import org.neo4j.kernel.impl.store.UnderlyingStorageException;
 import org.neo4j.test.EphemeralFileSystemRule;
 
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+
+import static java.util.concurrent.TimeUnit.MINUTES;
+
+import static org.neo4j.test.ProcessUtil.executeSubProcess;
 
 public class IdGeneratorImplTest
 {
@@ -54,6 +63,21 @@ public class IdGeneratorImplTest
         catch ( UnderlyingStorageException e )
         {   // OK
         }
+    }
+
+    @Test
+    public void correctDefragCountWhenHaveIdsInFile()
+    {
+        IdGeneratorImpl.createGenerator( fsr.get(), file, 0, false );
+        IdGenerator idGenerator = new IdGeneratorImpl( fsr.get(), file, 100, 100, true, 100 );
+
+        idGenerator.freeId( 5 );
+        idGenerator.close();
+
+        IdGenerator reloadedIdGenerator = new IdGeneratorImpl( fsr.get(), file, 100, 100, true, 100 );
+        assertEquals( 1, reloadedIdGenerator.getDefragCount() );
+        assertEquals( 5, reloadedIdGenerator.nextId() );
+        assertEquals( 0, reloadedIdGenerator.getDefragCount() );
     }
 
     @Test
@@ -84,5 +108,90 @@ public class IdGeneratorImplTest
 
         // Then
         assertThat( idGenerator.getHighId(), equalTo( 42L ) );
+    }
+
+    @Test
+    public void shouldForceStickyMark() throws Exception
+    {
+        // GIVEN
+        FileSystemAbstraction fs = new DefaultFileSystemAbstraction();
+        File dir = new File( "target/test-data/" + getClass().getName() );
+        fs.mkdirs( dir );
+        File file = new File( dir, "ids" );
+        fs.deleteFile( file );
+        IdGeneratorImpl.createGenerator( fs, file, 0, false );
+
+        // WHEN opening the id generator, where the jvm crashes right after
+        executeSubProcess( getClass(), 1, MINUTES, file.getAbsolutePath() );
+
+        // THEN
+        try
+        {
+            IdGeneratorImpl.readHighId( fs, file );
+            fail( "Should have thrown, saying something with sticky generator" );
+        }
+        catch ( InvalidIdGeneratorException e )
+        {
+            // THEN Good
+        }
+    }
+
+    @Test
+    public void shouldDeleteIfOpen() throws Exception
+    {
+        // GIVEN
+        IdGeneratorImpl.createGenerator( fsr.get(), file, 42, false );
+        IdGeneratorImpl idGenerator = new IdGeneratorImpl( fsr.get(), file, 100, 100, false, 42 );
+
+        // WHEN
+        idGenerator.delete();
+
+        // THEN
+        assertFalse( fsr.get().fileExists( file ) );
+    }
+
+    @Test
+    public void shouldDeleteIfClosed() throws Exception
+    {
+        // GIVEN
+        IdGeneratorImpl.createGenerator( fsr.get(), file, 42, false );
+        IdGeneratorImpl idGenerator = new IdGeneratorImpl( fsr.get(), file, 100, 100, false, 42 );
+        idGenerator.close();
+
+        // WHEN
+        idGenerator.delete();
+
+        // THEN
+        assertFalse( fsr.get().fileExists( file ) );
+    }
+
+    @Test
+    public void shouldTruncateTheFileIfOverwriting() throws Exception
+    {
+        // GIVEN
+        IdGeneratorImpl.createGenerator( fsr.get(), file, 10, true );
+        IdGeneratorImpl idGenerator = new IdGeneratorImpl( fsr.get(), file, 5, 100, false, 30 );
+        for ( int i = 0; i < 17; i++ )
+        {
+            idGenerator.freeId( i );
+        }
+        idGenerator.close();
+        assertThat( (int) fsr.get().getFileSize( file ), greaterThan( IdGeneratorImpl.HEADER_SIZE ) );
+
+        // WHEN
+        IdGeneratorImpl.createGenerator( fsr.get(), file, 30, false );
+
+        // THEN
+        assertEquals( IdGeneratorImpl.HEADER_SIZE, (int) fsr.get().getFileSize( file ) );
+        assertEquals( 30, IdGeneratorImpl.readHighId( fsr.get(), file ) );
+        idGenerator = new IdGeneratorImpl( fsr.get(), file, 5, 100, false, 30 );
+        assertEquals( 30, idGenerator.nextId() );
+    }
+
+    public static void main( String[] args )
+    {
+        // Leave it opened
+        new IdGeneratorImpl( new DefaultFileSystemAbstraction(), new File( args[0] ), 100, 100, false, 42 );
+        System.exit( 0 );
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,9 @@ package org.neo4j.kernel.impl.transaction.command;
 
 import java.io.IOException;
 import java.util.Collection;
+
+import org.act.temporalProperty.query.TimeIntervalKey;
+import org.act.temporalProperty.util.Slice;
 
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
@@ -92,8 +95,6 @@ public abstract class Command
         this.key = key;
     }
 
-    public abstract void accept( CommandRecordVisitor visitor );
-
     @Override
     public int hashCode()
     {
@@ -120,7 +121,7 @@ public abstract class Command
         return o != null && o.getClass().equals( getClass() ) && getKey() == ((Command) o).getKey();
     }
 
-    public abstract boolean handle( NeoCommandHandler handler ) throws IOException;
+    public abstract boolean handle( CommandHandler handler ) throws IOException;
 
     protected String beforeAndAfterToString( AbstractBaseRecord before, AbstractBaseRecord after )
     {
@@ -141,13 +142,7 @@ public abstract class Command
         }
 
         @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            visitor.visitNode( after );
-        }
-
-        @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitNodeCommand( this );
         }
@@ -181,19 +176,13 @@ public abstract class Command
         }
 
         @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            visitor.visitRelationship( record );
-        }
-
-        @Override
         public String toString()
         {
             return record.toString();
         }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitRelationshipCommand( this );
         }
@@ -216,19 +205,13 @@ public abstract class Command
         }
 
         @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            visitor.visitRelationshipGroup( record );
-        }
-
-        @Override
         public String toString()
         {
             return record.toString();
         }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitRelationshipGroupCommand( this );
         }
@@ -254,19 +237,13 @@ public abstract class Command
         }
 
         @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            visitor.visitNeoStore( record );
-        }
-
-        @Override
         public String toString()
         {
             return record.toString();
         }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitNeoStoreCommand( this );
         }
@@ -279,14 +256,9 @@ public abstract class Command
 
     public static class PropertyKeyTokenCommand extends TokenCommand<PropertyKeyTokenRecord>
     {
-        @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            visitor.visitPropertyKeyToken( record );
-        }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitPropertyKeyTokenCommand( this );
         }
@@ -308,19 +280,13 @@ public abstract class Command
         }
 
         @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            visitor.visitProperty( after );
-        }
-
-        @Override
         public String toString()
         {
             return beforeAndAfterToString( before, after );
         }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitPropertyCommand( this );
         }
@@ -348,6 +314,150 @@ public abstract class Command
         }
     }
 
+    public static class NodeTemporalPropertyCommand extends Command
+    {
+
+        private TimeIntervalKey key;
+        private Slice value;
+
+        public NodeTemporalPropertyCommand( TimeIntervalKey key, Slice value ) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public NodeTemporalPropertyCommand(){}
+
+        public TimeIntervalKey getIntervalKey()
+        {
+            return key;
+        }
+
+        public Slice getValue()
+        {
+            return value;
+        }
+
+        @Override
+        public String toString() {
+            return key.toString()+ value.toString();
+        }
+
+        @Override
+        public boolean handle(CommandHandler handler) throws IOException {
+            return handler.visitNodeTemporalPropertyCommand(this);
+        }
+
+        public void init(TimeIntervalKey key, Slice value ) {
+            this.key = key;
+            this.value = value;
+        }
+    }
+
+    public static class RelationshipTemporalPropertyCommand extends Command
+    {
+        private TimeIntervalKey key;
+        private Slice value;
+
+        public RelationshipTemporalPropertyCommand(TimeIntervalKey key, Slice value )
+        {
+            this.key = key;
+            this.value = value;
+        }
+
+        public RelationshipTemporalPropertyCommand() {}
+
+        public TimeIntervalKey getIntervalKey()
+        {
+            return key;
+        }
+
+        public Slice getValue()
+        {
+            return value;
+        }
+
+        @Override
+        public String toString() {
+            return key.toString()+ value.toString();
+        }
+
+        @Override
+        public boolean handle(CommandHandler handler) throws IOException {
+            return handler.visitRelationshipTemporalPropertyCommand(this);
+        }
+
+        public void init(TimeIntervalKey key, Slice value ) {
+            this.key = key;
+            this.value = value;
+        }
+    }
+
+//    public static class RelationshipTemporalPropertyDeleteCommand extends Command
+//    {
+//        private Slice id;
+//
+//        public RelationshipTemporalPropertyDeleteCommand(Slice id )
+//        {
+//            this.id = id;
+//        }
+//
+//        public RelationshipTemporalPropertyDeleteCommand() {}
+//
+//        public Slice getId()
+//        {
+//            return this.id;
+//        }
+//
+//        @Override
+//        public String toString()
+//        {
+//            return this.id.toString();
+//        }
+//
+//        @Override
+//        public boolean handle( CommandHandler handler ) throws IOException
+//        {
+//            return false;
+//        }
+//
+//        public void init(Slice slice) {
+//            this.id = slice;
+//        }
+//    }
+
+//    public static class NodeTemporalPropertyDeleteCommand extends Command
+//    {
+//        private Slice id;
+//
+//        public NodeTemporalPropertyDeleteCommand(Slice id )
+//        {
+//            this.id = id;
+//        }
+//
+//        public NodeTemporalPropertyDeleteCommand() {}
+//
+//        public Slice getId()
+//        {
+//            return this.id;
+//        }
+//
+//        @Override
+//        public String toString()
+//        {
+//            return this.id.toString();
+//        }
+//
+//        @Override
+//        public boolean handle( CommandHandler handler ) throws IOException
+//        {
+//            return false;
+//        }
+//
+//        public void init(Slice slice) {
+//            this.id = slice;
+//        }
+//    }
+
     public static abstract class TokenCommand<RECORD extends TokenRecord> extends Command
     {
         protected RECORD record;
@@ -373,14 +483,9 @@ public abstract class Command
 
     public static class RelationshipTypeTokenCommand extends TokenCommand<RelationshipTypeTokenRecord>
     {
-        @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            visitor.visitRelationshipTypeToken( record );
-        }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitRelationshipTypeTokenCommand( this );
         }
@@ -388,14 +493,9 @@ public abstract class Command
 
     public static class LabelTokenCommand extends TokenCommand<LabelTokenRecord>
     {
-        @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            visitor.visitLabelToken( record );
-        }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitLabelTokenCommand( this );
         }
@@ -418,12 +518,6 @@ public abstract class Command
         }
 
         @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            visitor.visitSchemaRule( recordsAfter );
-        }
-
-        @Override
         public String toString()
         {
             if ( schemaRule != null )
@@ -434,7 +528,7 @@ public abstract class Command
         }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitSchemaRuleCommand( this );
         }
@@ -477,15 +571,9 @@ public abstract class Command
         }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitNodeCountsCommand( this );
-        }
-
-        @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            // no record to visit
         }
 
         public int labelId()
@@ -526,15 +614,9 @@ public abstract class Command
         }
 
         @Override
-        public boolean handle( NeoCommandHandler handler ) throws IOException
+        public boolean handle( CommandHandler handler ) throws IOException
         {
             return handler.visitRelationshipCountsCommand( this );
-        }
-
-        @Override
-        public void accept( CommandRecordVisitor visitor )
-        {
-            // no record to visit
         }
 
         public int startLabelId()
@@ -557,4 +639,6 @@ public abstract class Command
             return delta;
         }
     }
+
+
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -67,7 +67,7 @@ import static org.neo4j.io.fs.FileUtils.truncateFile;
 public class IdGeneratorImpl implements IdGenerator
 {
     // sticky(byte), nextFreeId(long)
-    private static final int HEADER_SIZE = 9;
+    public static final int HEADER_SIZE = 9;
 
     // if sticky the id generator wasn't closed properly so it has to be
     // rebuilt (go through the node, relationship, property, rel type etc files)
@@ -86,7 +86,7 @@ public class IdGeneratorImpl implements IdGenerator
     // used to calculate number of ids actually in use
     private long defraggedIdCount = -1;
 
-    private final File fileName;
+    private final File file;
     private final FileSystemAbstraction fs;
     private StoreChannel fileChannel = null;
     // defragged ids read from file (freed in a previous session).
@@ -110,7 +110,7 @@ public class IdGeneratorImpl implements IdGenerator
      * happens one has to rebuild the id generator from the (node/rel/prop)
      * store file.
      *
-     * @param fileName
+     * @param file
      *            The file name (and path if needed) for the id generator to be
      *            opened
      * @param grabSize
@@ -123,7 +123,7 @@ public class IdGeneratorImpl implements IdGenerator
      * @throws UnderlyingStorageException
      *             If no such file exist or if the id generator is sticky
      */
-    public IdGeneratorImpl( FileSystemAbstraction fs, File fileName, int grabSize, long max, boolean aggressiveReuse,
+    public IdGeneratorImpl( FileSystemAbstraction fs, File file, int grabSize, long max, boolean aggressiveReuse,
             long highId )
     {
         this.fs = fs;
@@ -133,7 +133,7 @@ public class IdGeneratorImpl implements IdGenerator
             throw new IllegalArgumentException( "Illegal grabSize: " + grabSize );
         }
         this.max = max;
-        this.fileName = fileName;
+        this.file = file;
         this.grabSize = grabSize;
         initGenerator();
         this.highId.set( max( this.highId.get(), highId ) );
@@ -177,7 +177,7 @@ public class IdGeneratorImpl implements IdGenerator
         if ( id > max || id < 0  )
         {
             throw new UnderlyingStorageException(
-                    "Id capacity exceeded: " + id + " is not within bounds [0; " + max + "] for " + fileName );
+                    "Id capacity exceeded: " + id + " is not within bounds [0; " + max + "] for " + file );
         }
     }
 
@@ -215,7 +215,7 @@ public class IdGeneratorImpl implements IdGenerator
     {
         if ( fileChannel == null )
         {
-            throw new IllegalStateException( "Closed id generator " + fileName );
+            throw new IllegalStateException( "Closed id generator " + file );
         }
     }
 
@@ -302,7 +302,7 @@ public class IdGeneratorImpl implements IdGenerator
 
         if ( fileChannel == null )
         {
-            throw new IllegalStateException( "Generator closed " + fileName );
+            throw new IllegalStateException( "Generator closed " + file );
         }
         if ( id < 0 || id >= highId.get() )
         {
@@ -328,7 +328,7 @@ public class IdGeneratorImpl implements IdGenerator
     @Override
     public synchronized void close()
     {
-        if ( highId.get() == -1 )
+        if ( isClosed() )
         {
             return;
         }
@@ -358,18 +358,28 @@ public class IdGeneratorImpl implements IdGenerator
 
             markAsCleanlyClosed( buffer );
 
-            // flush and close
-            fileChannel.force( false );
-            fileChannel.close();
-            fileChannel = null;
-            // make this generator unusable
-            highId.set( -1 );
+            closeChannel();
         }
         catch ( IOException e )
         {
             throw new UnderlyingStorageException(
-                "Unable to close id generator " + fileName, e );
+                    "Unable to close id generator " + file, e );
         }
+    }
+
+    private boolean isClosed()
+    {
+        return highId.get() == -1;
+    }
+
+    private void closeChannel() throws IOException
+    {
+        // flush and close
+        fileChannel.force( false );
+        fileChannel.close();
+        fileChannel = null;
+        // make this generator unusable
+        highId.set( -1 );
     }
 
     private void markAsCleanlyClosed( ByteBuffer buffer ) throws IOException
@@ -417,9 +427,9 @@ public class IdGeneratorImpl implements IdGenerator
     /**
      * Creates a new id generator.
      *
-     * @param fileName
-     *            The name of the id generator
-     * @param throwIfFileExists
+     * @param fileName The name of the id generator
+     * @param throwIfFileExists if {@code true} will cause an {@link UnderlyingStorageException} to be thrown if
+     * the file already exists. if {@code false} will truncate the file writing the header in it.
      */
     public static void createGenerator( FileSystemAbstraction fs, File fileName, long highId,
                                         boolean throwIfFileExists )
@@ -438,15 +448,14 @@ public class IdGeneratorImpl implements IdGenerator
             throw new IllegalStateException( "Can't create IdGeneratorFile["
                 + fileName + "], file already exists" );
         }
-        try
+        try ( StoreChannel channel = fs.create( fileName ) )
         {
-            StoreChannel channel = fs.create( fileName );
             // write the header
+            channel.truncate( 0 );
             ByteBuffer buffer = ByteBuffer.allocate( HEADER_SIZE );
             buffer.put( CLEAN_GENERATOR ).putLong( highId ).flip();
             channel.write( buffer );
             channel.force( false );
-            channel.close();
         }
         catch ( IOException e )
         {
@@ -460,9 +469,9 @@ public class IdGeneratorImpl implements IdGenerator
     {
         try
         {
-            fileChannel = fs.open( fileName, "rw" );
+            fileChannel = fs.open( file, "rw" );
             ByteBuffer buffer = readHeader();
-            markAsSticky( buffer );
+            markAsSticky( fileChannel, buffer );
 
             fileChannel.position( HEADER_SIZE );
             maxReadPosition = fileChannel.size();
@@ -472,23 +481,28 @@ public class IdGeneratorImpl implements IdGenerator
         catch ( IOException e )
         {
             throw new UnderlyingStorageException(
-                "Unable to init id generator " + fileName, e );
+                    "Unable to init id generator " + file, e );
         }
     }
 
-    private void markAsSticky( ByteBuffer buffer ) throws IOException
+    /**
+     * Made available for testing purposes.
+     * Marks an id generator as sticky, i.e. not cleanly shut down.
+     */
+    public static void markAsSticky( StoreChannel fileChannel, ByteBuffer buffer ) throws IOException
     {
         buffer.clear();
         buffer.put( STICKY_GENERATOR ).limit( 1 ).flip();
         fileChannel.position( 0 );
         fileChannel.write( buffer );
+        fileChannel.force( false );
     }
 
     private ByteBuffer readHeader() throws IOException
     {
         try
         {
-            ByteBuffer buffer = readHighIdFromHeader( fileChannel, fileName );
+            ByteBuffer buffer = readHighIdFromHeader( fileChannel, file );
             readPosition = HEADER_SIZE;
             this.highId.set( buffer.getLong() );
             return buffer;
@@ -546,7 +560,6 @@ public class IdGeneratorImpl implements IdGenerator
             readBuffer.flip();
             assert (bytesRead % 8) == 0;
             int idsRead = bytesRead / 8;
-            defraggedIdCount -= idsRead;
             for ( int i = 0; i < idsRead; i++ )
             {
                 long id = readBuffer.getLong();
@@ -657,15 +670,23 @@ public class IdGeneratorImpl implements IdGenerator
     }
 
     @Override
-    public void delete()
+    public synchronized void delete()
     {
-        if ( highId.get() != -1 )
+        if ( !isClosed() )
         {
-            throw new RuntimeException( "Must be closed to delete" );
+            try
+            {
+                closeChannel();
+            }
+            catch ( IOException e )
+            {
+                throw new UnderlyingStorageException( "Unable to safe close id generator " + file, e );
+            }
         }
-        if ( !fs.deleteFile( fileName ) )
+
+        if ( !fs.deleteFile( file ) )
         {
-            throw new UnderlyingStorageException( "Unable to delete id generator " + fileName );
+            throw new UnderlyingStorageException( "Unable to delete id generator " + file );
         }
     }
 
@@ -673,6 +694,6 @@ public class IdGeneratorImpl implements IdGenerator
     public String toString()
     {
         return "IdGeneratorImpl " + hashCode() + " [highId=" + highId + ", defragged=" + defraggedIdCount + ", fileName="
-                + fileName + ", max=" + max + ", aggressive=" + aggressiveReuse + "]";
+               + file + ", max=" + max + ", aggressive=" + aggressiveReuse + "]";
     }
 }

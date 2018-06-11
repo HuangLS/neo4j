@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,7 +54,7 @@ public abstract class IoPrimitiveUtils
     {
         short lengthShort = channel.getShort();
         byte lengthByte = channel.get();
-        int length = (lengthByte << 16) | lengthShort;
+        int length = (lengthByte << 16) | (lengthShort & 0xFFFF);
         byte[] chars = new byte[length];
         channel.get( chars, length );
         return new String(chars, "UTF-8");
@@ -230,5 +230,10 @@ public abstract class IoPrimitiveUtils
             throw new IllegalArgumentException( "Casting long value " + value + " to an int would wrap around" );
         }
         return (int) value;
+    }
+
+    public static int shortToUnsignedInt( short value )
+    {
+        return value & 0xFFFF;
     }
 }

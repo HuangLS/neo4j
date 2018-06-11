@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,7 +32,7 @@ public interface FlushEvent
     FlushEvent NULL = new FlushEvent()
     {
         @Override
-        public void addBytesWritten( int bytes )
+        public void addBytesWritten( long bytes )
         {
         }
 
@@ -45,20 +45,27 @@ public interface FlushEvent
         public void done( IOException exception )
         {
         }
+
+        @Override
+        public void addPagesFlushed( int pageCount )
+        {
+        }
     };
 
     /**
      * Add up a number of bytes that has been written to the file.
      */
-    public void addBytesWritten( int bytes );
+    void addBytesWritten( long bytes );
 
     /**
      * The page flush has completed successfully.
      */
-    public void done();
+    void done();
 
     /**
      * The page flush did not complete successfully, but threw the given exception.
      */
-    public void done( IOException exception );
+    void done( IOException exception );
+
+    void addPagesFlushed( int pageCount );
 }

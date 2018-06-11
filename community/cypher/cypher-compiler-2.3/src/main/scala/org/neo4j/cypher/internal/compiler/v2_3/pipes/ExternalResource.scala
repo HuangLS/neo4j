@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,5 +22,5 @@ package org.neo4j.cypher.internal.compiler.v2_3.pipes
 import java.net.URL
 
 trait ExternalResource {
-  def getCsvIterator(url: URL, fieldTerminator: Option[String] = None): Iterator[Array[String]]
+  def getCsvIterator(url: URL, fieldTerminator: Option[String] = None, headers:Boolean=false): Iterator[Array[String]]
 }

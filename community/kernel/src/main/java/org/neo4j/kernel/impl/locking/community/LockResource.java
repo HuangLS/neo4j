@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,15 +24,22 @@ import org.neo4j.kernel.impl.locking.Locks;
 public class LockResource
 {
     private final Locks.ResourceType resourceType;
-    private final long resourceId;
+    private final LockResourceId resourceId;
 
     /** Local reference count, used for each client to count references to a lock. */
     private int refCount = 1;
 
-    public LockResource( Locks.ResourceType resourceType, long resourceId )
+    public LockResource( Locks.ResourceType resourceType, LockResourceId resourceId )
     {
         this.resourceType = resourceType;
         this.resourceId = resourceId;
+    }
+
+    // for tests only
+    LockResource( Locks.ResourceType resourceType, long resourceId )
+    {
+        this.resourceType = resourceType;
+        this.resourceId = new LockResourceId.Normal(resourceId);
     }
 
     @Override
@@ -49,7 +56,7 @@ public class LockResource
 
         LockResource that = (LockResource) o;
 
-        if ( resourceId != that.resourceId )
+        if ( !resourceId.equals(that.resourceId ))
         {
             return false;
         }
@@ -65,14 +72,14 @@ public class LockResource
     public int hashCode()
     {
         int result = resourceType.hashCode();
-        result = 31 * result + (int) (resourceId ^ (resourceId >>> 32));
+        result = 31 * result + (int) (resourceId.get() ^ (resourceId.get() >>> 32));
         return result;
     }
 
     @Override
     public String toString()
     {
-        return String.format( "%s(%d)", resourceType, resourceId );
+        return String.format( "%s(%s)", resourceType, resourceId );
     }
 
     public void acquireReference()
@@ -85,7 +92,7 @@ public class LockResource
         return --refCount;
     }
 
-    public long resourceId()
+    public LockResourceId resourceId()
     {
         return resourceId;
     }

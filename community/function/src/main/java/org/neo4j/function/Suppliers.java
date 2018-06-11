@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -113,6 +113,18 @@ public final class Suppliers
                     }
                 }
                 return instance;
+            }
+        };
+    }
+
+    public static <T> Supplier<Boolean> compose( final Supplier<T> input, final Predicate<T> predicate )
+    {
+        return new Supplier<Boolean>()
+        {
+            @Override
+            public Boolean get()
+            {
+                return predicate.test( input.get() );
             }
         };
     }

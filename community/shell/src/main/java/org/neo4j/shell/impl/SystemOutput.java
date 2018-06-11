@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,11 @@
  */
 package org.neo4j.shell.impl;
 
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import org.neo4j.shell.Output;
 
@@ -35,13 +35,14 @@ public class SystemOutput implements Output
 {
 	private PrintWriter out;
 
-    public SystemOutput() {
-        try {
-            out = new PrintWriter(new OutputStreamWriter(System.out,"UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            System.err.println("Unsupported encoding UTF-8, using "+Charset.defaultCharset()+", error: "+e.getMessage());
-            out = new PrintWriter(new OutputStreamWriter(System.out, Charset.defaultCharset()));
-        }
+    public SystemOutput()
+    {
+        this( System.out );
+    }
+
+    public SystemOutput( OutputStream out )
+    {
+        this.out = new PrintWriter( new OutputStreamWriter( out, StandardCharsets.UTF_8 ) );
     }
 
     public void print( Serializable object )

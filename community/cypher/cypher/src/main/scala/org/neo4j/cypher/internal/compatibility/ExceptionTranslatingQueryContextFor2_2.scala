@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.cypher.internal.compatibility
+
+import java.net.URL
 
 import org.neo4j.cypher.CypherExecutionException
 import org.neo4j.cypher.internal.compiler.v2_2.spi
@@ -127,14 +129,14 @@ class ExceptionTranslatingQueryContextFor2_2(inner: QueryContext) extends Delega
   override def getRelTypeName(id: Int) =
     translateException(super.getRelTypeName(id))
 
-  override def exactUniqueIndexSearch(index: IndexDescriptor, value: Any) =
-    translateException(super.exactUniqueIndexSearch(index, value))
+  override def lockingExactUniqueIndexSearch(index: IndexDescriptor, value: Any) =
+    translateException(super.lockingExactUniqueIndexSearch(index, value))
 
   override def commitAndRestartTx() =
     translateException(super.commitAndRestartTx())
 
-  override def hasLocalFileAccess =
-    translateException(super.hasLocalFileAccess)
+  override def getImportURL(url: URL): Either[String,URL] =
+    translateException(super.getImportURL(url))
 
   override def relationshipStartNode(rel: Relationship) =
     translateException(super.relationshipStartNode(rel))

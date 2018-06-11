@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -44,8 +44,10 @@ public abstract class KernelExtensionFactory<DEPENDENCIES> extends Service
     /**
      * Create a new instance of this kernel extension.
      *
-     * @param dependencies
-     * @deprecated use {@link #newInstance(KernelContext, DEPENDENCIES)} instead
+     * @param dependencies Dependencies
+     * @return the lifecycle for the instance
+     * @deprecated use {@link #newInstance(KernelContext, Object)} instead
+     * @throws Throwable depends on the implementation
      */
     @Deprecated
     public Lifecycle newKernelExtension( DEPENDENCIES dependencies )
@@ -60,6 +62,7 @@ public abstract class KernelExtensionFactory<DEPENDENCIES> extends Service
      * @param context the context the extension should be created for
      * @param dependencies deprecated
      * @return the {@link Lifecycle} for the extension
+     * @throws Throwable if there is an error
      */
     public Lifecycle newInstance( @SuppressWarnings( "unused" ) KernelContext context, DEPENDENCIES dependencies ) throws Throwable
     {

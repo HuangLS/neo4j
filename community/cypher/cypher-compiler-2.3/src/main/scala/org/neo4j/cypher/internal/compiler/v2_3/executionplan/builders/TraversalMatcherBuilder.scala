@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,11 +21,13 @@ package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{IdFunction, Identifier}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.{Equals, Predicate}
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ExecutionPlanInProgress, PlanBuilder}
-import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.{BidirectionalTraversalMatcher, MonoDirectionalTraversalMatcher, Trail, TraversalMatcher}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.{Trail, TraversalMatcher}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{EntityProducer, PipeMonitor, SingleRowPipe, TraversalMatchPipe}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 import org.neo4j.graphdb.Node
 import org.neo4j.helpers.ThisShouldNotHappenError
 
@@ -94,22 +96,22 @@ class TraversalMatcherBuilder extends PlanBuilder with PatternGraphBuilder {
     old ++ solvedPreds.map(_.solve)
   }
 
-  private def chooseCorrectMatcher(end:Option[String],
-                           longestPath:LongestTrail,
-                           startNodeFn:EntityProducer[Node],
-                           startToken:QueryToken[StartItem],
-                           unsolvedItems: Seq[QueryToken[StartItem]],
-                           ctx:PlanContext): (TraversalMatcher,Seq[QueryToken[StartItem]]) = {
+  private def chooseCorrectMatcher(end: Option[String],
+                                   longestPath: LongestTrail,
+                                   startNodeFn: EntityProducer[Node],
+                                   startToken: QueryToken[StartItem],
+                                   unsolvedItems: Seq[QueryToken[StartItem]],
+                                   ctx: PlanContext): (TraversalMatcher, Seq[QueryToken[StartItem]]) = {
     val (matcher, tokens) = if (end.isEmpty) {
-      val matcher = new MonoDirectionalTraversalMatcher(longestPath.step, startNodeFn)
+      val matcher = ctx.monoDirectionalTraversalMatcher(longestPath.step, startNodeFn)
       (matcher, Seq(startToken))
     } else {
       val (endToken, endNodeFn) = identifier2nodeFn(ctx, end.get, unsolvedItems)
       val step = longestPath.step
-      val matcher = new BidirectionalTraversalMatcher(step, startNodeFn, endNodeFn)
+      val matcher = ctx.bidirectionalTraversalMatcher(step, startNodeFn, endNodeFn)
       (matcher, Seq(startToken, endToken))
     }
-    (matcher,tokens)
+    (matcher, tokens)
   }
 
   def identifier2nodeFn(ctx:PlanContext, identifier: String, unsolvedItems: Seq[QueryToken[StartItem]]):
@@ -121,7 +123,7 @@ class TraversalMatcherBuilder extends PlanBuilder with PatternGraphBuilder {
   val entityFactory = new EntityProducerFactory
 
   private def mapNodeStartCreator(): PartialFunction[(PlanContext, StartItem), EntityProducer[Node]] =
-    entityFactory.nodeStartItems
+    entityFactory.readNodeStartItems
 
   def canWorkWith(plan: ExecutionPlanInProgress, ctx: PlanContext)(implicit pipeMonitor: PipeMonitor): Boolean = {
     val (longest,_) = extractExpanderStepsFromQuery(plan)

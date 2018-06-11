@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,19 +29,40 @@ public class BatchingIdSequence implements IdSequence
 {
     private long nextId = 0;
 
+    public BatchingIdSequence()
+    {
+        this( 0 );
+    }
+
+    public BatchingIdSequence( long startingId )
+    {
+        nextId = startingId;
+    }
+
     @Override
     public long nextId()
     {
-        long result = nextId++;
-        if ( result == IdGeneratorImpl.INTEGER_MINUS_ONE )
-        {
-            result = nextId++;
-        }
+        long result = peek();
+        nextId++;
         return result;
     }
 
     public void reset()
     {
         nextId = 0;
+    }
+
+    public void set( long nextId )
+    {
+        this.nextId = nextId;
+    }
+
+    public long peek()
+    {
+        if ( nextId == IdGeneratorImpl.INTEGER_MINUS_ONE )
+        {
+            nextId++;
+        }
+        return nextId;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,12 +21,15 @@ package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
 import java.net.URL
 
-import org.neo4j.cypher.internal.compiler.v2_3.{LoadExternalResourceException, ExecutionContext}
+import org.neo4j.cypher.internal.compiler.v2_3.ExecutionContext
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Expression
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.Effects
+import org.neo4j.cypher.internal.compiler.v2_3.helpers.ArrayBackedMap
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription
 import org.neo4j.cypher.internal.compiler.v2_3.spi.QueryContext
-import org.neo4j.cypher.internal.compiler.v2_3.symbols.{AnyType, CollectionType, MapType, SymbolTable}
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.LoadExternalResourceException
+import org.neo4j.cypher.internal.frontend.v2_3.symbols.{AnyType, CollectionType, MapType}
 
 sealed trait CSVFormat
 case object HasHeaders extends CSVFormat
@@ -38,24 +41,58 @@ case class LoadCSVPipe(source: Pipe,
                   identifier: String,
                   fieldTerminator: Option[String])(implicit pipeMonitor: PipeMonitor)
   extends PipeWithSource(source, pipeMonitor) {
-  private val protocolWhiteList: Seq[String] = Seq("file", "http", "https", "ftp")
 
-  protected def checkURL(urlString: String, context: QueryContext): URL = {
+  protected def getImportURL(urlString: String, context: QueryContext): URL = {
     val url: URL = try {
       new URL(urlString)
     } catch {
       case e: java.net.MalformedURLException =>
-        throw new LoadExternalResourceException(s"Invalid URL specified (${e.getMessage})", null)
+        throw new LoadExternalResourceException(s"Invalid URL '$urlString': ${e.getMessage}")
     }
 
-    val protocol = url.getProtocol
-    if (!protocolWhiteList.contains(protocol)) {
-      throw new LoadExternalResourceException(s"Unsupported URL protocol: $protocol", null)
+    context.getImportURL(url) match {
+      case Left(error) =>
+        throw new LoadExternalResourceException(s"Cannot load from URL '$urlString': $error")
+      case Right(urlToLoad) =>
+        urlToLoad
     }
-    if (url.getProtocol == "file" && !context.hasLocalFileAccess) {
-      throw new LoadExternalResourceException("Accessing local files not allowed by the configuration")
+  }
+
+  //Uses an ArrayBackedMap to store header-to-values mapping
+  private class IteratorWithHeaders(headers: Seq[String], context: ExecutionContext, inner: Iterator[Array[String]]) extends Iterator[ExecutionContext] {
+    private val internalMap = new ArrayBackedMap[String, String](headers.zipWithIndex.toMap)
+    private var nextContext: ExecutionContext = null
+    private var needsUpdate = true
+
+    def hasNext: Boolean = {
+      if (needsUpdate) {
+        nextContext = computeNextRow()
+        needsUpdate = false
+      }
+      nextContext != null
     }
-    url
+
+    def next(): ExecutionContext = {
+      if (!hasNext) Iterator.empty.next()
+      needsUpdate = true
+      nextContext
+    }
+
+    private def computeNextRow() = {
+      if (inner.hasNext) {
+        val row = inner.next()
+        internalMap.putValues(row)
+        //we need to make a copy here since someone may hold on this
+        //reference, e.g. EagerPipe
+        context.newWith(identifier -> internalMap.copy)
+      } else null
+    }
+  }
+
+  private class IteratorWithoutHeaders(context: ExecutionContext, inner: Iterator[Array[String]]) extends Iterator[ExecutionContext] {
+    override def hasNext: Boolean = inner.hasNext
+
+    override def next(): ExecutionContext = context.newWith(identifier -> inner.next().toSeq)
   }
 
   protected def internalCreateResults(input: Iterator[ExecutionContext], state: QueryState): Iterator[ExecutionContext] = {
@@ -64,20 +101,15 @@ case class LoadCSVPipe(source: Pipe,
 
     input.flatMap(context => {
       implicit val s = state
-      val url = checkURL(urlExpression(context).asInstanceOf[String], state.query)
+      val url = getImportURL(urlExpression(context).asInstanceOf[String], state.query)
 
-      val iterator: Iterator[Array[String]] = state.resources.getCsvIterator(url, fieldTerminator)
-
-      val nextRow: Array[String] => Iterable[Any] = format match {
+      val iterator: Iterator[Array[String]] = state.resources.getCsvIterator(url, fieldTerminator, format match {case HasHeaders => true; case _ => false})
+      format match {
         case HasHeaders =>
-          val headers = iterator.next().toSeq
-          (row: Array[String]) => (headers zip row).toMap
+          val headers = if (iterator.nonEmpty) iterator.next().toIndexedSeq else IndexedSeq.empty // First row is headers
+          new IteratorWithHeaders(headers, context, iterator)
         case NoHeaders =>
-          (row: Array[String]) => row.toSeq
-      }
-
-      iterator.map {
-        value => context.newWith(identifier -> nextRow(value))
+          new IteratorWithoutHeaders(context, iterator)
       }
     })
   }
@@ -97,4 +129,3 @@ case class LoadCSVPipe(source: Pipe,
     copy(source = head)
   }
 }
-

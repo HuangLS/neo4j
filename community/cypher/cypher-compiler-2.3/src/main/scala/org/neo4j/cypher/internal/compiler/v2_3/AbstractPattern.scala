@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,15 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3
 
-import commands._
-import commands.expressions.{Expression, Identifier}
-import commands.values.KeyToken
-import mutation.GraphElementPropertyFunctions
-import symbols._
-import org.neo4j.graphdb.Direction
-import collection.Map
+import org.neo4j.cypher.internal.compiler.v2_3.commands._
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expression, Identifier}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.values.KeyToken
+import org.neo4j.cypher.internal.compiler.v2_3.mutation.GraphElementPropertyFunctions
+import org.neo4j.cypher.internal.frontend.v2_3.SyntaxException
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+
+import scala.collection.Map
 
 abstract sealed class AbstractPattern extends AstNode[AbstractPattern] {
   def makeOutgoing: AbstractPattern
@@ -41,7 +43,7 @@ abstract sealed class AbstractPattern extends AstNode[AbstractPattern] {
 
 
 object PatternWithEnds {
-  def unapply(p: AbstractPattern): Option[(ParsedEntity, ParsedEntity, Seq[String], Direction, Boolean, Option[Int], Option[String])] = p match {
+  def unapply(p: AbstractPattern): Option[(ParsedEntity, ParsedEntity, Seq[String], SemanticDirection, Boolean, Option[Int], Option[String])] = p match {
     case ParsedVarLengthRelation(name, _, start, end, typ, dir, optional, None, maxHops, relIterator) => Some((start, end, typ, dir, optional, maxHops, relIterator))
     case ParsedVarLengthRelation(_, _, _, _, _, _, _, Some(x), _, _)                                  => throw new SyntaxException("Shortest path does not support a minimal length")
     case ParsedRelation(name, _, start, end, typ, dir, optional)                                      => Some((start, end, typ, dir, optional, Some(1), Some(name)))
@@ -76,7 +78,7 @@ case class ParsedEntity(name: String,
 }
 
 object ParsedRelation {
-  def apply(name: String, start: String, end: String, typ: Seq[String], dir: Direction): ParsedRelation =
+  def apply(name: String, start: String, end: String, typ: Seq[String], dir: SemanticDirection): ParsedRelation =
     new ParsedRelation(name, Map.empty, ParsedEntity(start), ParsedEntity(end), typ, dir, false)
 }
 
@@ -89,13 +91,13 @@ case class ParsedRelation(name: String,
                           start: ParsedEntity,
                           end: ParsedEntity,
                           typ: Seq[String],
-                          dir: Direction,
+                          dir: SemanticDirection,
                           optional: Boolean) extends PatternWithPathName(name)
 with Turnable
 with GraphElementPropertyFunctions {
   def rename(newName: String): PatternWithPathName = copy(name = newName)
 
-  def turn(start: ParsedEntity, end: ParsedEntity, dir: Direction): AbstractPattern =
+  def turn(start: ParsedEntity, end: ParsedEntity, dir: SemanticDirection): AbstractPattern =
     copy(start = start, end = end, dir = dir)
 
   def parsedEntities = Seq(start, end)
@@ -110,11 +112,11 @@ with GraphElementPropertyFunctions {
 }
 
 trait Turnable {
-  def turn(start: ParsedEntity, end: ParsedEntity, dir: Direction): AbstractPattern
+  def turn(start: ParsedEntity, end: ParsedEntity, dir: SemanticDirection): AbstractPattern
 
   // It's easier on everything if all relationships are either outgoing or both, but never incoming.
   // So we turn all patterns around, facing the same way
-  def dir: Direction
+  def dir: SemanticDirection
 
   def start: ParsedEntity
 
@@ -122,9 +124,9 @@ trait Turnable {
 
   def makeOutgoing: AbstractPattern = {
     dir match {
-      case Direction.INCOMING => turn(start = end, end = start, dir = Direction.OUTGOING)
-      case Direction.OUTGOING => this.asInstanceOf[AbstractPattern]
-      case Direction.BOTH     => (start.expression, end.expression) match {
+      case SemanticDirection.INCOMING => turn(start = end, end = start, dir = SemanticDirection.OUTGOING)
+      case SemanticDirection.OUTGOING => this.asInstanceOf[AbstractPattern]
+      case SemanticDirection.BOTH     => (start.expression, end.expression) match {
         case (Identifier(a), Identifier(b)) if a < b  => this.asInstanceOf[AbstractPattern]
         case (Identifier(a), Identifier(b)) if a >= b => turn(start = end, end = start, dir = dir)
         case _                                        => this.asInstanceOf[AbstractPattern]
@@ -140,7 +142,7 @@ case class ParsedVarLengthRelation(name: String,
                                    start: ParsedEntity,
                                    end: ParsedEntity,
                                    typ: Seq[String],
-                                   dir: Direction,
+                                   dir: SemanticDirection,
                                    optional: Boolean,
                                    minHops: Option[Int],
                                    maxHops: Option[Int],
@@ -150,7 +152,7 @@ case class ParsedVarLengthRelation(name: String,
   with GraphElementPropertyFunctions {
   def rename(newName: String): PatternWithPathName = copy(name = newName)
 
-  def turn(start: ParsedEntity, end: ParsedEntity, dir: Direction): AbstractPattern =
+  def turn(start: ParsedEntity, end: ParsedEntity, dir: SemanticDirection): AbstractPattern =
     copy(start = start, end = end, dir = dir)
 
   def parsedEntities = Seq(start, end)
@@ -169,7 +171,7 @@ case class ParsedShortestPath(name: String,
                               start: ParsedEntity,
                               end: ParsedEntity,
                               typ: Seq[String],
-                              dir: Direction,
+                              dir: SemanticDirection,
                               optional: Boolean,
                               maxDepth: Option[Int],
                               single: Boolean,

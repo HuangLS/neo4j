@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.graphdb;
+
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
+import org.act.temporalProperty.query.range.TimeRangeQuery;
+
+import java.util.Map;
 
 /**
  * Defines a common API for handling properties on both {@link Node nodes} and
@@ -126,4 +131,34 @@ public interface PropertyContainer
      */
     // TODO: figure out concurrency semantics
     Iterable<String> getPropertyKeys();
+
+    /**
+     * Returns specified existing properties. The collection is mutable,
+     * but changing it has no impact on the graph as the data is detached.
+     *
+     * @param keys the property keys to return
+     * @return specified properties on this property container
+     * @throws NullPointerException if the array of keys or any key is null
+     */
+    Map<String, Object> getProperties( String... keys );
+
+    /**
+     * Returns all existing properties.
+     *
+     * @return all properties on this property container
+     */
+    Map<String, Object> getAllProperties();
+
+
+    Object getTemporalProperty(String key, int time);
+
+    Object getTemporalProperty(String key, int startTime, int endTime, TimeRangeQuery callBack);
+
+    AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, int start, int end, long indexId );
+
+    void setTemporalProperty(String key, int time, Object value);
+
+    void setTemporalProperty(String key, int start, int end, Object value);
+
+    void removeTemporalProperty(String key);
 }

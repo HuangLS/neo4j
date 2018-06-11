@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,16 @@
  */
 package org.neo4j.graphdb.factory;
 
+import org.neo4j.kernel.impl.ha.ClusterManager;
+
 public class TestHighlyAvailableGraphDatabaseFactory extends HighlyAvailableGraphDatabaseFactory
 {
     @Override
     protected void configure( GraphDatabaseBuilder builder )
     {
         super.configure( builder );
+        builder.setConfig( ClusterManager.CONFIG_FOR_SINGLE_JVM_CLUSTER );
         builder.setConfig( GraphDatabaseSettings.pagecache_memory, "8m" );
+        builder.setConfig( GraphDatabaseSettings.store_internal_log_level, "DEBUG" );
     }
 }

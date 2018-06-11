@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
+import org.neo4j.kernel.impl.transaction.command.CommandHandler;
 
 /**
  * Batches updates to a legacy index. Used during recovery.
@@ -43,12 +43,12 @@ public class RecoveryLegacyIndexApplierLookup implements LegacyIndexApplierLooku
     }
 
     @Override
-    public NeoCommandHandler newApplier( String name, boolean recovery )
+    public CommandHandler newApplier( String name, boolean recovery )
     {
         RecoveryCommandHandler applier = appliers.get( name );
         if ( applier == null )
         {
-            NeoCommandHandler actualApplier = lookup.newApplier( name, recovery );
+            CommandHandler actualApplier = lookup.newApplier( name, recovery );
             appliers.put( name, applier = new RecoveryCommandHandler( name, actualApplier ) );
         }
         return applier;
@@ -69,13 +69,13 @@ public class RecoveryLegacyIndexApplierLookup implements LegacyIndexApplierLooku
         }
     }
 
-    private class RecoveryCommandHandler extends NeoCommandHandler.Delegator
+    private class RecoveryCommandHandler extends CommandHandler.Delegator
     {
         private final String name;
         private int applyCount;
         private boolean applied;
 
-        RecoveryCommandHandler( String name, NeoCommandHandler applier )
+        RecoveryCommandHandler( String name, CommandHandler applier )
         {
             super( applier );
             this.name = name;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,12 +20,12 @@
 package org.neo4j.kernel.api.exceptions.schema;
 
 /**
- * Constraint violation happens when a user tries to modify data so that it violates
+ * Constraint violation happens when a user attempts to perform an action that violates
  * an existing constraint.
  *
  * @see ConstraintVerificationFailedKernelException
  */
-public class ConstraintViolationKernelException extends ConstraintValidationKernelException
+public abstract class ConstraintViolationKernelException extends ConstraintValidationKernelException
 {
     public ConstraintViolationKernelException( String message, Object... parameters )
     {

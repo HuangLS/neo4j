@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,26 +19,29 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3
 
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.{ExternalResource, NullPipeDecorator, PipeDecorator, QueryState}
+import org.neo4j.cypher.internal.compiler.v2_3.spi.{QueryContext, UpdateCountingQueryContext}
+import org.neo4j.cypher.internal.spi.v2_3.TransactionBoundQueryContext
+import org.neo4j.cypher.internal.spi.v2_3.TransactionBoundQueryContext.IndexSearchMonitor
 import org.neo4j.graphdb.{GraphDatabaseService, Transaction}
 import org.neo4j.kernel.GraphDatabaseAPI
-import org.neo4j.cypher.internal.spi.v2_3.TransactionBoundQueryContext
-import org.neo4j.cypher.internal.compiler.v2_3.pipes.{ExternalResource, PipeDecorator, NullPipeDecorator, QueryState}
-import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge
 import org.neo4j.kernel.api.Statement
-import org.neo4j.cypher.internal.compiler.v2_3.spi.{UpdateCountingQueryContext, QueryContext}
+import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge
+import org.neo4j.kernel.monitoring.{Monitors => KernelMonitors}
 
 object QueryStateHelper {
   def empty: QueryState = emptyWith()
 
   def emptyWith(db: GraphDatabaseService = null, query: QueryContext = null, resources: ExternalResource = null,
                 params: Map[String, Any] = Map.empty, decorator: PipeDecorator = NullPipeDecorator) =
-    QueryState(query = query, resources = resources, params = params, decorator = decorator)
+    new QueryState(query = query, resources = resources, params = params, decorator = decorator)
 
-  def queryStateFrom(db: GraphDatabaseAPI, tx: Transaction): QueryState = {
+  def queryStateFrom(db: GraphDatabaseAPI, tx: Transaction, params: Map[String, Any] = Map.empty): QueryState = {
     val statement: Statement = db.getDependencyResolver.resolveDependency(classOf[ThreadToStatementContextBridge]).get()
-    val context = new TransactionBoundQueryContext(db, tx, isTopLevelTx = true, statement)
-    emptyWith(db = db, query = context)
+    val searchMonitor = new KernelMonitors().newMonitor(classOf[IndexSearchMonitor])
+    val context = new TransactionBoundQueryContext(db, tx, isTopLevelTx = true, statement)(searchMonitor)
+    emptyWith(db = db, query = context, params = params)
   }
 
-  def countStats(q: QueryState) = q.copy(query = new UpdateCountingQueryContext(q.query))
+  def countStats(q: QueryState) = q.withQueryContext(query = new UpdateCountingQueryContext(q.query))
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,8 @@
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.{topDown, Rewriter}
 
 // TODO: Support n.prop <op> m.prop, perhaps by
 //  either killing this and just looking on both lhs and rhs all over the place or
@@ -33,10 +34,10 @@ case object normalizeArgumentOrder extends Rewriter {
   private val instance: Rewriter = Rewriter.lift {
 
     // move id(n) on equals to the left
-    case predicate @ Equals(func@FunctionInvocation(_, _, _), _) if func.function == Some(functions.Id) =>
+    case predicate @ Equals(func@FunctionInvocation(_, _, _), _) if func.function.contains(functions.Id) =>
       predicate
 
-    case predicate @ Equals(lhs, rhs @ FunctionInvocation(_, _, _)) if rhs.function == Some(functions.Id) =>
+    case predicate @ Equals(lhs, rhs @ FunctionInvocation(_, _, _)) if rhs.function.contains(functions.Id) =>
       predicate.copy(lhs = rhs, rhs = lhs)(predicate.position)
 
     // move n.prop on equals to the left
@@ -50,9 +51,11 @@ case object normalizeArgumentOrder extends Rewriter {
       val lhsIsProperty = inequality.lhs.isInstanceOf[Property]
       val rhsIsProperty = inequality.rhs.isInstanceOf[Property]
       if (!lhsIsProperty && rhsIsProperty) {
-        inequality.swap
+        inequality.swapped
       } else {
         inequality
       }
   }
 }
+
+

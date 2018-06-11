@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -67,7 +67,7 @@ class SyntaxExceptionTest extends ExecutionEngineFunSuite {
   test("shouldComplainAboutWholeNumbers") {
     test(
       "match (s) where id(s) = 0 return s limit -1",
-      "Invalid input '-': expected whitespace, comment, an unsigned integer or a parameter (line 1, column 42)"
+      "Invalid input '-1' is not a valid value, must be a positive integer (line 1, column 42 (offset: 41))"
     )
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,10 +20,11 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes.matching
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Expression
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.{Predicate, True}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{MutableMaps, QueryState}
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticDirection, EntityNotFoundException}
 import org.neo4j.graphdb._
 import org.neo4j.helpers.ThisShouldNotHappenError
 
@@ -35,7 +36,7 @@ trait ExpanderStep {
 
   def typ: Seq[String]
 
-  def direction: Direction
+  def direction: SemanticDirection
 
   def id: Int
 
@@ -43,7 +44,7 @@ trait ExpanderStep {
 
   def nodePredicate: Predicate
 
-  def createCopy(next: Option[ExpanderStep], direction: Direction, nodePredicate: Predicate): ExpanderStep
+  def createCopy(next: Option[ExpanderStep], direction: SemanticDirection, nodePredicate: Predicate): ExpanderStep
 
   def size: Option[Int]
 
@@ -65,7 +66,7 @@ trait ExpanderStep {
 
     val reversed = allSteps.foldLeft[(Option[ExpanderStep], Predicate)]((None, True())) {
       case ((lastStep: Option[ExpanderStep], lastPred: Predicate), step: ExpanderStep) =>
-        val newStep = Some(step.createCopy(next = lastStep, direction = step.direction.reverse(), nodePredicate = lastPred))
+        val newStep = Some(step.createCopy(next = lastStep, direction = step.direction.reversed, nodePredicate = lastPred))
         (newStep, step.nodePredicate)
     }
 

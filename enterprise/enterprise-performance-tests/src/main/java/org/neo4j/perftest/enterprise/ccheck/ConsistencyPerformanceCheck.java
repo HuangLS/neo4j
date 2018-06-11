@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,8 +22,7 @@ package org.neo4j.perftest.enterprise.ccheck;
 import java.io.File;
 import java.util.Map;
 
-import org.neo4j.consistency.ConsistencyCheckSettings;
-import org.neo4j.consistency.checking.full.TaskExecutionOrder;
+import org.neo4j.consistency.statistics.Statistics;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
@@ -37,19 +36,21 @@ import org.neo4j.kernel.api.direct.DirectStoreAccess;
 import org.neo4j.kernel.api.impl.index.DirectoryFactory;
 import org.neo4j.kernel.api.impl.index.LuceneSchemaIndexProvider;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
+import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.pagecache.ConfiguringPageCacheFactory;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.StoreAccess;
 import org.neo4j.kernel.impl.store.StoreFactory;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.NullLog;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.perftest.enterprise.generator.DataGenerator;
 import org.neo4j.perftest.enterprise.util.Configuration;
 import org.neo4j.perftest.enterprise.util.Parameters;
 import org.neo4j.perftest.enterprise.util.Setting;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
+import static org.neo4j.consistency.ConsistencyCheckService.defaultConsistencyCheckThreadsNumber;
 import static org.neo4j.perftest.enterprise.util.Configuration.SYSTEM_PROPERTIES;
 import static org.neo4j.perftest.enterprise.util.Configuration.settingsOf;
 import static org.neo4j.perftest.enterprise.util.DirectlyCorrelatedParameter.param;
@@ -63,8 +64,6 @@ public class ConsistencyPerformanceCheck
     static final Setting<Boolean> generate_graph = booleanSetting( "generate_graph", false );
     static final Setting<String> report_file = stringSetting( "report_file", "target/report.json" );
     static final Setting<CheckerVersion> checker_version = enumSetting( "checker_version", CheckerVersion.NEW );
-    static final Setting<TaskExecutionOrder> execution_order =
-            enumSetting( "execution_order", TaskExecutionOrder.SINGLE_THREADED );
     static final Setting<Boolean> wait_before_check = booleanSetting( "wait_before_check", false );
     static final Setting<String> pagecache_memory =
             stringSetting( "dbms.pagecache.memory", "2G" );
@@ -130,7 +129,8 @@ public class ConsistencyPerformanceCheck
 
         try
         {
-            configuration.get( checker_version ).run( progressMonitor, directStoreAccess, tuningConfiguration );
+            configuration.get( checker_version ).run( progressMonitor, directStoreAccess, tuningConfiguration,
+                    Statistics.NONE, defaultConsistencyCheckThreadsNumber() );
         }
         finally
         {
@@ -141,30 +141,25 @@ public class ConsistencyPerformanceCheck
 
     private static DirectStoreAccess createScannableStores( File storeDir, Config tuningConfiguration )
     {
-        Monitors monitors = new Monitors();
-        StoreFactory factory = new StoreFactory(
-                storeDir,
-                tuningConfiguration,
-                new DefaultIdGeneratorFactory( fileSystem ),
-                pageCache,
+        StoreFactory factory = new StoreFactory( storeDir, tuningConfiguration,
+                new DefaultIdGeneratorFactory( fileSystem ), pageCache, fileSystem, NullLogProvider.getInstance() );
+        NeoStores neoStores = factory.openAllNeoStores( true );
+        OperationalMode operationalMode = OperationalMode.single;
+        SchemaIndexProvider indexes = new LuceneSchemaIndexProvider(
                 fileSystem,
-                NullLogProvider.getInstance(),
-                monitors );
-
-        NeoStore neoStore = factory.newNeoStore( true );
-
-        SchemaIndexProvider indexes = new LuceneSchemaIndexProvider( DirectoryFactory.PERSISTENT, storeDir );
-        return new DirectStoreAccess( new StoreAccess( neoStore ),
-                new LuceneLabelScanStoreBuilder( storeDir, neoStore, fileSystem, NullLogProvider.getInstance() ).build(), indexes );
+                DirectoryFactory.PERSISTENT,
+                storeDir, NullLogProvider.getInstance(), tuningConfiguration, operationalMode );
+        LuceneLabelScanStoreBuilder labelScanStoreBuilder = new LuceneLabelScanStoreBuilder( storeDir, neoStores,
+                fileSystem, tuningConfiguration, operationalMode, NullLogProvider.getInstance() );
+        LabelScanStore labelScanStore = labelScanStoreBuilder.build();
+        return new DirectStoreAccess( new StoreAccess( neoStores ).initialize(), labelScanStore, indexes );
     }
 
     private static Config buildTuningConfiguration( Configuration configuration )
     {
         Map<String, String> passedOnConfiguration = passOn( configuration,
                 param( GraphDatabaseSettings.pagecache_memory, pagecache_memory ),
-                param( GraphDatabaseSettings.mapped_memory_page_size, mapped_memory_page_size ),
-                param( ConsistencyCheckSettings.consistency_check_execution_order, execution_order ) );
-
+                param( GraphDatabaseSettings.mapped_memory_page_size, mapped_memory_page_size ) );
         return new Config( passedOnConfiguration, GraphDatabaseSettings.class );
     }
 }

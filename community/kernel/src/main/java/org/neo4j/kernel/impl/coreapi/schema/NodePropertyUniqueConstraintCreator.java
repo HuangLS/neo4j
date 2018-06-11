@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -39,12 +39,6 @@ public class NodePropertyUniqueConstraintCreator extends BaseNodeConstraintCreat
     public final NodePropertyUniqueConstraintCreator assertPropertyIsUnique( String propertyKey )
     {
         throw new UnsupportedOperationException( "You can only create one unique constraint at a time." );
-    }
-
-    @Override
-    public final NodePropertyUniqueConstraintCreator assertPropertyExists( String propertyKey )
-    {
-        throw new UnsupportedOperationException( "You are already creating a unique constraint." );
     }
 
     @Override

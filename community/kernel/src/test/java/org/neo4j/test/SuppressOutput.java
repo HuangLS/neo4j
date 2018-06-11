@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,8 +25,9 @@ import org.junit.runners.model.Statement;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -36,6 +37,9 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.logging.StreamHandler;
+
+import static java.lang.System.lineSeparator;
+import static java.util.Arrays.asList;
 
 /**
  * Suppresses outputs such as System.out, System.err and java.util.logging for example when running a test.
@@ -103,7 +107,7 @@ public final class SuppressOutput implements TestRule
 
     public static final Suppressible java_util_logging = java_util_logging( new ByteArrayOutputStream(), null );
 
-    public static Suppressible java_util_logging( final OutputStream redirectTo, Level level )
+    public static Suppressible java_util_logging( final ByteArrayOutputStream redirectTo, Level level )
     {
         final Handler replacement = redirectTo == null ? null : new StreamHandler( redirectTo, new SimpleFormatter() );
         if ( replacement != null && level != null )
@@ -149,7 +153,7 @@ public final class SuppressOutput implements TestRule
 
     public <T> T call( Callable<T> callable ) throws Exception
     {
-        Voice[] voices = captureVoices();
+        voices = captureVoices();
         boolean failure = true;
         try
         {
@@ -231,9 +235,9 @@ public final class SuppressOutput implements TestRule
     public static abstract class Voice
     {
         private Suppressible suppressible;
-        private OutputStream voiceStream;
+        private ByteArrayOutputStream voiceStream;
 
-        public Voice(Suppressible suppressible, OutputStream originalStream)
+        public Voice(Suppressible suppressible, ByteArrayOutputStream originalStream)
         {
             this.suppressible = suppressible;
             this.voiceStream = originalStream;
@@ -247,6 +251,25 @@ public final class SuppressOutput implements TestRule
         public boolean containsMessage( String message )
         {
             return voiceStream.toString().contains( message );
+        }
+
+        /** Get each line written to this voice since it was suppressed */
+        public List<String> lines()
+        {
+            return asList( toString().split( lineSeparator() ) );
+        }
+
+        @Override
+        public String toString()
+        {
+            try
+            {
+                return voiceStream.toString( StandardCharsets.UTF_8.name() );
+            }
+            catch ( UnsupportedEncodingException e )
+            {
+                throw new RuntimeException( e );
+            }
         }
 
         abstract void restore( boolean failure ) throws IOException;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -201,7 +201,7 @@ public class Clusters
 
         private static String localhost()
         {
-            return "127.0.0.1";
+            return "localhost";
         }
         
         public String getHost()

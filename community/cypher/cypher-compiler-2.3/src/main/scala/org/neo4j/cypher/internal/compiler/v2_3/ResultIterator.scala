@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,8 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3
 
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.Eagerly
+import org.neo4j.cypher.internal.frontend.v2_3.helpers.Eagerly
+import org.neo4j.cypher.internal.frontend.v2_3.{CypherException, NodeStillHasRelationshipsException}
 import org.neo4j.graphdb.TransactionFailureException
 import org.neo4j.kernel.api.exceptions.Status
 
@@ -81,7 +82,7 @@ class ClosingIterator(inner: Iterator[collection.Map[String, Any]],
 
   private def materialize(v: Any): Any = v match {
     case (x: Stream[_])   => x.map(materialize).toList
-    case (x: Map[_, _])   => Eagerly.immutableMapValues(x, materialize)
+    case (x: collection.Map[_, _])   => Eagerly.immutableMapValues(x.toMap, materialize)
     case (x: Iterable[_]) => x.map(materialize)
     case x => x
   }

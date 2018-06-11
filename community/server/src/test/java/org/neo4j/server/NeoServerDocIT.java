@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -65,7 +65,7 @@ public class NeoServerDocIT extends AbstractRestFunctionalTestBase
     @Test
     public void serverShouldProvideAWelcomePage() throws Exception
     {
-        JaxRsResponse response = RestRequest.req().get( functionalTestHelper.webAdminUri() );
+        JaxRsResponse response = RestRequest.req().get( functionalTestHelper.browserUri() );
 
         assertThat( response.getStatus(), is( 200 ) );
         assertThat( response.getHeaders().getFirst( "Content-Type" ), containsString( "html" ) );

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,7 +25,7 @@ package org.neo4j.helpers;
  * A parameter-less function for lazy evaluation to prevent the evaluation of an
  * expression until forced at a later time.
  * 
- * @param <T>
+ * @param <T> the type of the thunk
  * @deprecated Use {@link org.neo4j.function.Supplier} instead
  */
 @Deprecated

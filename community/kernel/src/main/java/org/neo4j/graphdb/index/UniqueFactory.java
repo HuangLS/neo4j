@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,8 +33,6 @@ import org.neo4j.graphdb.Transaction;
  *
  * Uses the {@link Index#putIfAbsent(PropertyContainer, String, Object) putIfAbsent() method} of the referenced index.
  *
- * @author Tobias Lindaaker <tobias.lindaaker@neotechnology.com>
- *
  * @param <T> the type of entity created by this {@link UniqueFactory}.
  */
 public abstract class UniqueFactory<T extends PropertyContainer>
@@ -63,8 +61,6 @@ public abstract class UniqueFactory<T extends PropertyContainer>
 
     /**
      * Implementation of {@link UniqueFactory} for {@link Node}.
-     *
-     * @author Tobias Lindaaker <tobias.lindaaker@neotechnology.com>
      */
     public static abstract class UniqueNodeFactory extends UniqueFactory<Node>
     {
@@ -118,8 +114,6 @@ public abstract class UniqueFactory<T extends PropertyContainer>
 
     /**
      * Implementation of {@link UniqueFactory} for {@link Relationship}.
-     *
-     * @author Tobias Lindaaker <tobias.lindaaker@neotechnology.com>
      */
     public static abstract class UniqueRelationshipFactory extends UniqueFactory<Relationship>
     {

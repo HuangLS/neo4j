@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -39,19 +39,18 @@ import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.core.NodeManager;
 import org.neo4j.logging.NullLogProvider;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.test.EphemeralFileSystemRule;
 import org.neo4j.test.OtherThreadExecutor;
 import org.neo4j.test.PageCacheRule;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-
 import static org.neo4j.graphdb.Neo4jMatchers.containsOnly;
 import static org.neo4j.graphdb.Neo4jMatchers.getPropertyKeys;
 import static org.neo4j.graphdb.Neo4jMatchers.hasProperty;
@@ -59,7 +58,8 @@ import static org.neo4j.graphdb.Neo4jMatchers.inTx;
 
 public class TestGraphProperties
 {
-    @Rule public EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
+    @Rule
+    public EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
     private TestGraphDatabaseFactory factory;
 
     @Before
@@ -175,19 +175,12 @@ public class TestGraphProperties
         db.shutdown();
 
         Config config = new Config( Collections.<String, String>emptyMap(), GraphDatabaseSettings.class );
-        Monitors monitors = new Monitors();
-        StoreFactory storeFactory = new StoreFactory(
-                storeDir,
-                config,
-                new DefaultIdGeneratorFactory( fs.get() ),
-                pageCacheRule.getPageCache( fs.get() ),
-                fs.get(),
-                NullLogProvider.getInstance(),
-                monitors );
-        NeoStore neoStore = storeFactory.newNeoStore( false );
-        long prop = neoStore.getGraphNextProp();
+        StoreFactory storeFactory = new StoreFactory( storeDir, config, new DefaultIdGeneratorFactory( fs.get() ),
+                pageCacheRule.getPageCache( fs.get() ), fs.get(), NullLogProvider.getInstance() );
+        NeoStores neoStores = storeFactory.openAllNeoStores();
+        long prop = neoStores.getMetaDataStore().getGraphNextProp();
         assertTrue( prop != 0 );
-        neoStore.close();
+        neoStores.close();
     }
 
     @Test
@@ -264,6 +257,54 @@ public class TestGraphProperties
         db = (GraphDatabaseAPI) factory.newImpermanentDatabase();
         assertFalse( graphProperties.equals( properties( db ) ) );
         db.shutdown();
+    }
+
+    @Test
+    public void shouldBeAbleToCreateLongGraphPropertyChainsAndReadTheCorrectNextPointerFromTheStore()
+    {
+        GraphDatabaseService database = new TestGraphDatabaseFactory().newImpermanentDatabase();
+
+        PropertyContainer graphProperties = properties( (GraphDatabaseAPI) database );
+
+        try ( Transaction tx = database.beginTx() )
+        {
+            graphProperties.setProperty( "a", new String[]{"A", "B", "C", "D", "E"} );
+            graphProperties.setProperty( "b", true );
+            graphProperties.setProperty( "c", "C" );
+            tx.success();
+        }
+
+        try ( Transaction tx = database.beginTx() )
+        {
+            graphProperties.setProperty( "d", new String[]{"A", "F"} );
+            graphProperties.setProperty( "e", true );
+            graphProperties.setProperty( "f", "F" );
+            tx.success();
+        }
+
+        try ( Transaction tx = database.beginTx() )
+        {
+            graphProperties.setProperty( "g", new String[]{"F"} );
+            graphProperties.setProperty( "h", false );
+            graphProperties.setProperty( "i", "I" );
+            tx.success();
+        }
+
+        try ( Transaction tx = database.beginTx() )
+        {
+            assertArrayEquals( new String[]{"A", "B", "C", "D", "E"}, (String[]) graphProperties.getProperty( "a" ) );
+            assertTrue( (boolean) graphProperties.getProperty( "b" ) );
+            assertEquals( "C", graphProperties.getProperty( "c" ) );
+
+            assertArrayEquals( new String[]{"A", "F"}, (String[]) graphProperties.getProperty( "d" ) );
+            assertTrue( (boolean) graphProperties.getProperty( "e" ) );
+            assertEquals( "F", graphProperties.getProperty( "f" ) );
+
+            assertArrayEquals( new String[]{"F"}, (String[]) graphProperties.getProperty( "g" ) );
+            assertFalse( (boolean) graphProperties.getProperty( "h" ) );
+            assertEquals( "I", graphProperties.getProperty( "i" ) );
+            tx.success();
+        }
     }
 
     private static class State

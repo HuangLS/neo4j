@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,14 +21,13 @@ package org.neo4j.cypher.internal.compiler.v2_3.helpers
 
 import java.util.{Map => JavaMap}
 
-import org.neo4j.cypher.internal.compiler.v2_3.EntityNotFoundException
 import org.neo4j.cypher.internal.compiler.v2_3.spi.{Operations, QueryContext}
+import org.neo4j.cypher.internal.frontend.v2_3.EntityNotFoundException
 import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
 import org.neo4j.helpers.ThisShouldNotHappenError
 
 import scala.collection.JavaConverters._
-import scala.collection.{Iterator, Map}
-import scala.collection.immutable
+import scala.collection.{Iterator, Map, immutable}
 
 object IsMap extends MapSupport {
   def unapply(x: Any): Option[(QueryContext) => Map[String, Any]] = if (isMap(x)) {

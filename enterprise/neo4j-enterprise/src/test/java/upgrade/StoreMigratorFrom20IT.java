@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,29 +38,29 @@ import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.HighlyAvailableGraphDatabase;
 import org.neo4j.kernel.impl.api.index.inmemory.InMemoryIndexProvider;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.ha.ClusterManager;
+import org.neo4j.kernel.impl.logging.NullLogService;
+import org.neo4j.kernel.impl.store.MetaDataStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.storemigration.MigrationTestUtils;
 import org.neo4j.kernel.impl.storemigration.StoreMigrator;
 import org.neo4j.kernel.impl.storemigration.StoreUpgrader;
 import org.neo4j.kernel.impl.storemigration.StoreVersionCheck;
 import org.neo4j.kernel.impl.storemigration.UpgradableDatabase;
+import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStoreVersionCheck;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.logging.NullLogProvider;
-import org.neo4j.kernel.impl.logging.NullLogService;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.test.PageCacheRule;
 import org.neo4j.test.TargetDirectory;
-import org.neo4j.test.ha.ClusterManager;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.neo4j.consistency.store.StoreAssertions.assertConsistentStore;
+import static org.neo4j.kernel.impl.ha.ClusterManager.allSeesAllAsAvailable;
 import static org.neo4j.kernel.impl.store.CommonAbstractStore.ALL_STORES_VERSION;
-import static org.neo4j.kernel.impl.store.NeoStore.versionLongToString;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.find20FormatStoreDirectory;
 import static org.neo4j.kernel.impl.storemigration.UpgradeConfiguration.ALLOW_UPGRADE;
-import static org.neo4j.test.ha.ClusterManager.allSeesAllAsAvailable;
 import static upgrade.StoreMigratorTestUtil.buildClusterWithMasterDirIn;
 
 public class StoreMigratorFrom20IT
@@ -71,10 +71,9 @@ public class StoreMigratorFrom20IT
     public void shouldMigrate() throws IOException, ConsistencyCheckIncompleteException
     {
         // WHEN
-        StoreMigrator storeMigrator = new StoreMigrator(
-                monitor, fs, pageCache, upgradableDatabase, config, NullLogService.getInstance() );
+        StoreMigrator storeMigrator = new StoreMigrator( monitor, fs, pageCache, config, NullLogService.getInstance() );
         upgrader( storeMigrator ).migrateIfNeeded(
-                find20FormatStoreDirectory( storeDir.directory() ), schemaIndexProvider );
+                find20FormatStoreDirectory( storeDir.directory() ), upgradableDatabase, schemaIndexProvider );
 
         // THEN
         assertEquals( 100, monitor.eventSize() );
@@ -92,9 +91,9 @@ public class StoreMigratorFrom20IT
             database.shutdown();
         }
 
-        try ( NeoStore neoStore = storeFactory.newNeoStore( true ) )
+        try ( NeoStores neoStores = storeFactory.openAllNeoStores( true ) )
         {
-            verifyNeoStore( neoStore );
+            verifyNeoStore( neoStores );
         }
         assertConsistentStore( storeDir.directory() );
     }
@@ -106,9 +105,8 @@ public class StoreMigratorFrom20IT
         File legacyStoreDir = find20FormatStoreDirectory( storeDir.directory() );
 
         // When
-        StoreMigrator storeMigrator = new StoreMigrator(
-                monitor, fs, pageCache, upgradableDatabase, config, NullLogService.getInstance() );
-        upgrader( storeMigrator ).migrateIfNeeded( legacyStoreDir, schemaIndexProvider );
+        StoreMigrator storeMigrator = new StoreMigrator( monitor, fs, pageCache, config, NullLogService.getInstance() );
+        upgrader( storeMigrator ).migrateIfNeeded( legacyStoreDir, upgradableDatabase, schemaIndexProvider );
         ClusterManager.ManagedCluster cluster = buildClusterWithMasterDirIn( fs, legacyStoreDir, life );
         cluster.await( allSeesAllAsAvailable() );
         cluster.sync();
@@ -143,13 +141,15 @@ public class StoreMigratorFrom20IT
         verifier.verifyRelationships( 500 );
     }
 
-    public static void verifyNeoStore( NeoStore neoStore )
+    public static void verifyNeoStore( NeoStores neoStores )
     {
-        assertEquals( 1317392957120L, neoStore.getCreationTime() );
-        assertEquals( -472309512128245482l, neoStore.getRandomNumber() );
-        assertEquals( 5l, neoStore.getCurrentLogVersion() );
-        assertEquals( ALL_STORES_VERSION, versionLongToString( neoStore.getStoreVersion() ) );
-        assertEquals( 1042l, neoStore.getLastCommittedTransactionId() );
+        MetaDataStore metaDataStore = neoStores.getMetaDataStore();
+        assertEquals( 1317392957120L, metaDataStore.getCreationTime() );
+        assertEquals( -472309512128245482l, metaDataStore.getRandomNumber() );
+        assertEquals( 5l, metaDataStore.getCurrentLogVersion() );
+        assertEquals( ALL_STORES_VERSION, MetaDataStore.versionLongToString(
+                metaDataStore.getStoreVersion() ) );
+        assertEquals( 1042l, metaDataStore.getLastCommittedTransactionId() );
     }
 
     private StoreUpgrader upgrader( StoreMigrator storeMigrator )
@@ -176,16 +176,10 @@ public class StoreMigratorFrom20IT
     public void setUp()
     {
         pageCache = pageCacheRule.getPageCache( fs );
-
-        storeFactory = new StoreFactory(
-                storeDir.directory(),
-                config,
-                new DefaultIdGeneratorFactory( fs ),
-                pageCache,
-                fs,
-                NullLogProvider.getInstance(),
-                new Monitors() );
-        upgradableDatabase = new UpgradableDatabase( new StoreVersionCheck( pageCache ) );
+        storeFactory = new StoreFactory( storeDir.directory(), config, new DefaultIdGeneratorFactory( fs ),
+                pageCache, fs, NullLogProvider.getInstance() );
+        upgradableDatabase =
+                new UpgradableDatabase( new StoreVersionCheck( pageCache ), new LegacyStoreVersionCheck( fs ) );
     }
 
     @After

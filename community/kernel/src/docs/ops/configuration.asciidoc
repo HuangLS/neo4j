@@ -1,5 +1,5 @@
 [[configuration-settings]]
-= Configuration Settings
+= Configuration Settings Reference
 
 On this page you'll find the main configuration settings you can use with Neo4j.
 They can be set in the _conf/neo4j.properties_ file when using the Neo4j Server (see <<server-configuration>>).
@@ -14,6 +14,7 @@ For additional configuration settings, see:
 * <<config-org.neo4j.backup.OnlineBackupSettings>>
 * <<config-org.neo4j.consistency.ConsistencyCheckSettings>>
 * <<config-org.neo4j.ext.udc.UdcSettings>>
+* <<config-org.neo4j.metrics.MetricsSettings>>
 
 
 include::configuration-attributes.asciidoc[]

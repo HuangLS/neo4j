@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,8 +21,9 @@ package org.neo4j.kernel.impl.store;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
-import org.neo4j.io.fs.FileSystemAbstraction;
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.PageCursor;
 import org.neo4j.kernel.IdGeneratorFactory;
@@ -30,7 +31,6 @@ import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.record.Record;
 import org.neo4j.kernel.impl.store.record.RelationshipGroupRecord;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.LogProvider;
 
 import static org.neo4j.io.pagecache.PagedFile.PF_EXCLUSIVE_LOCK;
@@ -54,13 +54,19 @@ public class RelationshipGroupStore extends AbstractRecordStore<RelationshipGrou
             Config config,
             IdGeneratorFactory idGeneratorFactory,
             PageCache pageCache,
-            FileSystemAbstraction fileSystemAbstraction,
-            LogProvider logProvider,
-            StoreVersionMismatchHandler versionMismatchHandler,
-            Monitors monitors )
+            LogProvider logProvider )
     {
-        super( fileName, config, IdType.RELATIONSHIP_GROUP, idGeneratorFactory, pageCache,
-                fileSystemAbstraction, logProvider, versionMismatchHandler, monitors );
+        super( fileName, config, IdType.RELATIONSHIP_GROUP, idGeneratorFactory, pageCache, logProvider );
+    }
+
+    @Override
+    protected ByteBuffer createHeaderRecord()
+    {
+        int denseNodeThreshold = configuration.get( GraphDatabaseSettings.dense_node_threshold );
+        ByteBuffer headerRecord = ByteBuffer.allocate( RelationshipGroupStore.RECORD_SIZE ).putInt( denseNodeThreshold );
+        headerRecord.flip();
+        headerRecord.limit( headerRecord.capacity() );
+        return headerRecord;
     }
 
     @Override
@@ -89,24 +95,23 @@ public class RelationshipGroupStore extends AbstractRecordStore<RelationshipGrou
         }
     }
 
-    public RelationshipGroupRecord getRecord( long id, RelationshipGroupRecord recordInstance )
+    public RelationshipGroupRecord forceGetRecord( long id, RelationshipGroupRecord record )
     {
         try ( PageCursor cursor = storeFile.io( pageIdForRecord( id ), PF_SHARED_LOCK ) )
         {
             if ( cursor.next() )
             {
-                RelationshipGroupRecord record;
                 do
                 {
-                    record = getRecord( id, cursor, recordInstance );
-                } while ( cursor.shouldRetry() );
-
-                if ( record != null )
-                {
-                    return record;
+                    readRecord( id, cursor, record );
                 }
+                while ( cursor.shouldRetry() );
             }
-            throw new InvalidRecordException( "Record[" + id + "] not in use" );
+            else
+            {
+                record.setInUse( false );
+            }
+            return record;
         }
         catch ( IOException e )
         {
@@ -129,10 +134,11 @@ public class RelationshipGroupStore extends AbstractRecordStore<RelationshipGrou
     private RelationshipGroupRecord getRecord( long id, PageCursor cursor )
     {
         RelationshipGroupRecord record = new RelationshipGroupRecord( -1, -1 );
-        return getRecord( id, cursor, record );
+        readRecord( id, cursor, record );
+        return record;
     }
 
-    private RelationshipGroupRecord getRecord( long id, PageCursor cursor, RelationshipGroupRecord record )
+    private void readRecord( long id, PageCursor cursor, RelationshipGroupRecord record )
     {
         cursor.setOffset( offsetForId( id ) );
 
@@ -141,16 +147,12 @@ public class RelationshipGroupStore extends AbstractRecordStore<RelationshipGrou
         // [ xxx,    ] high firstOut bits
         long inUseByte = cursor.getByte();
         boolean inUse = (inUseByte&0x1) > 0;
-        if ( !inUse )
-        {
-            return null;
-        }
 
         // [    ,xxx ] high firstIn bits
         // [ xxx,    ] high firstLoop bits
         long highByte = cursor.getByte();
 
-        int type = cursor.getShort();
+        int type = getUnsignedShort( cursor.getShort() );
         long nextLowBits = cursor.getUnsignedInt();
         long nextOutLowBits = cursor.getUnsignedInt();
         long nextInLowBits = cursor.getUnsignedInt();
@@ -164,13 +166,12 @@ public class RelationshipGroupStore extends AbstractRecordStore<RelationshipGrou
 
         record.setId( id );
         record.setType( type );
-        record.setInUse( true );
+        record.setInUse( inUse );
         record.setNext( longFromIntAndMod( nextLowBits, nextMod ) );
         record.setFirstOut( longFromIntAndMod( nextOutLowBits, nextOutMod ) );
         record.setFirstIn( longFromIntAndMod( nextInLowBits, nextInMod ) );
         record.setFirstLoop( longFromIntAndMod( nextLoopLowBits, nextLoopMod ) );
         record.setOwningNode( owningNode );
-        return record;
     }
 
     @Override
@@ -233,24 +234,19 @@ public class RelationshipGroupStore extends AbstractRecordStore<RelationshipGrou
     {
         try ( PageCursor cursor = storeFile.io( pageIdForRecord( id ), PF_SHARED_LOCK ) )
         {
+            RelationshipGroupRecord record = new RelationshipGroupRecord( id, -1 );
             if ( cursor.next() )
             {
-                RelationshipGroupRecord record;
                 do
                 {
-                    record = getRecord( id, cursor );
+                    readRecord( id, cursor, record );
                 } while ( cursor.shouldRetry() );
-
-                if ( record != null )
-                {
-                    return record;
-                }
             }
-            return new RelationshipGroupRecord( id, -1 );
+            return record;
         }
         catch ( IOException e )
         {
-            return new RelationshipGroupRecord( id, -1 );
+            throw new UnderlyingStorageException( e );
         }
     }
 
@@ -301,5 +297,10 @@ public class RelationshipGroupStore extends AbstractRecordStore<RelationshipGrou
     public int getDenseNodeThreshold()
     {
         return denseNodeThreshold;
+    }
+
+    private int getUnsignedShort( short value )
+    {
+        return value & 0xFFFF;
     }
 }

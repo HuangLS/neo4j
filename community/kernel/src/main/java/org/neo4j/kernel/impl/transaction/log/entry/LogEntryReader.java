@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,7 +23,20 @@ import java.io.IOException;
 
 import org.neo4j.kernel.impl.transaction.log.ReadableLogChannel;
 
+/**
+* Reads a stream of {@link LogEntry log entries} from a {@link ReadableLogChannel}.
+*
+* @param <S> type of source to read from
+*/
 public interface LogEntryReader<S extends ReadableLogChannel>
 {
+    /**
+     * Reads next {@link LogEntry} from the source.
+     *
+     * @param source to read from.
+     * @return the read {@link LogEntry}.
+     * @throws IOException on error reading from source.
+     * @throws ReadPastEndException if there were no more {@link LogEntry log entries} to read.
+     */
     LogEntry readLogEntry( S source ) throws IOException;
 }

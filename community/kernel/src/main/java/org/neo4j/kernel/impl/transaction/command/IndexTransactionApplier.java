@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -50,7 +50,7 @@ import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsField;
  * Gather node and property changes, converting them into logical updates to the indexes.
  * {@link #close()} will actually apply to the indexes.
  */
-public class IndexTransactionApplier extends NeoCommandHandler.Adapter
+public class IndexTransactionApplier extends CommandHandler.Adapter
 {
     private final ValidatedIndexUpdates indexUpdates;
     private List<NodeLabelUpdate> labelUpdates;

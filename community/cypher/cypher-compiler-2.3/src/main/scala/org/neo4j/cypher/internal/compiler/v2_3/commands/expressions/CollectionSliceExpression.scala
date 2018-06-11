@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,8 +21,9 @@ package org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.{CastSupport, CollectionSupport}
-import pipes.QueryState
-import symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
 case class CollectionSliceExpression(collection: Expression, from: Option[Expression], to: Option[Expression])
   extends NullInNullOutExpression(collection) with CollectionSupport {
@@ -37,53 +38,57 @@ case class CollectionSliceExpression(collection: Expression, from: Option[Expres
     }
 
   private def fullSlice(from: Expression, to: Expression)(collectionValue: Iterable[Any], ctx: ExecutionContext, state: QueryState) = {
-    val fromValue = asInt(from, ctx, state)
-    val toValue = asInt(to, ctx, state)
-
-    val size = collectionValue.size
-
-    if (fromValue >= 0 && toValue >= 0)
-      collectionValue.slice(fromValue, toValue)
-    else if (fromValue >= 0) {
-      val end = size + toValue
-      collectionValue.slice(fromValue, end)
-    } else if (toValue >= 0) {
-      val start = size + fromValue
-      collectionValue.slice(start, toValue)
-    } else {
-      val start = size + fromValue
-      val end = size + toValue
-      collectionValue.slice(start, end)
+    val maybeFromValue = asInt(from, ctx, state)
+    val maybeToValue = asInt(to, ctx, state)
+    (maybeFromValue, maybeToValue) match {
+      case (None, _) => null
+      case (_, None) => null
+      case (Some(fromValue), Some(toValue)) =>
+        val size = collectionValue.size
+        if (fromValue >= 0 && toValue >= 0)
+          collectionValue.slice(fromValue, toValue)
+        else if (fromValue >= 0) {
+          val end = size + toValue
+          collectionValue.slice(fromValue, end)
+        } else if (toValue >= 0) {
+          val start = size + fromValue
+          collectionValue.slice(start, toValue)
+        } else {
+          val start = size + fromValue
+          val end = size + toValue
+          collectionValue.slice(start, end)
+        }
     }
   }
 
   private def fromSlice(from: Expression)(collectionValue: Iterable[Any], ctx: ExecutionContext, state: QueryState) = {
     val fromValue = asInt(from, ctx, state)
-    val size = collectionValue.size
-
-    if (fromValue >= 0)
-      collectionValue.drop(fromValue)
-    else {
-      val end = size + fromValue
-      collectionValue.drop(end)
+    fromValue match {
+      case None => null
+      case Some(value) if value >= 0 => collectionValue.drop(value)
+      case Some(value) =>
+        val end = collectionValue.size + value
+        collectionValue.drop(end)
     }
   }
 
   private def toSlice(from: Expression)(collectionValue: Iterable[Any], ctx: ExecutionContext, state: QueryState) = {
     val toValue = asInt(from, ctx, state)
-    val size = collectionValue.size
-
-    if (toValue >= 0)
-      collectionValue.take(toValue)
-    else {
-      val end = size + toValue
-      collectionValue.take(end)
+    toValue match {
+      case None => null
+      case Some(value) if value >= 0 => collectionValue.take(value)
+      case Some(value) =>
+        val end = collectionValue.size + value
+        collectionValue.take(end)
     }
   }
 
 
-  def asInt(e: Expression, ctx: ExecutionContext, state: QueryState): Int =
-    CastSupport.castOrFail[Number](e(ctx)(state)).intValue()
+  def asInt(e: Expression, ctx: ExecutionContext, state: QueryState): Option[Int] = {
+    val index = e(ctx)(state)
+    if (index == null) None
+    else Some(CastSupport.castOrFail[Number](index).intValue())
+  }
 
   def compute(value: Any, ctx: ExecutionContext)(implicit state: QueryState): Any = {
     val collectionValue: Iterable[Any] = makeTraversable(value)

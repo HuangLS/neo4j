@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,28 +19,29 @@
  */
 package org.neo4j.kernel.impl.transaction.state;
 
-import org.neo4j.kernel.api.properties.DefinedProperty;
+import static org.neo4j.kernel.impl.transaction.state.RelationshipCreator.relCount;
+
+import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.locking.ResourceTypes;
 import org.neo4j.kernel.impl.store.InvalidRecordException;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.store.record.Record;
 import org.neo4j.kernel.impl.store.record.RelationshipGroupRecord;
 import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 import org.neo4j.kernel.impl.transaction.state.RecordAccess.RecordProxy;
-import org.neo4j.kernel.impl.util.ArrayMap;
-import org.neo4j.kernel.impl.util.DirectionWrapper;
 
-import static org.neo4j.kernel.impl.transaction.state.RelationshipCreator.relCount;
+import org.neo4j.kernel.impl.util.DirectionWrapper;
 
 public class RelationshipDeleter
 {
+    private final Locks.Client locks;
     private final RelationshipGroupGetter relGroupGetter;
     private final PropertyDeleter propertyChainDeleter;
-    private final RelationshipLocker locker;
 
-    public RelationshipDeleter( RelationshipLocker locker, RelationshipGroupGetter relGroupGetter,
+    public RelationshipDeleter( Locks.Client locks, RelationshipGroupGetter relGroupGetter,
                                 PropertyDeleter propertyChainDeleter )
     {
-        this.locker = locker;
+        this.locks = locks;
         this.relGroupGetter = relGroupGetter;
         this.propertyChainDeleter = propertyChainDeleter;
     }
@@ -55,15 +56,13 @@ public class RelationshipDeleter
      * @return The properties of the relationship that were removed during the
      *         delete.
      */
-    public ArrayMap<Integer, DefinedProperty> relDelete( long id, RecordAccessSet recordChanges )
+    public void relDelete( long id, RecordAccessSet recordChanges )
     {
         RelationshipRecord record = recordChanges.getRelRecords().getOrLoad( id, null ).forChangingLinkage();
-        ArrayMap<Integer, DefinedProperty> propertyMap =
-                propertyChainDeleter.getAndDeletePropertyChain( record, recordChanges.getPropertyRecords() );
+        propertyChainDeleter.deletePropertyChain( record, recordChanges.getPropertyRecords() );
         disconnectRelationship( record, recordChanges );
         updateNodesForDeletedRelationship( record, recordChanges );
         record.setInUse( false );
-        return propertyMap;
     }
 
     private void disconnectRelationship( RelationshipRecord rel, RecordAccessSet recordChangeSet )
@@ -83,7 +82,7 @@ public class RelationshipDeleter
             return;
         }
 
-        locker.getWriteLock( otherRelId );
+        locks.acquireExclusive( ResourceTypes.RELATIONSHIP, otherRelId );
         RelationshipRecord otherRel = relChanges.getOrLoad( otherRelId, null ).forChangingLinkage();
         boolean changed = false;
         long newId = pointer.get( rel );
@@ -197,7 +196,7 @@ public class RelationshipDeleter
         boolean firstInChain = relIsFirstInChain( nodeId, rel );
         if ( !firstInChain )
         {
-            locker.getWriteLock( firstRelId );
+            locks.acquireExclusive( ResourceTypes.RELATIONSHIP, firstRelId );
         }
         RelationshipRecord firstRel = relRecords.getOrLoad( firstRelId, null ).forChangingLinkage();
         if ( nodeId == firstRel.getFirstNode() )

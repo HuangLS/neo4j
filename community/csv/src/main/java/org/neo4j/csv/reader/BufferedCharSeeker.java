@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -90,6 +90,7 @@ public class BufferedCharSeeker implements CharSeeker
         int endOffset = 1;
         int skippedChars = 0;
         int quoteDepth = 0;
+        int quoteStartLine = 0;
         boolean isQuoted = false;
 
         while ( !eof )
@@ -101,6 +102,7 @@ public class BufferedCharSeeker implements CharSeeker
                 {   // We found a quote, which was the first of the value, skip it and switch mode
                     quoteDepth++;
                     seekStartPos++;
+                    quoteStartLine = lineNumber;
                     continue;
                 }
                 else if ( isNewLine( ch ) )
@@ -162,6 +164,11 @@ public class BufferedCharSeeker implements CharSeeker
                     {   // Found a slash encoded quote
                         repositionChar( bufferPos++, ++skippedChars );
                     }
+                }
+                else if ( eof )
+                {
+                    // We have an open quote but have reached the end of the file, this is a formatting error
+                    throw new MissingEndQuoteException( this, quoteStartLine, quoteChar );
                 }
             }
         }
@@ -264,8 +271,11 @@ public class BufferedCharSeeker implements CharSeeker
         {
             if ( bufferPos - seekStartPos >= charBuffer.pivot() )
             {
-                throw new IllegalStateException( "Tried to read in a value larger than effective buffer size " +
-                        charBuffer.pivot() );
+                throw new IllegalStateException( "Tried to read a field larger than buffer size " +
+                        charBuffer.pivot() + ". A common cause of this is that a field has an unterminated " +
+                        "quote and so will try to seek until the next quote, which ever line it may be on." +
+                        " This should not happen if multi-line fields are disabled, given that the fields contains " +
+                        "no new-line characters. This field started at " + sourceDescription() + ":" + lineNumber() );
             }
 
             absoluteBufferStartPosition += charBuffer.available();

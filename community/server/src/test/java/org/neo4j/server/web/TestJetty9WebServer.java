@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,6 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import java.io.File;
-import java.io.IOException;
 
 import org.neo4j.kernel.GraphDatabaseDependencies;
 import org.neo4j.kernel.configuration.Config;
@@ -36,10 +35,9 @@ import org.neo4j.server.configuration.ServerConfigurator;
 import org.neo4j.server.helpers.CommunityServerBuilder;
 import org.neo4j.test.ImpermanentDatabaseRule;
 import org.neo4j.test.ImpermanentGraphDatabase;
+import org.neo4j.test.SuppressOutput;
 import org.neo4j.test.server.ExclusiveServerTestBase;
 import org.neo4j.test.server.HTTP;
-import org.neo4j.test.SuppressOutput;
-
 
 import static org.junit.Assert.assertEquals;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
@@ -51,7 +49,7 @@ public class TestJetty9WebServer extends ExclusiveServerTestBase
     private CommunityNeoServer server;
 
     @Test
-    public void shouldBeAbleToUsePortZero() throws IOException
+    public void shouldBeAbleToUsePortZero() throws Exception
     {
         // Given
         webServer = new Jetty9WebServer( NullLogProvider.getInstance(), new Config() );

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,9 @@
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.ast.Statement
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.ast.Statement
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.{DummyPosition, Rewriter}
 
 trait RewriteTest {
   self: CypherFunSuite =>
@@ -35,7 +36,7 @@ trait RewriteTest {
     val original = parseForRewriting(originalQuery)
     val expected = parseForRewriting(expectedQuery)
     val mkException = new SyntaxExceptionCreator(originalQuery, Some(DummyPosition(0)))
-    semanticChecker.check(originalQuery, original, devNullLogger, mkException)
+    semanticChecker.check(originalQuery, original, mkException)
 
     val result = rewrite(original)
     assert(result === expected, "\n" + originalQuery)

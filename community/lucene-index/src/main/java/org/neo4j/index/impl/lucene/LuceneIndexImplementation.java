@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,9 +31,13 @@ import org.neo4j.graphdb.index.IndexImplementation;
 import org.neo4j.graphdb.index.IndexManager;
 import org.neo4j.graphdb.index.LegacyIndexProviderTransaction;
 import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
+import org.neo4j.io.fs.FileSystemAbstraction;
+import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.index.IndexConfigStore;
+import org.neo4j.kernel.impl.transaction.command.CommandHandler;
+import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
-public class LuceneIndexImplementation implements IndexImplementation
+public class LuceneIndexImplementation extends LifecycleAdapter implements IndexImplementation
 {
     static final String KEY_TYPE = "type";
     static final String KEY_ANALYZER = "analyzer";
@@ -50,13 +54,45 @@ public class LuceneIndexImplementation implements IndexImplementation
                     IndexManager.PROVIDER, SERVICE_NAME, KEY_TYPE, "fulltext",
                     KEY_TO_LOWER_CASE, "true" ) );
 
-    public static final int DEFAULT_LAZY_THRESHOLD = 100;
+    private LuceneDataSource dataSource;
+    private final File storeDir;
+    private final Config config;
+    private final IndexConfigStore indexStore;
+    private final FileSystemAbstraction fileSystemAbstraction;
 
-    private final LuceneDataSource dataSource;
-
-    public LuceneIndexImplementation( LuceneDataSource dataSource )
+    public LuceneIndexImplementation( File storeDir, Config config, IndexConfigStore indexStore,
+            FileSystemAbstraction fileSystemAbstraction )
     {
-        this.dataSource = dataSource;
+        this.storeDir = storeDir;
+        this.config = config;
+        this.indexStore = indexStore;
+        this.fileSystemAbstraction = fileSystemAbstraction;
+    }
+
+    @Override
+    public void init() throws Throwable
+    {
+        this.dataSource = new LuceneDataSource( storeDir, config, indexStore, fileSystemAbstraction );
+        this.dataSource.init();
+    }
+
+    @Override
+    public void start() throws Throwable
+    {
+        this.dataSource.start();
+    }
+
+    @Override
+    public void stop() throws Throwable
+    {
+        this.dataSource.stop();
+    }
+
+    @Override
+    public void shutdown() throws Throwable
+    {
+        this.dataSource.shutdown();
+        this.dataSource = null;
     }
 
     @Override
@@ -128,7 +164,7 @@ public class LuceneIndexImplementation implements IndexImplementation
     }
 
     @Override
-    public NeoCommandHandler newApplier( boolean recovery )
+    public CommandHandler newApplier( boolean recovery )
     {
         return new LuceneCommandApplier( dataSource, recovery );
     }

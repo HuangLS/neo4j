@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -56,7 +56,7 @@ public class CoarseBoundedProgressExecutionMonitor extends ExecutionMonitor.Adap
         int highestPercentThere = previousPercent;
         for ( StageExecution execution : executions )
         {
-            // This calculation below is aware of internals of the parallell importer and may
+            // This calculation below is aware of internals of the parallel importer and may
             // be wrong for other importers.
             long maxNumberOfBatches =
                     (highNodeId/execution.getConfig().batchSize()) * 2 + // node records encountered twice

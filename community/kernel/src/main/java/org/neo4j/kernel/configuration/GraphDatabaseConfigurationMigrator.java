@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,8 +22,8 @@ package org.neo4j.kernel.configuration;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Args;
-import org.neo4j.helpers.Settings;
 
 import static java.util.regex.Pattern.quote;
 
@@ -206,6 +206,34 @@ public class GraphDatabaseConfigurationMigrator extends BaseConfigurationMigrato
                 }
             }
         });
+
+        add( new SpecificPropertyMigration( "cache_type",
+                "The cache_type setting has been removed as of Neo4j 2.3. " +
+                "Configuration has been simplified to only require tuning of the page cache.")
+        {
+            @Override
+            public boolean appliesTo( Map<String,String> rawConfiguration )
+            {
+                String value = rawConfiguration.get( "cache_type" );
+                if ( value == null )
+                {
+                    // differentiate between the setting not being set, and it being set to null
+                    return rawConfiguration.containsKey( "cache_type" );
+                }
+                if ( GraphDatabaseSettings.cache_type.getDefaultValue().equals( value ) )
+                {
+                    // remove the default value, but don't issue a warning.
+                    rawConfiguration.remove( "cache_type" );
+                    return false;
+                }
+                return true;
+            }
+
+            @Override
+            public void setValueWithOldSetting( String value, Map<String,String> rawConfiguration )
+            {
+            }
+        } );
     }
 
     @Deprecated

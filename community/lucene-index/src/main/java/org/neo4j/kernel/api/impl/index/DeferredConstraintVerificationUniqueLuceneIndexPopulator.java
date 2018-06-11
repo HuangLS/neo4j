@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,6 +34,7 @@ import org.apache.lucene.search.TermQuery;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.neo4j.collection.primitive.PrimitiveLongSet;
@@ -51,6 +52,7 @@ import org.neo4j.kernel.api.index.Reservation;
 import org.neo4j.kernel.api.index.util.FailureStorage;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.api.index.sampling.UniqueIndexSampler;
+import org.neo4j.logging.LogProvider;
 import org.neo4j.register.Register.DoubleLong;
 
 import static org.neo4j.kernel.api.impl.index.LuceneDocumentStructure.NODE_ID_KEY;
@@ -64,13 +66,14 @@ class DeferredConstraintVerificationUniqueLuceneIndexPopulator extends LuceneInd
     private ReferenceManager<IndexSearcher> searcherManager;
 
     DeferredConstraintVerificationUniqueLuceneIndexPopulator( LuceneDocumentStructure documentStructure,
+                                                              LogProvider logging,
                                                               IndexWriterFactory<LuceneIndexWriter> writers,
                                                               SearcherManagerFactory searcherManagerFactory,
                                                               DirectoryFactory dirFactory, File dirFile,
-                                                              FailureStorage failureStorage, long indexId,
-                                                              IndexDescriptor descriptor )
+                                                              boolean archiveOld, FailureStorage failureStorage,
+                                                              long indexId, IndexDescriptor descriptor )
     {
-        super( documentStructure, writers, dirFactory, dirFile, failureStorage, indexId );
+        super( documentStructure, logging, writers, dirFactory, dirFile, archiveOld, failureStorage, indexId );
         this.descriptor = descriptor;
         this.sampler = new UniqueIndexSampler();
         this.searcherManagerFactory = searcherManagerFactory;
@@ -267,7 +270,7 @@ class DeferredConstraintVerificationUniqueLuceneIndexPopulator extends LuceneInd
         private final PropertyAccessor accessor;
         private final LuceneDocumentStructure documentStructure;
         private final int propertyKeyId;
-        private final EntrySet actualValues;
+        private EntrySet actualValues;
         private IndexReader reader;
         private int docBase;
 
@@ -354,7 +357,7 @@ class DeferredConstraintVerificationUniqueLuceneIndexPopulator extends LuceneInd
 
         public void reset()
         {
-            actualValues.reset(); // TODO benchmark this vs. not clearing and instead creating a new object, perhaps
+            actualValues = new EntrySet();
         }
     }
 
@@ -366,23 +369,15 @@ class DeferredConstraintVerificationUniqueLuceneIndexPopulator extends LuceneInd
      */
     private static class EntrySet
     {
-        static final int INCREMENT = 100;
+        static final int INCREMENT = 10000;
 
         Object[] value = new Object[INCREMENT];
         long[] nodeId = new long[INCREMENT];
         EntrySet next;
 
-        public void reset()
+        EntrySet()
         {
-            EntrySet current = this;
-            do {
-                for (int i = 0; i < INCREMENT; i++)
-                {
-                    current.value[i] = null;
-                    current.nodeId[i] = StatementConstants.NO_SUCH_NODE;
-                }
-                current = next;
-            } while ( current != null );
+	       Arrays.fill( nodeId, StatementConstants.NO_SUCH_NODE );
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -80,8 +80,6 @@ public interface Node extends PropertyContainer
      */
     void delete();
 
-    // Relationships
-
     /**
      * Returns all the relationships attached to this node. If no relationships
      * are attached to this node, an empty iterable will be returned.
@@ -110,7 +108,7 @@ public interface Node extends PropertyContainer
      *         node
      */
     Iterable<Relationship> getRelationships( RelationshipType... types );
-    
+
     /**
      * Returns all the relationships of any of the types in <code>types</code>
      * that are attached to this node and have the given <code>direction</code>.
@@ -148,7 +146,7 @@ public interface Node extends PropertyContainer
      *         <code>false</code> otherwise
      */
     boolean hasRelationship( Direction direction, RelationshipType... types );
-    
+
     /**
      * Returns all {@link Direction#OUTGOING OUTGOING} or
      * {@link Direction#INCOMING INCOMING} relationships from this node. If
@@ -230,7 +228,6 @@ public interface Node extends PropertyContainer
      * time more than one such relationships exist, it is a fatal error that
      * should generate an unchecked exception. This method reflects that
      * semantics and returns either:
-     * <p>
      * <ol>
      * <li><code>null</code> if there are zero relationships of the given type
      * and direction,</li>
@@ -273,7 +270,7 @@ public interface Node extends PropertyContainer
      * @return the newly created relationship
      */
     Relationship createRelationshipTo( Node otherNode, RelationshipType type );
-    
+
     /**
      * Returns relationship types which this node has one more relationships
      * for. If this node doesn't have any relationships an empty {@link Iterable}
@@ -291,34 +288,26 @@ public interface Node extends PropertyContainer
 
     /**
      * Returns the number of relationships of a given {@code type} connected to this node.
-     * If the degree of this node is less than (TODO) dense node threshold this method
-     * will have to load all relationships, if not already loaded, to be able to give
-     * the answer. If the number of relationships connected to this node is greater than
-     * or equal to the (TODO) dense node threshold this lookup will be O(1).
      *
+     * @param type the type of relationships to get the degree for
      * @return the number of relationships of a given {@code type} connected to this node.
      */
     public int getDegree( RelationshipType type );
 
     /**
      * Returns the number of relationships of a given {@code direction} connected to this node.
-     * If the degree of this node is less than (TODO) dense node threshold this method
-     * will have to load all relationships, if not already loaded, to be able to give
-     * the answer. If the number of relationships connected to this is node greater than
-     * or equal to the (TODO) dense node threshold this lookup will be O(1).
      *
+     * @param direction the direction of the relationships
      * @return the number of relationships of a given {@code direction} for this node.
      */
     public int getDegree( Direction direction );
 
     /**
      * Returns the number of relationships of a given {@code type} and {@code direction}
-     * connected to this node. If the degree of this node is less than (TODO) dense node
-     * threshold this method will have to load all relationships, if not already loaded,
-     * to be able to give the answer. If the number of relationships connected to this
-     * node is greater than or equal to the (TODO) dense node threshold this lookup will
-     * be O(1).
+     * connected to this node.
      *
+     * @param type the type of relationships to get the degree for
+     * @param direction the direction of the relationships
      * @return the number of relationships of a given {@code type} and {@code direction}
      * for this node.
      */
@@ -334,7 +323,7 @@ public interface Node extends PropertyContainer
      * tree formed by the given relationship types (with direction) exactly
      * once. For more information about traversal, see the {@link Traverser}
      * documentation.
-     * 
+     *
      *
      * @param traversalOrder the traversal order
      * @param stopEvaluator an evaluator instructing the new traverser about
@@ -376,7 +365,7 @@ public interface Node extends PropertyContainer
      * each node that can be reached from this node by the spanning tree formed
      * by the given relationship types (with direction) exactly once. For more
      * information about traversal, see the {@link Traverser} documentation.
-     * 
+     *
      * @param traversalOrder the traversal order
      * @param stopEvaluator an evaluator instructing the new traverser about
      *            when to stop traversing, either a predefined evaluator such as
@@ -432,7 +421,7 @@ public interface Node extends PropertyContainer
      * from this node by the spanning tree formed by the given relationship
      * types (with direction) exactly once. For more information about
      * traversal, see the {@link Traverser} documentation.
-     * 
+     *
      * @param traversalOrder the traversal order
      * @param stopEvaluator an evaluator instructing the new traverser about
      *            when to stop traversing, either a predefined evaluator such as
@@ -488,7 +477,7 @@ public interface Node extends PropertyContainer
      * @return {@code true} if this node has the given label, otherwise {@code false}.
      */
     boolean hasLabel( Label label );
-    
+
     /**
      * Lists all labels attached to this node. If this node has no
      * labels an empty {@link Iterable} will be returned.

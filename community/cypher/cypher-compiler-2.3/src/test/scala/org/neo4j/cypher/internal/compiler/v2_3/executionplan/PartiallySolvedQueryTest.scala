@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,8 +23,8 @@ import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Identifier
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders.Unsolved
 import org.neo4j.cypher.internal.compiler.v2_3.mutation.{CreateNode, DeleteEntityAction, MergeNodeAction, MergePatternAction}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class PartiallySolvedQueryTest extends CypherFunSuite {
 
@@ -43,7 +43,7 @@ class PartiallySolvedQueryTest extends CypherFunSuite {
 
   test("deletes and creates should not be compacted together") {
     // Given MATCH (a) WITH a DELETE a WITH a CREATE (:Person)
-    val deleteAction = DeleteEntityAction(Identifier("a"))
+    val deleteAction = DeleteEntityAction(Identifier("a"), forced = false)
     val q3 = Query.start(createNode("a3")).returns()
     val q2 = Query.updates(deleteAction).tail(q3).returns(AllIdentifiers())
     val q1 = Query.matches(SingleNode("a")).tail(q2).returns(AllIdentifiers())
@@ -66,7 +66,7 @@ class PartiallySolvedQueryTest extends CypherFunSuite {
   test("delete followed by merge node should not be compacted together") {
     // MATCH (a) DELETE a MERGE (b:B)
     val q3 = Query.updates(mergeNode("b")).returns()
-    val q2 = Query.updates(DeleteEntityAction(Identifier("a"))).tail(q3).returns(AllIdentifiers())
+    val q2 = Query.updates(DeleteEntityAction(Identifier("a"), forced = false)).tail(q3).returns(AllIdentifiers())
     val q1 = Query.matches(SingleNode("a")).tail(q2).returns(AllIdentifiers())
 
     // When
@@ -76,7 +76,7 @@ class PartiallySolvedQueryTest extends CypherFunSuite {
     psq.updates shouldBe empty
 
     // Second query part contains no merge node
-    psq.tail.get.updates.toList should equal(List(Unsolved(DeleteEntityAction(Identifier("a")))))
+    psq.tail.get.updates.toList should equal(List(Unsolved(DeleteEntityAction(Identifier("a"), forced = false))))
 
     // Third part contains the merge node
     psq.tail.get.tail.get.updates.toList should equal(List(Unsolved(mergeNode("b"))))
@@ -103,7 +103,7 @@ class PartiallySolvedQueryTest extends CypherFunSuite {
 
   test("merge pattern followed by merge node should not be compacted together") {
     // MATCH (n) MERGE (n)-[t:T]->(n) MERGE (a:A)
-    val pattern = mergePattern(RelatedTo("n", "n", "t", "T", Direction.OUTGOING))
+    val pattern = mergePattern(RelatedTo("n", "n", "t", "T", SemanticDirection.OUTGOING))
     val q3 = Query.updates(mergeNode("a")).returns()
     val q2 = Query.updates(pattern).tail(q3).returns(AllIdentifiers())
     val q1 = Query.matches(SingleNode("a")).tail(q2).returns(AllIdentifiers())
@@ -125,5 +125,5 @@ class PartiallySolvedQueryTest extends CypherFunSuite {
 
   private def mergeNode(name: String) = MergeNodeAction(name, Map.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, None)
 
-  private def mergePattern(pattern: Pattern) = MergePatternAction(Seq(pattern), Seq.empty, Seq.empty)
+  private def mergePattern(pattern: Pattern) = MergePatternAction(Seq(pattern), Seq.empty, Seq.empty, Seq.empty)
 }

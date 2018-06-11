@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,9 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.pipes.aggregation
 
-import org.neo4j.cypher.internal.compiler.v2_3.CypherTypeException
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Expression
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.CypherTypeException
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class SumFunctionTest extends CypherFunSuite with AggregateTest {
   def createAggregator(inner: Expression) = new SumFunction(inner)
@@ -30,7 +30,7 @@ class SumFunctionTest extends CypherFunSuite with AggregateTest {
     val result = aggregateOn(1)
 
     result should equal(1)
-    result shouldBe a [java.lang.Integer]
+    result shouldBe a [java.lang.Long]
   }
 
   test("singleValueOfDecimalReturnsDecimal") {
@@ -51,24 +51,39 @@ class SumFunctionTest extends CypherFunSuite with AggregateTest {
     val result = aggregateOn(1.byteValue(), 1.shortValue())
 
     result should equal(2)
-    result shouldBe a [java.lang.Integer]
+    result shouldBe a [java.lang.Long]
   }
 
   test("noNumbersEqualsZero") {
     val result = aggregateOn()
 
     result should equal(0)
-    result shouldBe a [java.lang.Integer]
+    result shouldBe a [java.lang.Long]
   }
 
   test("nullDoesNotChangeTheSum") {
     val result = aggregateOn(1, null)
 
     result should equal(1)
-    result shouldBe a [java.lang.Integer]
+    result shouldBe a [java.lang.Long]
   }
 
   test("noNumberValuesThrowAnException") {
     intercept[CypherTypeException](aggregateOn(1, "wut"))
+  }
+
+  test("intOverflowTransformsSumToLong") {
+    val halfInt= Int.MaxValue
+    val result = aggregateOn(halfInt, halfInt, halfInt)
+    val expected = 3L * halfInt
+    result should equal(expected)
+  }
+
+  test("typesArentUnnecessaryWidened") {
+    val thirdOfMaxInt: Int = Int.MaxValue / 3
+    val result = aggregateOn(thirdOfMaxInt, thirdOfMaxInt)
+    val expected = thirdOfMaxInt + thirdOfMaxInt
+    result should equal(expected)
+    result shouldBe a [java.lang.Long]
   }
 }

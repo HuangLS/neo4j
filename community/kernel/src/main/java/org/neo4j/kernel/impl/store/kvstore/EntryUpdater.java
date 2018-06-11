@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -68,4 +68,23 @@ public abstract class EntryUpdater<Key> implements AutoCloseable
             throw new IllegalStateException( "The updater is not available." );
         }
     }
+
+    @SuppressWarnings( "unchecked" )
+    static <Key> EntryUpdater<Key> noUpdates()
+    {
+        return NO_UPDATES;
+    }
+
+    private static final EntryUpdater NO_UPDATES = new EntryUpdater( null )
+    {
+        @Override
+        public void apply( Object o, ValueUpdate update )
+        {
+        }
+
+        @Override
+        public void close()
+        {
+        }
+    };
 }

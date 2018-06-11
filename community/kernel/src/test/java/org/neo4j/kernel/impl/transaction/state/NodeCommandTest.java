@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,6 +33,7 @@ import java.util.Set;
 
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeLabels;
 import org.neo4j.kernel.impl.store.NodeStore;
 import org.neo4j.kernel.impl.store.StoreFactory;
@@ -43,7 +44,6 @@ import org.neo4j.kernel.impl.transaction.command.CommandReader;
 import org.neo4j.kernel.impl.transaction.command.PhysicalLogNeoCommandReaderV2_2;
 import org.neo4j.kernel.impl.transaction.log.CommandWriter;
 import org.neo4j.kernel.impl.transaction.log.InMemoryLogChannel;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.EphemeralFileSystemRule;
 import org.neo4j.test.PageCacheRule;
@@ -54,6 +54,7 @@ import static org.hamcrest.core.IsEqual.equalTo;
 import static org.neo4j.kernel.impl.store.DynamicNodeLabels.dynamicPointer;
 import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsField;
 import static org.neo4j.kernel.impl.store.ShortArray.LONG;
+
 import static org.neo4j.kernel.impl.store.record.DynamicRecord.dynamicRecord;
 import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.safeCastLongToInt;
 
@@ -67,6 +68,7 @@ public class NodeCommandTest
     private final CommandWriter commandWriter = new CommandWriter( channel );
     @Rule
     public EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
+    private NeoStores neoStores;
 
     @Test
     public void shouldSerializeAndDeserializeUnusedRecords() throws Exception
@@ -208,23 +210,16 @@ public class NodeCommandTest
     {
         File dir = new File( "dir" );
         fs.get().mkdirs( dir );
-        Monitors monitors = new Monitors();
         @SuppressWarnings("deprecation")
-        StoreFactory storeFactory = new StoreFactory(
-                dir,
-                new Config(),
-                new DefaultIdGeneratorFactory( fs.get() ),
-                pageCacheRule.getPageCache( fs.get() ),
-                fs.get(),
-                NullLogProvider.getInstance(),
-                monitors );
-        storeFactory.createNodeStore();
-        nodeStore = storeFactory.newNodeStore();
+        StoreFactory storeFactory = new StoreFactory( dir, new Config(), new DefaultIdGeneratorFactory( fs.get() ),
+                pageCacheRule.getPageCache( fs.get() ), fs.get(), NullLogProvider.getInstance() );
+        neoStores = storeFactory.openAllNeoStores( true );
+        nodeStore = neoStores.getNodeStore();
     }
 
     @After
     public void after() throws Exception
     {
-        nodeStore.close();
+        neoStores.close();
     }
 }

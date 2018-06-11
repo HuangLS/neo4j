@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ /*
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,11 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.executionplan
 
-import org.neo4j.cypher.internal.compiler.v2_3.{LoadCsvStatusWrapCypherException, CypherException}
+import java.net.URL
+
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.ExternalResource
 import org.neo4j.cypher.internal.compiler.v2_3.spi.QueryContext
-import java.net.URL
+import org.neo4j.cypher.internal.frontend.v2_3.{CypherException, LoadCsvStatusWrapCypherException}
 
 class LoadCsvPeriodicCommitObserver(batchRowCount: Long, resources: ExternalResource, queryContext: QueryContext)
   extends ExternalResource with ((CypherException) => CypherException) {
@@ -30,9 +31,11 @@ class LoadCsvPeriodicCommitObserver(batchRowCount: Long, resources: ExternalReso
   val updateCounter = new UpdateCounter
   var outerLoadCSVIterator: Option[LoadCsvIterator] = None
 
-  def getCsvIterator(url: URL, fieldTerminator: Option[String] = None): Iterator[Array[String]] = {
-    val innerIterator = resources.getCsvIterator(url, fieldTerminator)
+  def getCsvIterator(url: URL, fieldTerminator: Option[String] = None, headers:Boolean=false): Iterator[Array[String]] = {
+    val innerIterator = resources.getCsvIterator(url, fieldTerminator, headers)
     if (outerLoadCSVIterator.isEmpty) {
+      if (headers)
+        updateCounter.offsetForHeaders()
       val iterator = new LoadCsvIterator(url, innerIterator)(onNext())
       outerLoadCSVIterator = Some(iterator)
       iterator
@@ -42,8 +45,8 @@ class LoadCsvPeriodicCommitObserver(batchRowCount: Long, resources: ExternalReso
   }
 
   private def onNext() {
-    updateCounter += 1
     updateCounter.resetIfPastLimit(batchRowCount)(commitAndRestartTx())
+    updateCounter += 1
   }
 
   private def commitAndRestartTx() {

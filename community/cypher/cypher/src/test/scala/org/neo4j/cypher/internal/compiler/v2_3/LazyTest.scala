@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.cypher.internal.compiler.v2_3
 
 import java.lang.{Iterable => JIterable}
+import java.util
 import java.util.{Iterator => JIterator}
 
 import org.junit.Assert._
@@ -30,11 +31,13 @@ import org.mockito.stubbing.Answer
 import org.neo4j.collection.primitive.PrimitiveLongCollections
 import org.neo4j.cypher._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Identifier, Literal}
-import org.neo4j.cypher.internal.compiler.v2_3.commands.{GreaterThan, True}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.{GreaterThan, True}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes._
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching._
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.Argument
-import org.neo4j.cypher.internal.compiler.v2_3.symbols.CTInteger
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.cypher.internal.frontend.v2_3.symbols.CTInteger
+import org.neo4j.cypher.internal.spi.v2_3.MonoDirectionalTraversalMatcher
 import org.neo4j.cypher.internal.{ExecutionPlan, CypherCompiler => Compiler}
 import org.neo4j.graphdb.Traverser.Order
 import org.neo4j.graphdb._
@@ -91,7 +94,7 @@ class LazyTest extends ExecutionEngineFunSuite {
     val limiter = new Limiter(2)
     val monitoredNode = new MonitoredNode(aNode, limiter.monitor)
 
-    val step = SingleStep(0, Seq(), Direction.OUTGOING, None, True(), True())
+    val step = SingleStep(0, Seq(), SemanticDirection.OUTGOING, None, True(), True())
     val producer = EntityProducer[Node]("test", mock[Argument]) { (ctx, state) => Iterator(monitoredNode) }
     val matcher = new MonoDirectionalTraversalMatcher(step, producer)
     val ctx = ExecutionContext().newWith("a" -> monitoredNode)
@@ -213,9 +216,12 @@ class LazyTest extends ExecutionEngineFunSuite {
     val nodesIterator = PrimitiveLongCollections.iterator( 0L, 1L, 2L, 3L, 4L, 5L, 6L )
     when(fakeReadStatement.nodesGetAll()).thenReturn(nodesIterator)
 
-    val cache = new LRUCache[String, (ExecutionPlan, Map[String, Any])](1)
-    when(fakeReadStatement.schemaStateGetOrCreate(any(), any())).then(
-      new Answer[LRUCache[String, (ExecutionPlan, Map[String, Any])]]() {
+    val lruCache: LRUCache[String, (ExecutionPlan, Map[String, Any])] = new LRUCache[String, (ExecutionPlan, Map[String, Any])](1)
+    val cacheAccessor = new MonitoringCacheAccessor[String, (ExecutionPlan, Map[String, Any])](mock[CypherCacheHitMonitor[String]])
+    val cache = new QueryCache[String, (ExecutionPlan, Map[String, Any])](cacheAccessor, lruCache)
+
+    when(fakeReadStatement.schemaStateGetOrCreate(any(), any())).thenAnswer(
+      new Answer[QueryCache[String, (ExecutionPlan, Map[String, Any])]]() {
         def answer(invocation: InvocationOnMock) = { cache }
     })
 
@@ -269,7 +275,7 @@ class LazyTest extends ExecutionEngineFunSuite {
     val monitoredNode = new MonitoredNode(aNode, limiter.monitor)
 
     val end = EndPoint("b")
-    val trail = SingleStepTrail(end, Direction.OUTGOING, "r", Seq(), "a", True(), True(), null, Seq())
+    val trail = SingleStepTrail(end, SemanticDirection.OUTGOING, "r", Seq(), "a", True(), True(), null, Seq())
     val step = trail.toSteps(0).get
     val producer = EntityProducer[Node]("test", mock[Argument]) { (ctx, state) => Iterator(monitoredNode) }
     val matcher = new MonoDirectionalTraversalMatcher(step, producer)
@@ -375,6 +381,10 @@ class MonitoredNode(inner: Node, monitor: () => Unit) extends Node {
   def removeProperty(key: String): AnyRef = null
 
   def getPropertyKeys: JIterable[String] = null
+
+  def getProperties( keys: String* ): util.Map[String, AnyRef] = null
+
+  def getAllProperties: util.Map[String, AnyRef] = null
 
   override def toString = "°" + inner.toString + "°"
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,18 +19,18 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast
-import org.neo4j.cypher.internal.compiler.v2_3.ast.RelTypeName
-import org.neo4j.cypher.internal.compiler.v2_3.perty.PageDocFormatting
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticDirection, ast}
+import org.neo4j.cypher.internal.frontend.v2_3.ast.RelTypeName
+import org.neo4j.cypher.internal.frontend.v2_3.perty.PageDocFormatting
 
-final case class PatternRelationship(name: IdName, nodes: (IdName, IdName), dir: Direction, types: Seq[RelTypeName], length: PatternLength)
+final case class PatternRelationship(name: IdName, nodes: (IdName, IdName), dir: SemanticDirection,
+                                     types: Seq[RelTypeName], length: PatternLength)
   extends PageDocFormatting { // with ToPrettyString[PatternRelationship] {
 
 //  def toDefaultPrettyString(formatter: DocFormatter) =
 //    toPrettyString(formatter)(InternalDocHandler.docGen)
 
-  def directionRelativeTo(node: IdName): Direction = if (node == left) dir else dir.reverse()
+  def directionRelativeTo(node: IdName): SemanticDirection = if (node == left) dir else dir.reversed
 
   def otherSide(node: IdName) = if (node == left) right else left
 
@@ -41,7 +41,7 @@ final case class PatternRelationship(name: IdName, nodes: (IdName, IdName), dir:
   def right = nodes._2
 
   def inOrder = dir match {
-    case Direction.INCOMING => (right, left)
+    case SemanticDirection.INCOMING => (right, left)
     case _ => (left, right)
   }
 }

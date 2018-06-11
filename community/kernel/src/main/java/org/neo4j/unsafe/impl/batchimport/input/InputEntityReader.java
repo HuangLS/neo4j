@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import java.io.IOException;
 import org.neo4j.collection.primitive.Primitive;
 import org.neo4j.collection.primitive.PrimitiveIntObjectMap;
 import org.neo4j.helpers.collection.PrefetchingIterator;
+import org.neo4j.io.ByteUnit;
 import org.neo4j.io.fs.StoreChannel;
 import org.neo4j.kernel.impl.transaction.log.LogPositionMarker;
 import org.neo4j.kernel.impl.transaction.log.PhysicalLogVersionedStoreChannel;
@@ -31,7 +32,6 @@ import org.neo4j.kernel.impl.transaction.log.ReadAheadLogChannel;
 import org.neo4j.kernel.impl.transaction.log.ReadableLogChannel;
 import org.neo4j.unsafe.impl.batchimport.InputIterator;
 
-import static org.neo4j.helpers.Format.KB;
 import static org.neo4j.kernel.impl.transaction.log.LogVersionBridge.NO_MORE_CHANNELS;
 import static org.neo4j.unsafe.impl.batchimport.input.InputCache.END_OF_ENTITIES;
 import static org.neo4j.unsafe.impl.batchimport.input.InputCache.HAS_FIRST_PROPERTY_ID;
@@ -70,7 +70,7 @@ abstract class InputEntityReader<ENTITY extends InputEntity> extends Prefetching
 
     private void readHeader( StoreChannel header ) throws IOException
     {
-        try ( ReadableLogChannel reader = reader( header, 8*KB ) )
+        try ( ReadableLogChannel reader = reader( header, (int) ByteUnit.kibiBytes( 8 ) ) )
         {
             for ( short id = 0; reader.get() == TOKEN; id++ )
             {

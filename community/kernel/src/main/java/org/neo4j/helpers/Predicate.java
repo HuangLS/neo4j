@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,6 +29,9 @@ package org.neo4j.helpers;
 public interface Predicate<T>
 {
     /**
+     * Decide whether or not to accept an item. 
+     * 
+     * @param item item to accept or not
      * @return whether or not to accept the {@code item}, where {@code true}
      * means that the {@code item} is accepted and {@code false} means that
      * it's not (i.e. didn't pass the filter).

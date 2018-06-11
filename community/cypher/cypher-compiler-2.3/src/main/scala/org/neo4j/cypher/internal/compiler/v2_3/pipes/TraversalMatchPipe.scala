@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,7 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, ReadsNodes, ReadsRelationships}
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ReadsAllNodes, Effects, ReadsRelationships}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.{Trail, TraversalMatcher}
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments.KeyNames
 
@@ -52,7 +52,7 @@ case class TraversalMatchPipe(source: Pipe, matcher: TraversalMatcher, trail: Tr
   def planDescription =
     source.planDescription.andThen(this.id, "TraversalMatcher", identifiers, KeyNames(trail.pathDescription))
 
-  override def localEffects = trail.predicates.flatten.foldLeft(Effects(ReadsNodes, ReadsRelationships))(_ | _.effects(symbols))
+  override def localEffects = trail.predicates.flatten.foldLeft(Effects(ReadsAllNodes, ReadsRelationships))(_ | _.effects(symbols))
 
   def dup(sources: List[Pipe]): Pipe = {
     val (head :: Nil) = sources

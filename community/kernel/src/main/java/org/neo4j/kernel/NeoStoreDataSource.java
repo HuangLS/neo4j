@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,12 +25,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
+import org.neo4j.function.Factory;
 import org.neo4j.function.Supplier;
 import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.graphdb.ResourceIterator;
@@ -41,7 +42,6 @@ import org.neo4j.graphdb.index.IndexProviders;
 import org.neo4j.helpers.Clock;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Provider;
-import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.api.KernelAPI;
@@ -70,17 +70,23 @@ import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.api.TransactionHooks;
 import org.neo4j.kernel.impl.api.TransactionRepresentationStoreApplier;
 import org.neo4j.kernel.impl.api.UpdateableSchemaState;
+import org.neo4j.kernel.impl.api.index.IndexUpdateMode;
 import org.neo4j.kernel.impl.api.index.IndexUpdatesValidator;
 import org.neo4j.kernel.impl.api.index.IndexingService;
+import org.neo4j.kernel.impl.api.index.OnlineIndexUpdatesValidator;
+import org.neo4j.kernel.impl.api.index.RecoveryIndexingUpdatesValidator;
 import org.neo4j.kernel.impl.api.index.SchemaIndexProviderMap;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
 import org.neo4j.kernel.impl.api.scan.LabelScanStoreProvider;
 import org.neo4j.kernel.impl.api.state.ConstraintIndexCreator;
 import org.neo4j.kernel.impl.api.store.CacheLayer;
 import org.neo4j.kernel.impl.api.store.DiskLayer;
+import org.neo4j.kernel.impl.api.store.ProcedureCache;
 import org.neo4j.kernel.impl.api.store.SchemaCache;
 import org.neo4j.kernel.impl.api.store.StoreReadLayer;
+import org.neo4j.kernel.impl.api.store.StoreStatement;
 import org.neo4j.kernel.impl.cache.BridgingCacheAccess;
+import org.neo4j.kernel.impl.constraints.ConstraintSemantics;
 import org.neo4j.kernel.impl.core.CacheAccessBackDoor;
 import org.neo4j.kernel.impl.core.LabelTokenHolder;
 import org.neo4j.kernel.impl.core.NodeManager;
@@ -91,25 +97,22 @@ import org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory;
 import org.neo4j.kernel.impl.index.IndexConfigStore;
 import org.neo4j.kernel.impl.index.LegacyIndexStore;
 import org.neo4j.kernel.impl.locking.LockService;
-import org.neo4j.kernel.impl.locking.Locks;
 import org.neo4j.kernel.impl.locking.ReentrantLockService;
-import org.neo4j.kernel.impl.store.NeoStore;
-import org.neo4j.kernel.impl.store.SchemaStorage;
-import org.neo4j.kernel.impl.store.StoreFactory;
-import org.neo4j.kernel.impl.store.StoreId;
-import org.neo4j.kernel.impl.store.UnderlyingStorageException;
+import org.neo4j.kernel.impl.locking.StatementLocksFactory;
+import org.neo4j.kernel.impl.store.*;
+import org.neo4j.kernel.impl.store.id.BufferingIdGeneratorFactory;
+import org.neo4j.kernel.impl.store.id.IdReuseEligibility;
 import org.neo4j.kernel.impl.store.record.SchemaRule;
 import org.neo4j.kernel.impl.storemigration.StoreUpgrader;
 import org.neo4j.kernel.impl.storemigration.StoreVersionCheck;
 import org.neo4j.kernel.impl.storemigration.UpgradableDatabase;
+import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStoreVersionCheck;
 import org.neo4j.kernel.impl.transaction.TransactionHeaderInformationFactory;
 import org.neo4j.kernel.impl.transaction.TransactionMonitor;
 import org.neo4j.kernel.impl.transaction.log.BatchingTransactionAppender;
 import org.neo4j.kernel.impl.transaction.log.LogFile;
 import org.neo4j.kernel.impl.transaction.log.LogFileInformation;
-import org.neo4j.kernel.impl.transaction.log.LogFileRecoverer;
 import org.neo4j.kernel.impl.transaction.log.LogPosition;
-import org.neo4j.kernel.impl.transaction.log.LogVersionedStoreChannel;
 import org.neo4j.kernel.impl.transaction.log.LoggingLogFileMonitor;
 import org.neo4j.kernel.impl.transaction.log.LogicalTransactionStore;
 import org.neo4j.kernel.impl.transaction.log.PhysicalLogFile;
@@ -126,10 +129,12 @@ import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointThresholds;
 import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointer;
 import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointerImpl;
 import org.neo4j.kernel.impl.transaction.log.checkpoint.CountCommittedTransactionThreshold;
+import org.neo4j.kernel.impl.transaction.log.checkpoint.SimpleTriggerInfo;
 import org.neo4j.kernel.impl.transaction.log.checkpoint.TimeCheckPointThreshold;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntry;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryReader;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryStart;
+import org.neo4j.kernel.impl.transaction.log.entry.LogHeader;
 import org.neo4j.kernel.impl.transaction.log.entry.VersionAwareLogEntryReader;
 import org.neo4j.kernel.impl.transaction.log.pruning.LogPruneStrategy;
 import org.neo4j.kernel.impl.transaction.log.pruning.LogPruning;
@@ -142,13 +147,13 @@ import org.neo4j.kernel.impl.transaction.state.IntegrityValidator;
 import org.neo4j.kernel.impl.transaction.state.NeoStoreFileListing;
 import org.neo4j.kernel.impl.transaction.state.NeoStoreIndexStoreView;
 import org.neo4j.kernel.impl.transaction.state.NeoStoreInjectedTransactionValidator;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreTransactionContextSupplier;
+import org.neo4j.kernel.impl.transaction.state.NeoStoreTransactionContextFactory;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
 import org.neo4j.kernel.impl.transaction.state.PropertyLoader;
-import org.neo4j.kernel.impl.transaction.state.RecoveryVisitor;
 import org.neo4j.kernel.impl.util.Dependencies;
 import org.neo4j.kernel.impl.util.IdOrderingQueue;
 import org.neo4j.kernel.impl.util.JobScheduler;
+import org.neo4j.kernel.impl.util.JobScheduler.JobHandle;
 import org.neo4j.kernel.impl.util.SynchronizedArrayIdOrderingQueue;
 import org.neo4j.kernel.info.DiagnosticsExtractor;
 import org.neo4j.kernel.info.DiagnosticsManager;
@@ -156,6 +161,7 @@ import org.neo4j.kernel.info.DiagnosticsPhase;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
+import org.neo4j.kernel.lifecycle.Lifecycles;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.kernel.monitoring.tracing.Tracers;
 import org.neo4j.kernel.recovery.DefaultRecoverySPI;
@@ -165,15 +171,21 @@ import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.logging.Logger;
 import org.neo4j.unsafe.batchinsert.LabelScanWriter;
+import org.neo4j.unsafe.impl.internal.dragons.FeatureToggles;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.neo4j.helpers.collection.Iterables.toList;
+import static org.neo4j.kernel.impl.locking.LockService.NO_LOCK_SERVICE;
 import static org.neo4j.kernel.impl.transaction.log.pruning.LogPruneStrategyFactory.fromConfigValue;
 
-public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexProviders
+public class NeoStoreDataSource implements NeoStoresSupplier, Lifecycle, IndexProviders
 {
+
     private interface NeoStoreModule
     {
-        NeoStore neoStore();
+        NeoStores neoStores();
+
+        MetaDataStore metaDataStore(); // Used for Dependency resolution
     }
 
     private interface CacheModule
@@ -183,6 +195,8 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         CacheAccessBackDoor cacheAccess();
 
         SchemaCache schemaCache();
+
+        ProcedureCache procedureCache();
     }
 
     private interface IndexingModule
@@ -222,6 +236,8 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         CheckPointer checkPointing();
 
         TransactionAppender transactionAppender();
+
+        IdOrderingQueue legacyIndexTransactionOrderingQueue();
     }
 
     private interface KernelModule
@@ -235,14 +251,14 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         NeoStoreFileListing fileListing();
     }
 
-    private enum Diagnostics implements DiagnosticsExtractor<NeoStoreDataSource>
+    enum Diagnostics implements DiagnosticsExtractor<NeoStoreDataSource>
     {
         NEO_STORE_VERSIONS( "Store versions:" )
                 {
                     @Override
                     void dump( NeoStoreDataSource source, Logger logger )
                     {
-                        source.neoStoreModule.neoStore().logVersions( logger );
+                        source.neoStoreModule.neoStores().logVersions( logger );
                     }
                 },
         NEO_STORE_ID_USAGE( "Id usage:" )
@@ -250,13 +266,50 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
                     @Override
                     void dump( NeoStoreDataSource source, Logger logger )
                     {
-                        source.neoStoreModule.neoStore().logIdUsage( logger );
+                        source.neoStoreModule.neoStores().logIdUsage( logger );
+                    }
+                },
+        NEO_STORE_RECORDS( "Neostore records:" )
+                {
+                    @Override
+                    void dump( NeoStoreDataSource source, Logger log )
+                    {
+                        source.neoStoreModule.neoStores().getMetaDataStore().logRecords( log );
+                    }
+                },
+        TRANSACTION_RANGE( "Transaction log:" )
+                {
+                    @Override
+                    void dump( NeoStoreDataSource source, Logger log )
+                    {
+                        PhysicalLogFiles logFiles =
+                                source.getDependencyResolver().resolveDependency( PhysicalLogFiles.class );
+                        try
+                        {
+                            for ( long logVersion = logFiles.getLowestLogVersion();
+                                    logFiles.versionExists( logVersion ); logVersion++ )
+                            {
+                                if ( logFiles.hasAnyTransaction( logVersion ) )
+                                {
+                                    LogHeader header = logFiles.extractHeader( logVersion );
+                                    long firstTransactionIdInThisLog = header.lastCommittedTxId + 1;
+                                    log.log( "Oldest transaction " + firstTransactionIdInThisLog +
+                                            " found in log with version " + logVersion );
+                                    return;
+                                }
+                            }
+                            log.log( "No transactions found in any log" );
+                        }
+                        catch ( IOException e )
+                        {   // It's fine, we just tried to be nice and log this. Failing is OK
+                            log.log( "Error trying to figure out oldest transaction in log" );
+                        }
                     }
                 };
 
         private final String message;
 
-        private Diagnostics( String message )
+        Diagnostics( String message )
         {
             this.message = message;
         }
@@ -280,6 +333,12 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     }
 
     public static final String DEFAULT_DATA_SOURCE_NAME = "nioneodb";
+
+    private static final boolean takePropertyReadLocks = FeatureToggles.flag(
+            NeoStoreDataSource.class, "propertyReadLocks", false );
+    private static final boolean safeIdBuffering = FeatureToggles.flag(
+            NeoStoreDataSource.class, "safeIdBuffering", true );
+
     private final Monitors monitors;
     private final Tracers tracers;
 
@@ -290,7 +349,7 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     private final PropertyKeyTokenHolder propertyKeyTokenHolder;
     private final LabelTokenHolder labelTokens;
     private final RelationshipTypeTokenHolder relationshipTypeTokens;
-    private final Locks locks;
+    private final StatementLocksFactory statementLocksFactory;
     private final SchemaWriteGuard schemaWriteGuard;
     private final TransactionEventHandlers transactionEventHandlers;
     private final StoreFactory storeFactory;
@@ -308,11 +367,15 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     private final NodeManager nodeManager;
     private final CommitProcessFactory commitProcessFactory;
     private final PageCache pageCache;
-    private final AtomicInteger recoveredCount = new AtomicInteger();
     private final Guard guard;
     private final Map<String,IndexImplementation> indexProviders = new HashMap<>();
     private final LegacyIndexProviderLookup legacyIndexProviderLookup;
     private final IndexConfigStore indexConfigStore;
+    private final ConstraintSemantics constraintSemantics;
+    private final IdGeneratorFactory idGeneratorFactory;
+    private BufferingIdGeneratorFactory bufferingIdGeneratorFactory;
+    private final IdReuseEligibility idReuseEligibility;
+    private final IdTypeConfigurationProvider idTypeConfigurationProvider;
 
     private Dependencies dependencies;
     private LifeSupport life;
@@ -324,6 +387,7 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     private CacheModule cacheModule;
     private IndexingModule indexingModule;
     private StoreLayerModule storeLayerModule;
+    private TemporalPropertyStoreAdapter temporalStoreModule;
     private TransactionLogModule transactionLogModule;
     private KernelModule kernelModule;
 
@@ -349,7 +413,8 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     public NeoStoreDataSource( File storeDir, Config config, StoreFactory sf, LogProvider logProvider,
             JobScheduler scheduler, TokenNameLookup tokenNameLookup, DependencyResolver dependencyResolver,
             PropertyKeyTokenHolder propertyKeyTokens, LabelTokenHolder labelTokens,
-            RelationshipTypeTokenHolder relationshipTypeTokens, Locks lockManager,
+            RelationshipTypeTokenHolder relationshipTypeTokens,
+            StatementLocksFactory statementLocksFactory,
             SchemaWriteGuard schemaWriteGuard, TransactionEventHandlers transactionEventHandlers,
             IndexingService.Monitor indexingServiceMonitor, FileSystemAbstraction fs,
             StoreUpgrader storeMigrationProcess, TransactionMonitor transactionMonitor,
@@ -359,8 +424,12 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
             NodeManager nodeManager, Guard guard,
             IndexConfigStore indexConfigStore, CommitProcessFactory commitProcessFactory,
             PageCache pageCache,
+            ConstraintSemantics constraintSemantics,
             Monitors monitors,
-            Tracers tracers )
+            Tracers tracers,
+            IdGeneratorFactory idGeneratorFactory,
+            IdReuseEligibility idReuseEligibility,
+            IdTypeConfigurationProvider idTypeConfigurationProvider )
     {
         this.storeDir = storeDir;
         this.config = config;
@@ -371,7 +440,7 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         this.propertyKeyTokenHolder = propertyKeyTokens;
         this.labelTokens = labelTokens;
         this.relationshipTypeTokens = relationshipTypeTokens;
-        this.locks = lockManager;
+        this.statementLocksFactory = statementLocksFactory;
         this.schemaWriteGuard = schemaWriteGuard;
         this.transactionEventHandlers = transactionEventHandlers;
         this.indexingServiceMonitor = indexingServiceMonitor;
@@ -385,8 +454,12 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         this.nodeManager = nodeManager;
         this.guard = guard;
         this.indexConfigStore = indexConfigStore;
+        this.constraintSemantics = constraintSemantics;
         this.monitors = monitors;
         this.tracers = tracers;
+        this.idGeneratorFactory = idGeneratorFactory;
+        this.idReuseEligibility = idReuseEligibility;
+        this.idTypeConfigurationProvider = idTypeConfigurationProvider;
 
         readOnly = config.get( Configuration.read_only );
         msgLog = logProvider.getLog( getClass() );
@@ -422,7 +495,7 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
 
     @Override
     public void init()
-    { // We do our own internal life management:
+    {   // We do our own internal life management:
         // start() does life.init() and life.start(),
         // stop() does life.stop() and life.shutdown().
     }
@@ -432,10 +505,6 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     {
         dependencies = new Dependencies();
         life = new LifeSupport();
-        if ( !storeFactory.storeExists() )
-        {
-            storeFactory.createNeoStore().close();
-        }
 
         indexProvider = dependencyResolver.resolveDependency( SchemaIndexProvider.class,
                 SchemaIndexProvider.HIGHEST_PRIORITIZED_OR_NONE );
@@ -445,14 +514,8 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         // Monitor listeners
         LoggingLogFileMonitor loggingLogMonitor = new LoggingLogFileMonitor( msgLog );
         monitors.addMonitorListener( loggingLogMonitor );
-        monitors.addMonitorListener( new RecoveryVisitor.Monitor()
-        {
-            @Override
-            public void transactionRecovered( long txId )
-            {
-                recoveredCount.incrementAndGet();
-            }
-        } );
+
+        life.add( new Lifecycle.Delegate( Lifecycles.multiple( indexProviders.values() ) ) );
 
         // Upgrade the store before we begin
         upgradeStore( storeDir, storeMigrationProcess, indexProvider );
@@ -460,45 +523,72 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         // Build all modules and their services
         try
         {
+            LegacyIndexApplierLookup legacyIndexApplierLookup =
+                    dependencies.satisfyDependency( new LegacyIndexApplierLookup.Direct( legacyIndexProviderLookup ) );
+
+            if ( safeIdBuffering )
+            {
+                // This buffering id generator factory will have properly buffering id generators injected into
+                // the stores. The buffering depends on knowledge about active transactions,
+                // so we'll initialize it below when all those components have been instantiated.
+                bufferingIdGeneratorFactory = new BufferingIdGeneratorFactory( idGeneratorFactory, idTypeConfigurationProvider );
+                storeFactory.setIdGeneratorFactory( bufferingIdGeneratorFactory );
+            }
+
             final NeoStoreModule neoStoreModule =
                     buildNeoStore( storeFactory, labelTokens, relationshipTypeTokens, propertyKeyTokenHolder );
             // TODO The only reason this is here is because of the provider-stuff for DiskLayer. Remove when possible:
             this.neoStoreModule = neoStoreModule;
 
-            CacheModule cacheModule = buildCaches( neoStoreModule.neoStore(), nodeManager,
+            CacheModule cacheModule = buildCaches(
                     labelTokens, relationshipTypeTokens, propertyKeyTokenHolder );
 
             IndexingModule indexingModule = buildIndexing( config, scheduler, indexProvider, lockService,
                     tokenNameLookup, logProvider, indexingServiceMonitor,
-                    neoStoreModule.neoStore(), cacheModule.updateableSchemaState() );
+                    neoStoreModule.neoStores(), cacheModule.updateableSchemaState() );
 
-            StoreLayerModule storeLayerModule = buildStoreLayer( neoStoreModule.neoStore(),
+            StoreLayerModule storeLayerModule = buildStoreLayer( neoStoreModule.neoStores(),
                     propertyKeyTokenHolder, labelTokens, relationshipTypeTokens,
-                    indexingModule.indexingService(), cacheModule.schemaCache() );
+                    indexingModule.indexingService(), cacheModule.schemaCache(), cacheModule.procedureCache() );
+
+            temporalStoreModule = TemporalPropertyStoreAdapter.getInstance(config, storeDir);
+            life.add(temporalStoreModule);
 
             TransactionLogModule transactionLogModule =
                     buildTransactionLogs( storeDir, config, logProvider, scheduler, indexingModule.labelScanStore(),
-                            fs, neoStoreModule.neoStore(), cacheModule.cacheAccess(), indexingModule.indexingService(),
-                            indexProviders.values() );
+                            fs, neoStoreModule.neoStores(), cacheModule.cacheAccess(), indexingModule.indexingService(),
+                            indexProviders.values(), legacyIndexApplierLookup );
 
             buildRecovery( fs, cacheModule.cacheAccess(), indexingModule.indexingService(),
-                    indexingModule.indexUpdatesValidator(), indexingModule.labelScanStore(), neoStoreModule.neoStore(),
-                    monitors.newMonitor( RecoveryVisitor.Monitor.class ), monitors.newMonitor( Recovery.Monitor.class ),
-                    transactionLogModule.logFiles(), transactionLogModule.storeFlusher(), startupStatistics );
+                    indexingModule.labelScanStore(), neoStoreModule.neoStores(),
+                    monitors.newMonitor( Recovery.Monitor.class ),
+                    transactionLogModule.logFiles(), transactionLogModule.storeFlusher(), startupStatistics,
+                    legacyIndexApplierLookup, transactionLogModule.logicalTransactionStore() );
 
-            KernelModule kernelModule = buildKernel( indexingModule.integrityValidator(),
-                    transactionLogModule.transactionAppender(), neoStoreModule.neoStore(),
+            final KernelModule kernelModule = buildKernel( indexingModule.integrityValidator(),
+                    transactionLogModule.transactionAppender(), neoStoreModule.neoStores(),
                     transactionLogModule.storeApplier(), indexingModule.indexingService(),
                     indexingModule.indexUpdatesValidator(),
                     storeLayerModule.storeLayer(),
                     cacheModule.updateableSchemaState(), indexingModule.labelScanStore(),
-                    indexingModule.schemaIndexProviderMap() );
+                    indexingModule.schemaIndexProviderMap(), cacheModule.procedureCache() );
 
+            if ( safeIdBuffering )
+            {
+                // Now that we've instantiated the component which can keep track of transaction boundaries
+                // we let the id generator know about it.
+                bufferingIdGeneratorFactory.initialize( kernelModule.kernelTransactions(), idReuseEligibility );
+                BufferedIdMaintenanceController idMaintenanceController =
+                        new BufferedIdMaintenanceController( bufferingIdGeneratorFactory );
+                dependencies.satisfyDependencies( idMaintenanceController );
+                life.add( (Lifecycle) idMaintenanceController );
+            }
 
             // Do these assignments last so that we can ensure no cyclical dependencies exist
             this.cacheModule = cacheModule;
             this.indexingModule = indexingModule;
             this.storeLayerModule = storeLayerModule;
+//            this.temporalStoreModule = temporalStoreModule;
             this.transactionLogModule = transactionLogModule;
             this.kernelModule = kernelModule;
 
@@ -509,15 +599,14 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         catch ( Throwable e )
         {
             // Something unexpected happened during startup
-            msgLog.warn( "Exception occurred while setting up store modules. Attempting to close things down.",
-                    e, true );
+            msgLog.warn( "Exception occurred while setting up store modules. Attempting to close things down.", e );
             try
             { // Close the neostore, so that locks are released properly
-                neoStoreModule.neoStore().close();
+                neoStoreModule.neoStores().close();
             }
             catch ( Exception closeException )
             {
-                msgLog.error( "Couldn't close neostore after startup failure" );
+                msgLog.error( "Couldn't close neostore after startup failure", closeException );
             }
             throw Exceptions.launderedException( e );
         }
@@ -529,15 +618,14 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         catch ( Throwable e )
         {
             // Something unexpected happened during startup
-            msgLog.warn( "Exception occurred while starting the datasource. Attempting to close things down.",
-                    e, true );
+            msgLog.warn( "Exception occurred while starting the datasource. Attempting to close things down.", e );
             try
             { // Close the neostore, so that locks are released properly
-                neoStoreModule.neoStore().close();
+                neoStoreModule.neoStores().close();
             }
             catch ( Exception closeException )
             {
-                msgLog.error( "Couldn't close neostore after startup failure" );
+                msgLog.error( "Couldn't close neostore after startup failure", closeException );
             }
             throw Exceptions.launderedException( e );
         }
@@ -556,60 +644,63 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     // of the dependency tree, starting at the bottom
     private void upgradeStore( File storeDir, StoreUpgrader storeMigrationProcess, SchemaIndexProvider indexProvider )
     {
-        UpgradableDatabase upgradableDatabase = new UpgradableDatabase( new StoreVersionCheck( pageCache ) );
+        UpgradableDatabase upgradableDatabase =
+                new UpgradableDatabase( new StoreVersionCheck( pageCache ), new LegacyStoreVersionCheck( fs ) );
         storeMigrationProcess
-                .addParticipant( indexProvider.storeMigrationParticipant( fs, pageCache, upgradableDatabase ) );
-        storeMigrationProcess.migrateIfNeeded( storeDir, indexProvider );
+                .addParticipant( indexProvider.storeMigrationParticipant( fs, pageCache ) );
+        storeMigrationProcess.migrateIfNeeded( storeDir, upgradableDatabase, indexProvider );
     }
 
     private NeoStoreModule buildNeoStore( final StoreFactory storeFactory, final LabelTokenHolder
             labelTokens, final RelationshipTypeTokenHolder relationshipTypeTokens,
             final PropertyKeyTokenHolder propertyKeyTokenHolder )
     {
-        final NeoStore neoStore = storeFactory.newNeoStore( false );
-
         life.add( new LifecycleAdapter()
         {
             @Override
             public void start() throws IOException
             {
-                if ( startupStatistics.numberOfRecoveredTransactions() > 0 )
-                {
-                    neoStore.rebuildIdGenerators();
-                }
-                neoStoreModule.neoStore().makeStoreOk();
+                neoStoreModule.neoStores().makeStoreOk();
 
                 propertyKeyTokenHolder.setInitialTokens(
-                        neoStoreModule.neoStore().getPropertyKeyTokenStore().getTokens( Integer.MAX_VALUE ) );
+                        neoStoreModule.neoStores().getPropertyKeyTokenStore().getTokens( Integer.MAX_VALUE ) );
                 relationshipTypeTokens.setInitialTokens(
-                        neoStoreModule.neoStore().getRelationshipTypeTokenStore().getTokens( Integer.MAX_VALUE ) );
-                labelTokens.setInitialTokens( neoStoreModule.neoStore().getLabelTokenStore().getTokens( Integer
-                        .MAX_VALUE ) );
+                        neoStoreModule.neoStores().getRelationshipTypeTokenStore().getTokens( Integer.MAX_VALUE ) );
+                labelTokens.setInitialTokens(
+                        neoStoreModule.neoStores().getLabelTokenStore().getTokens( Integer.MAX_VALUE ) );
 
-                neoStore.rebuildCountStoreIfNeeded(); // TODO: move this to lifecycle
+                neoStoreModule.neoStores().rebuildCountStoreIfNeeded(); // TODO: move this to counts store lifecycle
             }
         } );
 
+        final NeoStores neoStores = storeFactory.openAllNeoStores( true );
         return new NeoStoreModule()
         {
             @Override
-            public NeoStore neoStore()
+            public NeoStores neoStores()
             {
-                return neoStore;
+                return neoStores;
+            }
+
+            @Override
+            public MetaDataStore metaDataStore()
+            {
+                return neoStores.getMetaDataStore();
             }
         };
     }
 
-    private CacheModule buildCaches( final NeoStore neoStore, NodeManager nodeManager,
-            LabelTokenHolder labelTokens, RelationshipTypeTokenHolder relationshipTypeTokens,
+    private CacheModule buildCaches( LabelTokenHolder labelTokens, RelationshipTypeTokenHolder relationshipTypeTokens,
             PropertyKeyTokenHolder propertyKeyTokenHolder )
     {
         final UpdateableSchemaState updateableSchemaState = new KernelSchemaStateStore( logProvider );
 
-        final SchemaCache schemaCache = new SchemaCache( Collections.<SchemaRule>emptyList() );
+        final SchemaCache schemaCache = new SchemaCache( constraintSemantics, Collections.<SchemaRule>emptyList() );
 
         final CacheAccessBackDoor cacheAccess = new BridgingCacheAccess( schemaCache, updateableSchemaState,
                 propertyKeyTokenHolder, relationshipTypeTokens, labelTokens );
+
+        final ProcedureCache procedureCache = new ProcedureCache();
 
         life.add( new LifecycleAdapter()
         {
@@ -617,11 +708,6 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
             public void start() throws Throwable
             {
                 loadSchemaCache();
-            }
-
-            @Override
-            public void stop() throws Throwable
-            {
             }
         } );
 
@@ -631,6 +717,12 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
             public SchemaCache schemaCache()
             {
                 return schemaCache;
+            }
+
+            @Override
+            public ProcedureCache procedureCache()
+            {
+                return procedureCache;
             }
 
             @Override
@@ -650,19 +742,20 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     private IndexingModule buildIndexing( Config config, JobScheduler scheduler, SchemaIndexProvider indexProvider,
             LockService lockService, TokenNameLookup tokenNameLookup,
             LogProvider logProvider, IndexingService.Monitor indexingServiceMonitor,
-            NeoStore neoStore, UpdateableSchemaState updateableSchemaState )
+            NeoStores neoStores, UpdateableSchemaState updateableSchemaState )
     {
         final DefaultSchemaIndexProviderMap providerMap = new DefaultSchemaIndexProviderMap( indexProvider );
 
         final IndexingService indexingService = IndexingService.create(
                 new IndexSamplingConfig( config ), scheduler, providerMap,
-                new NeoStoreIndexStoreView( lockService, neoStore ), tokenNameLookup, updateableSchemaState,
-                toList( new SchemaStorage( neoStore.getSchemaStore() ).allIndexRules() ), logProvider,
+                new NeoStoreIndexStoreView( lockService, neoStores ), tokenNameLookup, updateableSchemaState,
+                toList( new SchemaStorage( neoStores.getSchemaStore() ).allIndexRules() ), logProvider,
                 indexingServiceMonitor );
-        final IntegrityValidator integrityValidator = new IntegrityValidator( neoStore, indexingService );
+        final IntegrityValidator integrityValidator = new IntegrityValidator( neoStores, indexingService );
 
         final IndexUpdatesValidator indexUpdatesValidator = dependencies.satisfyDependency(
-                new IndexUpdatesValidator( neoStore, kernelHealth, new PropertyLoader( neoStore ), indexingService ) );
+                new OnlineIndexUpdatesValidator( neoStores, kernelHealth, new PropertyLoader( neoStores ),
+                        indexingService, IndexUpdateMode.ONLINE ) );
 
         // TODO Move to constructor
         final LabelScanStore labelScanStore = dependencyResolver.resolveDependency( LabelScanStoreProvider.class,
@@ -705,16 +798,17 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         };
     }
 
-    private StoreLayerModule buildStoreLayer( NeoStore neoStore,
+    private StoreLayerModule buildStoreLayer( NeoStores neoStores,
             PropertyKeyTokenHolder propertyKeyTokenHolder, LabelTokenHolder labelTokens,
             RelationshipTypeTokenHolder relationshipTypeTokens,
             IndexingService indexingService,
-            SchemaCache schemaCache )
+            SchemaCache schemaCache,
+            ProcedureCache procedureCache )
     {
-        SchemaStorage schemaStorage = new SchemaStorage( neoStore.getSchemaStore() );
+        SchemaStorage schemaStorage = new SchemaStorage( neoStores.getSchemaStore() );
         DiskLayer diskLayer = new DiskLayer( propertyKeyTokenHolder, labelTokens, relationshipTypeTokens, schemaStorage,
-                neoStore, indexingService );
-        final StoreReadLayer storeLayer = new CacheLayer( diskLayer, schemaCache );
+                neoStores, indexingService, storeStatementFactory( neoStores ) );
+        final StoreReadLayer storeLayer = new CacheLayer( diskLayer, schemaCache, procedureCache );
 
         return new StoreLayerModule()
         {
@@ -726,29 +820,44 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         };
     }
 
+    private Factory<StoreStatement> storeStatementFactory( final NeoStores neoStores )
+    {
+        final LockService lockService = takePropertyReadLocks ? this.lockService : NO_LOCK_SERVICE;
+        return new Factory<StoreStatement>()
+        {
+            @Override
+            public StoreStatement newInstance()
+            {
+                return new StoreStatement( neoStores, lockService );
+            }
+        };
+    }
+
     private TransactionLogModule buildTransactionLogs( File storeDir, Config config, LogProvider logProvider,
             JobScheduler scheduler,
             LabelScanStore labelScanStore,
             FileSystemAbstraction fileSystemAbstraction,
-            NeoStore neoStore, CacheAccessBackDoor cacheAccess,
+            NeoStores neoStores, CacheAccessBackDoor cacheAccess,
             IndexingService indexingService,
-            Iterable<IndexImplementation> indexProviders )
+            Iterable<IndexImplementation> indexProviders,
+            LegacyIndexApplierLookup legacyIndexApplierLookup )
     {
         TransactionMetadataCache transactionMetadataCache = new TransactionMetadataCache( 1000, 100_000 );
         final PhysicalLogFiles logFiles = new PhysicalLogFiles( storeDir, PhysicalLogFile.DEFAULT_NAME,
                 fileSystemAbstraction );
 
-        IdOrderingQueue legacyIndexTransactionOrdering = new SynchronizedArrayIdOrderingQueue( 20 );
-        LegacyIndexApplierLookup.Direct legacyIndexProviderLookup =
-                new LegacyIndexApplierLookup.Direct( this.legacyIndexProviderLookup );
+        final IdOrderingQueue legacyIndexTransactionOrdering = new SynchronizedArrayIdOrderingQueue( 20 );
         final TransactionRepresentationStoreApplier storeApplier = dependencies.satisfyDependency(
                 new TransactionRepresentationStoreApplier( indexingService, alwaysCreateNewWriter( labelScanStore ),
-                        neoStore, cacheAccess, lockService, legacyIndexProviderLookup, indexConfigStore, kernelHealth,
-                        legacyIndexTransactionOrdering ) );
+                        neoStores, cacheAccess, lockService, legacyIndexApplierLookup, indexConfigStore, kernelHealth,
+                        legacyIndexTransactionOrdering,
+                        temporalStoreModule
+                        ) );
 
-        final PhysicalLogFile logFile = new PhysicalLogFile( fileSystemAbstraction, logFiles,
-                config.get( GraphDatabaseSettings.logical_log_rotation_threshold ), neoStore,
-                neoStore, physicalLogMonitor, transactionMetadataCache );
+        MetaDataStore metaDataStore = neoStores.getMetaDataStore();
+        final PhysicalLogFile logFile = life.add( new PhysicalLogFile( fileSystemAbstraction, logFiles,
+                config.get( GraphDatabaseSettings.logical_log_rotation_threshold ), metaDataStore,
+                metaDataStore, physicalLogMonitor, transactionMetadataCache ) );
 
         final PhysicalLogFileInformation.LogVersionToTimestamp
                 logInformation = new PhysicalLogFileInformation.LogVersionToTimestamp()
@@ -773,7 +882,7 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
             }
         };
         final LogFileInformation logFileInformation =
-                new PhysicalLogFileInformation( logFiles, transactionMetadataCache, neoStore, logInformation );
+                new PhysicalLogFileInformation( logFiles, transactionMetadataCache, metaDataStore, logInformation );
 
         String pruningConf = config.get(
                 config.get( GraphDatabaseFacadeFactory.Configuration.ephemeral )
@@ -784,14 +893,15 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
 
         final LogPruning logPruning = new LogPruningImpl( logPruneStrategy, logProvider );
 
-        final StoreFlusher storeFlusher = new StoreFlusher( neoStore, indexingService, labelScanStore,
-                indexProviders );
+        final StoreFlusher storeFlusher = new StoreFlusher(
+                neoStores, indexingService, labelScanStore, indexProviders, temporalStoreModule );
 
-        final LogRotation logRotation = new LogRotationImpl( monitors.newMonitor( LogRotation.Monitor.class ),
-                logFile, kernelHealth, logProvider );
+        final LogRotation logRotation =
+                new LogRotationImpl( monitors.newMonitor( LogRotation.Monitor.class ), logFile, kernelHealth );
 
-        final TransactionAppender appender = new BatchingTransactionAppender( logFile, logRotation,
-                transactionMetadataCache, neoStore, legacyIndexTransactionOrdering, kernelHealth );
+        final TransactionAppender appender = life.add( new BatchingTransactionAppender(
+                logFile, logRotation, transactionMetadataCache, metaDataStore, legacyIndexTransactionOrdering,
+                kernelHealth ) );
         final LogicalTransactionStore logicalTransactionStore =
                 new PhysicalLogicalTransactionStore( logFile, transactionMetadataCache );
 
@@ -800,19 +910,19 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
                 new CountCommittedTransactionThreshold( txThreshold );
 
         long timeMillisThreshold = config.get( GraphDatabaseSettings.check_point_interval_time );
-        TimeCheckPointThreshold timeCheckPointThreshold = new TimeCheckPointThreshold( timeMillisThreshold, Clock.SYSTEM_CLOCK );
+        TimeCheckPointThreshold timeCheckPointThreshold =
+                new TimeCheckPointThreshold( timeMillisThreshold, Clock.SYSTEM_CLOCK );
 
         CheckPointThreshold threshold =
                 CheckPointThresholds.or( countCommittedTransactionThreshold, timeCheckPointThreshold );
 
-        final CheckPointerImpl checkPointer = new CheckPointerImpl( neoStore, threshold, storeFlusher, logPruning,
-                appender, kernelHealth, logProvider, tracers.checkPointTracer );
+        final CheckPointerImpl checkPointer = new CheckPointerImpl(
+                metaDataStore, threshold, storeFlusher, logPruning, appender, kernelHealth, logProvider,
+                tracers.checkPointTracer );
 
         long recurringPeriod = Math.min( timeMillisThreshold, TimeUnit.SECONDS.toMillis( 10 ) );
         CheckPointScheduler checkPointScheduler = new CheckPointScheduler( checkPointer, scheduler, recurringPeriod );
 
-        life.add( logFile );
-        life.add( appender );
         life.add( checkPointer );
         life.add( checkPointScheduler );
 
@@ -871,6 +981,12 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
             {
                 return appender;
             }
+
+            @Override
+            public IdOrderingQueue legacyIndexTransactionOrderingQueue()
+            {
+                return legacyIndexTransactionOrdering;
+            }
         };
     }
 
@@ -886,57 +1002,63 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         };
     }
 
-    private void buildRecovery( final FileSystemAbstraction fileSystemAbstraction, CacheAccessBackDoor cacheAccess,
-            IndexingService indexingService, IndexUpdatesValidator indexUpdatesValidator, LabelScanStore labelScanStore,
-            final NeoStore neoStore, RecoveryVisitor.Monitor recoveryVisitorMonitor, Recovery.Monitor recoveryMonitor,
-            final PhysicalLogFiles logFiles, final StoreFlusher storeFlusher,
-            final StartupStatisticsProvider startupStatistics )
+    private void buildRecovery(final FileSystemAbstraction fileSystemAbstraction, CacheAccessBackDoor cacheAccess,
+                               IndexingService indexingService, LabelScanStore labelScanStore,
+                               final NeoStores neoStores, Recovery.Monitor recoveryMonitor,
+                               final PhysicalLogFiles logFiles, final StoreFlusher storeFlusher,
+                               final StartupStatisticsProvider startupStatistics,
+                               LegacyIndexApplierLookup legacyIndexApplierLookup,
+                               LogicalTransactionStore logicalTransactionStore)
     {
+        MetaDataStore metaDataStore = neoStores.getMetaDataStore();
         final RecoveryLabelScanWriterProvider labelScanWriters =
                 new RecoveryLabelScanWriterProvider( labelScanStore, 1000 );
-        final RecoveryLegacyIndexApplierLookup legacyIndexApplierLookup = new RecoveryLegacyIndexApplierLookup(
-                new LegacyIndexApplierLookup.Direct( legacyIndexProviderLookup ), 1000 );
+        final RecoveryLegacyIndexApplierLookup recoveryLegacyIndexApplierLookup = new RecoveryLegacyIndexApplierLookup(
+                legacyIndexApplierLookup, 1000 );
+        final RecoveryIndexingUpdatesValidator indexUpdatesValidator = new RecoveryIndexingUpdatesValidator( indexingService );
         final TransactionRepresentationStoreApplier storeRecoverer =
-                new TransactionRepresentationStoreApplier( indexingService, labelScanWriters, neoStore, cacheAccess,
-                        lockService, legacyIndexApplierLookup, indexConfigStore, kernelHealth, IdOrderingQueue.BYPASS );
-
-        RecoveryVisitor recoveryVisitor =
-                new RecoveryVisitor( neoStore, storeRecoverer, indexUpdatesValidator, recoveryVisitorMonitor );
+                new TransactionRepresentationStoreApplier( indexingService, labelScanWriters, neoStores, cacheAccess,
+                        lockService, legacyIndexApplierLookup, indexConfigStore, kernelHealth, IdOrderingQueue.BYPASS,
+                        temporalStoreModule);
 
         LogEntryReader<ReadableLogChannel> logEntryReader = new VersionAwareLogEntryReader<>();
-        final Visitor<LogVersionedStoreChannel,IOException> logFileRecoverer =
-                new LogFileRecoverer( logEntryReader, recoveryVisitor );
 
         final LatestCheckPointFinder checkPointFinder =
                 new LatestCheckPointFinder( logFiles, fileSystemAbstraction, logEntryReader );
-
-        Recovery.SPI spi = new DefaultRecoverySPI( labelScanWriters, legacyIndexApplierLookup,
-                storeFlusher, logFileRecoverer, logFiles, fileSystemAbstraction, neoStore, checkPointFinder );
+        Recovery.SPI spi = new DefaultRecoverySPI( labelScanWriters, recoveryLegacyIndexApplierLookup,
+                storeFlusher, neoStores, logFiles, fileSystemAbstraction, metaDataStore,
+                checkPointFinder, indexUpdatesValidator, metaDataStore, logicalTransactionStore, storeRecoverer, temporalStoreModule );
         Recovery recovery = new Recovery( spi, recoveryMonitor );
-
-        life.add( recovery );
-
-        life.add( new LifecycleAdapter()
+        monitors.addMonitorListener( new Recovery.Monitor()
         {
             @Override
-            public void start() throws Throwable
+            public void recoveryCompleted( int numberOfRecoveredTransactions )
             {
-                startupStatistics.setNumberOfRecoveredTransactions( recoveredCount.get() );
-                recoveredCount.set( 0 );
+                startupStatistics.setNumberOfRecoveredTransactions( numberOfRecoveredTransactions );
+            }
+
+            @Override
+            public void recoveryRequired( LogPosition recoveryPosition )
+            {   // noop
+            }
+
+            @Override
+            public void transactionRecovered( long txId )
+            {   // noop
             }
         } );
+        life.add( recovery );
     }
 
     private KernelModule buildKernel( IntegrityValidator integrityValidator, TransactionAppender appender,
-            NeoStore neoStore, TransactionRepresentationStoreApplier storeApplier, IndexingService indexingService,
+            NeoStores neoStores, TransactionRepresentationStoreApplier storeApplier, IndexingService indexingService,
             IndexUpdatesValidator indexUpdatesValidator, StoreReadLayer storeLayer,
             UpdateableSchemaState updateableSchemaState, LabelScanStore labelScanStore,
-            SchemaIndexProviderMap schemaIndexProviderMap )
+            SchemaIndexProviderMap schemaIndexProviderMap, ProcedureCache procedureCache )
     {
-        final TransactionCommitProcess transactionCommitProcess =
-                commitProcessFactory.create( appender, kernelHealth, neoStore, storeApplier,
-                        new NeoStoreInjectedTransactionValidator( integrityValidator ), indexUpdatesValidator,
-                        config );
+        NeoStoreInjectedTransactionValidator validator = new NeoStoreInjectedTransactionValidator( integrityValidator );
+        final TransactionCommitProcess transactionCommitProcess = commitProcessFactory.create( appender, storeApplier,
+                validator, indexUpdatesValidator, config );
 
         /*
          * This is used by legacy indexes and constraint indexes whenever a transaction is to be spawned
@@ -959,20 +1081,22 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
 
         LegacyPropertyTrackers legacyPropertyTrackers = new LegacyPropertyTrackers( propertyKeyTokenHolder,
                 nodeManager.getNodePropertyTrackers(), nodeManager.getRelationshipPropertyTrackers(), nodeManager );
-        final NeoStoreTransactionContextSupplier neoStoreTransactionContextSupplier =
-                new NeoStoreTransactionContextSupplier( neoStore );
+        NeoStoreTransactionContextFactory neoStoreTxContextFactory =
+                new NeoStoreTransactionContextFactory( neoStores );
 
-        StatementOperationParts statementOperations = buildStatementOperations( storeLayer, legacyPropertyTrackers,
-                constraintIndexCreator, updateableSchemaState, guard, legacyIndexStore );
+        StatementOperationParts statementOperations = dependencies.satisfyDependency( buildStatementOperations(
+                storeLayer, legacyPropertyTrackers, constraintIndexCreator, updateableSchemaState, guard,
+                legacyIndexStore ) );
 
         final TransactionHooks hooks = new TransactionHooks();
         final KernelTransactions kernelTransactions =
-                life.add( new KernelTransactions( neoStoreTransactionContextSupplier,
-                        neoStore, locks, integrityValidator, constraintIndexCreator, indexingService, labelScanStore,
-                        statementOperations, updateableSchemaState, schemaWriteGuard, schemaIndexProviderMap,
-                        transactionHeaderInformationFactory, storeLayer, transactionCommitProcess,
-                        indexConfigStore,
-                        legacyIndexProviderLookup, hooks, transactionMonitor, life, tracers ) );
+                life.add( new KernelTransactions( neoStoreTxContextFactory,
+                        neoStores, statementLocksFactory, integrityValidator, constraintIndexCreator,
+                        indexingService, labelScanStore, statementOperations, updateableSchemaState,
+                        schemaWriteGuard, schemaIndexProviderMap, transactionHeaderInformationFactory, storeLayer,
+                        transactionCommitProcess, indexConfigStore, legacyIndexProviderLookup, hooks,
+                        constraintSemantics, transactionMonitor, life, procedureCache, config, tracers,
+                        Clock.SYSTEM_CLOCK ) );
 
         final Kernel kernel = new Kernel( kernelTransactions, hooks, kernelHealth, transactionMonitor );
 
@@ -1009,7 +1133,7 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         };
     }
 
-    // We do this last to ensure noone is cheating with dependency access
+    // We do this last to ensure no one is cheating with dependency access
     private void satisfyDependencies( Object... modules )
     {
         for ( Object module : modules )
@@ -1034,12 +1158,13 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     // Startup sequence done
     private void loadSchemaCache()
     {
-        cacheModule.schemaCache().load( neoStoreModule.neoStore().getSchemaStore().loadAllSchemaRules() );
+        List<SchemaRule> schemaRules = toList( neoStoreModule.neoStores().getSchemaStore().loadAllSchemaRules() );
+        cacheModule.schemaCache().load( schemaRules );
     }
 
-    public NeoStore getNeoStore()
+    public NeoStores getNeoStores()
     {
-        return neoStoreModule.neoStore();
+        return neoStoreModule.neoStores();
     }
 
     public IndexingService getIndexService()
@@ -1055,11 +1180,6 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     public LabelScanStore getLabelScanStore()
     {
         return indexingModule.labelScanStore();
-    }
-
-    public LockService getLockService()
-    {
-        return lockService;
     }
 
     @Override
@@ -1083,6 +1203,10 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         // Here we're zooming in and focusing on getting committed transactions to close.
         awaitAllTransactionsClosed();
         LogFile logFile = transactionLogModule.logFile();
+        // In order to prevent various issues with life components that can perform operations with logFile on their
+        // stop phase before performing further shutdown/cleanup work and taking a lock on a logfile
+        // we stop all other life components to make sure that we are the last and only one (from current life)
+        life.stop();
         synchronized ( logFile )
         {
             // Under the guard of the logFile monitor do a second pass of waiting committing transactions
@@ -1100,7 +1224,7 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
             {
                 try
                 {
-                    checkPointer.forceCheckPoint();
+                    checkPointer.forceCheckPoint( new SimpleTriggerInfo( "database shutdown" ) );
                 }
                 catch ( IOException e )
                 {
@@ -1111,9 +1235,9 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
             // Shut down all services in here, effectively making the database unusable for anyone who tries.
             life.shutdown();
 
-            // Close the NeoStore
-            neoStoreModule.neoStore().close();
-            msgLog.info( "NeoStore closed" );
+            // Close the NeoStores
+            neoStoreModule.neoStores().close();
+            msgLog.info( "NeoStores closed" );
         }
         // After we've released the logFile monitor there might be transactions that wants to commit, but had
         // to wait for the logFile monitor until now. When they finally get it and try to commit they will
@@ -1122,7 +1246,7 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
 
     private void awaitAllTransactionsClosed()
     {
-        while ( !neoStoreModule.neoStore().closedTransactionIdIsOnParWithOpenedTransactionId() )
+        while ( !neoStoreModule.neoStores().getMetaDataStore().closedTransactionIdIsOnParWithOpenedTransactionId() )
         {
             LockSupport.parkNanos( 10_000_000 ); // 10 ms
         }
@@ -1137,7 +1261,7 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
 
     public StoreId getStoreId()
     {
-        return getNeoStore().getStoreId();
+        return getNeoStores().getMetaDataStore().getStoreId();
     }
 
     public File getStoreDir()
@@ -1147,17 +1271,17 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
 
     public long getCreationTime()
     {
-        return getNeoStore().getCreationTime();
+        return getNeoStores().getMetaDataStore().getCreationTime();
     }
 
     public long getRandomIdentifier()
     {
-        return getNeoStore().getRandomNumber();
+        return getNeoStores().getMetaDataStore().getRandomNumber();
     }
 
     public long getCurrentLogVersion()
     {
-        return getNeoStore().getCurrentLogVersion();
+        return getNeoStores().getMetaDataStore().getCurrentLogVersion();
     }
 
     public boolean isReadOnly()
@@ -1181,9 +1305,9 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     }
 
     @Override
-    public NeoStore get()
+    public NeoStores get()
     {
-        return neoStoreModule.neoStore();
+        return neoStoreModule.neoStores();
     }
 
     public StoreReadLayer getStoreLayer()
@@ -1206,14 +1330,14 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
         // + Transaction state handling
         StateHandlingStatementOperations stateHandlingContext = new StateHandlingStatementOperations( storeReadLayer,
                 legacyPropertyTrackers, constraintIndexCreator,
-                legacyIndexStore );
+                legacyIndexStore, this.temporalStoreModule );
         StatementOperationParts parts = new StatementOperationParts( stateHandlingContext, stateHandlingContext,
                 stateHandlingContext, stateHandlingContext, stateHandlingContext, stateHandlingContext,
                 new SchemaStateConcern( updateableSchemaState ), null, stateHandlingContext, stateHandlingContext,
                 stateHandlingContext );
         // + Constraints
         ConstraintEnforcingEntityOperations constraintEnforcingEntityOperations =
-                new ConstraintEnforcingEntityOperations( parts.entityWriteOperations(), parts.entityReadOperations(),
+                new ConstraintEnforcingEntityOperations( constraintSemantics, parts.entityWriteOperations(), parts.entityReadOperations(),
                         parts.schemaWriteOperations(), parts.schemaReadOperations() );
         // + Data integrity
         DataIntegrityValidatingStatementOperations dataIntegrityContext =
@@ -1254,16 +1378,36 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     }
 
     /**
-     * Hook that must be called whenever there is an HA mode switch (eg master/slave switch).
+     * Hook that must be called before there is an HA mode switch (eg master/slave switch),
+     * i.e. after state has changed to pending and before state is about to change to the new target state.
+     * This must only be called when the database is otherwise inaccessible.
+     */
+    public void beforeModeSwitch()
+    {
+        clearTransactions();
+    }
+
+    private void clearTransactions()
+    {
+        if ( bufferingIdGeneratorFactory != null )
+        {
+            // We don't want to have buffered ids carry over to the new role
+            bufferingIdGeneratorFactory.clear();
+        }
+
+        // Get rid of all pooled transactions, as they will otherwise reference
+        // components that have been swapped out during the mode switch.
+        kernelModule.kernelTransactions().disposeAll();
+    }
+
+    /**
+     * Hook that must be called after an HA mode switch (eg master/slave switch) have completed.
      * This must only be called when the database is otherwise inaccessible.
      */
     public void afterModeSwitch()
     {
         loadSchemaCache();
-
-        // Stop all running transactions and get rid of all pooled transactions, as they will otherwise reference
-        // components that have been swapped out during the mode switch.
-        kernelModule.kernelTransactions().disposeAll();
+        clearTransactions();
     }
 
     @SuppressWarnings( "deprecation" )
@@ -1271,5 +1415,40 @@ public class NeoStoreDataSource implements NeoStoreSupplier, Lifecycle, IndexPro
     {
         public static final Setting<String> keep_logical_logs = GraphDatabaseSettings.keep_logical_logs;
         public static final Setting<Boolean> read_only = GraphDatabaseSettings.read_only;
+    }
+
+    public class BufferedIdMaintenanceController extends LifecycleAdapter
+    {
+        private final BufferingIdGeneratorFactory bufferingIdGeneratorFactory;
+        private JobHandle jobHandle;
+
+        BufferedIdMaintenanceController( BufferingIdGeneratorFactory bufferingIdGeneratorFactory )
+        {
+            this.bufferingIdGeneratorFactory = bufferingIdGeneratorFactory;
+        }
+
+        @Override
+        public void start() throws Throwable
+        {
+            jobHandle = scheduler.scheduleRecurring( JobScheduler.Groups.storageMaintenance, new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    maintenance();
+                }
+            }, 1, SECONDS );
+        }
+
+        @Override
+        public void stop() throws Throwable
+        {
+            jobHandle.cancel( false );
+        }
+
+        public void maintenance()
+        {
+            bufferingIdGeneratorFactory.maintenance();
+        }
     }
 }

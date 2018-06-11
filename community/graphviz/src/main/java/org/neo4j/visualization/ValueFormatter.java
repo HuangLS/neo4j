@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,6 @@ import java.util.Arrays;
 /**
  * A formatter that, directed by a {@link PropertyType} can turn a value into a
  * specific result type.
- * @author Tobias Ivarsson <tobias.ivarsson@neotechnology.com>
  * @param <T>
  *            The result type that this formatter yields.
  */
@@ -78,7 +77,7 @@ public interface ValueFormatter<T>
 
 	/**
 	 * Format an object of unsupported type.
-	 * @param value
+	 * @param value the value of unsupported type
 	 * @return a formatted version of the given value.
 	 */
 	T formatUnknownObject( Object value );

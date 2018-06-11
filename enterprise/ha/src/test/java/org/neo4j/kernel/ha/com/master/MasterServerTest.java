@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -45,8 +45,8 @@ public class MasterServerTest
                 mock( ByteCounterMonitor.class ), mock( RequestMonitor.class ), conversationManager );
         RequestContext requestContext = new RequestContext( 1l, 1, 1, 0, 0l );
 
-        masterServer.cleanConversation( requestContext );
+        masterServer.stopConversation( requestContext );
 
-        Mockito.verify( conversationManager ).remove( requestContext );
+        Mockito.verify( conversationManager ).stop( requestContext );
     }
 }

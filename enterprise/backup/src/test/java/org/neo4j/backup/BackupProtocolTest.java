@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -72,7 +72,7 @@ public class BackupProtocolTest
         int port = BackupServer.DEFAULT_PORT;
         LifeSupport life = new LifeSupport();
 
-        BackupClient client = life.add( new BackupClient( host, port, NullLogProvider.getInstance(), storeId, 1000,
+        BackupClient client = life.add( new BackupClient( host, port, null, NullLogProvider.getInstance(), storeId, 1000,
                 mock( ResponseUnpacker.class ), mock( ByteCounterMonitor.class ), mock( RequestMonitor.class ) ) );
         ControlledBackupInterface backup = new ControlledBackupInterface();
         life.add( new BackupServer( backup, new HostnamePort( host, port ), NullLogProvider.getInstance(), mock( ByteCounterMonitor.class ),

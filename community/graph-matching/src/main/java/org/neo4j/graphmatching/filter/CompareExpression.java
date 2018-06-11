@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,8 +22,8 @@ package org.neo4j.graphmatching.filter;
 import org.neo4j.graphmatching.PatternNode;
 
 /**
- * An implementation which can compare commons expressions, f.ex:
- * less than (<), greater than or equal to (>=) a.s.o.
+ * An implementation which can compare commons expressions, for example
+ * less than (&lt;), greater than or equal to (&gt;=) a.s.o.
  */
 @Deprecated
 public class CompareExpression extends AbstractFilterExpression
@@ -35,7 +35,7 @@ public class CompareExpression extends AbstractFilterExpression
      * Constructs a new comparison expression.
      * @param label the {@link PatternNode} label.
      * @param property property key.
-     * @param operator operator, f.ex. >= or < or =
+     * @param operator operator, f.ex. &gt;= or &lt; or =
      * @param value value to compare against.
      */
     public CompareExpression( String label, String property, String operator,

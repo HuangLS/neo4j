@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,16 @@
 package org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 
 case class Modulo(a: Expression, b: Expression) extends Arithmetics(a, b) {
-  def calc(a: Number, b: Number) = a.doubleValue() % b.doubleValue()
+  def calc(a: Number, b: Number): Any = (a, b) match {
+    case (l1: java.lang.Double, _) => l1 % b.doubleValue()
+    case (_, l2: java.lang.Double) => a.doubleValue() % l2
+    case (l1: java.lang.Float, _) => l1 % b.floatValue()
+    case (_, l2: java.lang.Float) => a.floatValue() % l2
+
+    //no floating point values, then we treat everything else as longs
+    case _ => a.longValue() % b.longValue()
+  }
+
 
   def rewrite(f: (Expression) => Expression) = f(Modulo(a.rewrite(f), b.rewrite(f)))
 

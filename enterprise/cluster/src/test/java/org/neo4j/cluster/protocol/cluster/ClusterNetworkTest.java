@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -44,8 +44,6 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.neo4j.kernel.impl.logging.NullLogService;
-import org.neo4j.logging.NullLogProvider;
 
 import org.neo4j.cluster.ClusterSettings;
 import org.neo4j.cluster.InstanceId;
@@ -64,13 +62,11 @@ import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.monitoring.Monitors;
+import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.LoggerRule;
 
 import static org.junit.Assert.assertEquals;
 
-/**
- * TODO
- */
 @RunWith(value = Parameterized.class)
 public class ClusterNetworkTest
 {
@@ -88,7 +84,7 @@ public class ClusterNetworkTest
                                 leave( 100L, 2 ).
                                 leave( 100L, 1 )
                         },
-/*                        {
+                        {
                                 // 3 nodes join and then leaves
                                 3, new ClusterTestScriptDSL().
                                 join( 10L, 1 ).
@@ -136,26 +132,26 @@ public class ClusterNetworkTest
                         },
                         {
                                 3, new ClusterTestScriptRandom( 1337830212532839000L )
-                        }*/
+                        }
                 } );
     }
 
-    static List<Cluster> servers = new ArrayList<Cluster>();
-    static List<Cluster> out = new ArrayList<Cluster>();
-    static List<Cluster> in = new ArrayList<Cluster>();
+    private static List<Cluster> servers = new ArrayList<>();
+    private static List<Cluster> out = new ArrayList<>();
+    private static List<Cluster> in = new ArrayList<>();
 
     @ClassRule
     public static LoggerRule logger = new LoggerRule( Level.OFF );
 
-    List<AtomicReference<ClusterConfiguration>> configurations = new ArrayList<AtomicReference<ClusterConfiguration>>();
+    private List<AtomicReference<ClusterConfiguration>> configurations = new ArrayList<AtomicReference<ClusterConfiguration>>();
 
-    ClusterTestScript script;
+    private ClusterTestScript script;
 
-    Timer timer = new Timer();
+    private Timer timer = new Timer();
 
-    LifeSupport life = new LifeSupport();
+    private LifeSupport life = new LifeSupport();
 
-    static ExecutorService executor;
+    private static ExecutorService executor;
 
     public ClusterNetworkTest( int nrOfServers, ClusterTestScript script )
             throws URISyntaxException
@@ -172,7 +168,7 @@ public class ClusterNetworkTest
             Monitors monitors = new Monitors();
             NetworkedServerFactory factory = new NetworkedServerFactory( life,
                     new MultiPaxosServerFactory( new ClusterConfiguration( "default", NullLogProvider.getInstance() ),
-                            NullLogService.getInstance(), monitors.newMonitor( StateMachines.Monitor.class )
+                            NullLogProvider.getInstance(), monitors.newMonitor( StateMachines.Monitor.class )
                     ),
                     new FixedTimeoutStrategy( 1000 ), NullLogProvider.getInstance(), new ObjectStreamFactory(), new ObjectStreamFactory(),
                     monitors.newMonitor( NetworkReceiver.Monitor.class ), monitors.newMonitor( NetworkSender.Monitor.class ), monitors.newMonitor( NamedThreadFactory.Monitor.class )
@@ -240,7 +236,7 @@ public class ClusterNetworkTest
         logger.getLogger().fine( "All nodes leave" );
 
         // All leave
-        for ( Cluster cluster : new ArrayList<Cluster>( in ) )
+        for ( Cluster cluster : new ArrayList<>( in ) )
         {
             logger.getLogger().fine( "Leaving:" + cluster );
             cluster.leave();
@@ -256,7 +252,7 @@ public class ClusterNetworkTest
 
     private AtomicReference<ClusterConfiguration> clusterStateListener( final URI uri, final Cluster cluster )
     {
-        final AtomicReference<ClusterConfiguration> config = new AtomicReference<ClusterConfiguration>();
+        final AtomicReference<ClusterConfiguration> config = new AtomicReference<>();
         cluster.addClusterListener( new ClusterListener()
         {
             @Override
@@ -305,45 +301,22 @@ public class ClusterNetworkTest
         return config;
     }
 
-    private void verifyConfigurations()
-    {
-        List<URI> nodes = null;
-        for ( int j = 0; j < configurations.size(); j++ )
-        {
-            AtomicReference<ClusterConfiguration> configurationAtomicReference = configurations.get( j );
-            if ( configurationAtomicReference.get() != null )
-            {
-                if ( nodes == null )
-                {
-                    nodes = configurationAtomicReference.get().getMemberURIs();
-                }
-                else
-                {
-                    assertEquals( "Config for server" + (j + 1) + " is wrong", nodes,
-                            configurationAtomicReference.get().getMemberURIs() );
-                }
-
-            }
-        }
-    }
-
-    public interface ClusterTestScript
+    interface ClusterTestScript
     {
         void tick( long time );
 
         long getLength();
     }
 
-    public static class ClusterTestScriptDSL
-            implements ClusterTestScript
+    private static class ClusterTestScriptDSL implements ClusterTestScript
     {
-        public abstract static class ClusterAction
+        abstract static class ClusterAction
                 implements Runnable
         {
             public long time;
         }
 
-        private Queue<ClusterAction> actions = new LinkedList<ClusterAction>();
+        private Queue<ClusterAction> actions = new LinkedList<>();
 
         private long now = 0;
 

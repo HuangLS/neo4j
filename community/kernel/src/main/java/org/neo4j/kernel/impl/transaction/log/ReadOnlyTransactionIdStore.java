@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,11 +20,15 @@
 package org.neo4j.kernel.impl.transaction.log;
 
 import java.io.File;
+import java.io.IOException;
 
 import org.neo4j.io.pagecache.PageCache;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.MetaDataStore;
+import org.neo4j.kernel.impl.store.MetaDataStore.Position;
+import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.TransactionId;
 
-import static org.neo4j.kernel.impl.store.NeoStore.Position;
+import static org.neo4j.kernel.impl.store.MetaDataStore.getRecord;
 
 public class ReadOnlyTransactionIdStore implements TransactionIdStore
 {
@@ -33,16 +37,16 @@ public class ReadOnlyTransactionIdStore implements TransactionIdStore
     private final long logVersion;
     private final long byteOffset;
 
-    public ReadOnlyTransactionIdStore( PageCache pageCache, File storeDir )
+    public ReadOnlyTransactionIdStore( PageCache pageCache, File storeDir ) throws IOException
     {
         long id = 0, checksum = 0, logVersion = 0, byteOffset = 0;
-        if ( NeoStore.isStorePresent( pageCache, storeDir ) )
+        if ( NeoStores.isStorePresent( pageCache, storeDir ) )
         {
-            File neoStore = new File( storeDir, NeoStore.DEFAULT_NAME );
-            id = NeoStore.getRecord( pageCache, neoStore, Position.LAST_TRANSACTION_ID );
-            checksum = NeoStore.getRecord( pageCache, neoStore, Position.LAST_TRANSACTION_CHECKSUM );
-            logVersion = NeoStore.getRecord( pageCache, neoStore, Position.LAST_CLOSED_TRANSACTION_LOG_VERSION );
-            byteOffset = NeoStore.getRecord( pageCache, neoStore, Position.LAST_CLOSED_TRANSACTION_LOG_BYTE_OFFSET );
+            File neoStore = new File( storeDir, MetaDataStore.DEFAULT_NAME );
+            id = getRecord( pageCache, neoStore, Position.LAST_TRANSACTION_ID );
+            checksum = getRecord( pageCache, neoStore, Position.LAST_TRANSACTION_CHECKSUM );
+            logVersion = getRecord( pageCache, neoStore, Position.LAST_CLOSED_TRANSACTION_LOG_VERSION );
+            byteOffset = getRecord( pageCache, neoStore, Position.LAST_CLOSED_TRANSACTION_LOG_BYTE_OFFSET );
         }
 
         this.transactionId = id;
@@ -58,7 +62,7 @@ public class ReadOnlyTransactionIdStore implements TransactionIdStore
     }
 
     @Override
-    public void transactionCommitted( long transactionId, long checksum )
+    public void transactionCommitted( long transactionId, long checksum, long commitTimestamp )
     {
         throw new UnsupportedOperationException( "Read-only transaction ID store" );
     }
@@ -70,13 +74,13 @@ public class ReadOnlyTransactionIdStore implements TransactionIdStore
     }
 
     @Override
-    public long[] getLastCommittedTransaction()
+    public TransactionId getLastCommittedTransaction()
     {
-        return new long[] {transactionId, transactionChecksum};
+        return new TransactionId( transactionId, transactionChecksum, BASE_TX_COMMIT_TIMESTAMP );
     }
 
     @Override
-    public long[] getUpgradeTransaction()
+    public TransactionId getUpgradeTransaction()
     {
         return getLastCommittedTransaction();
     }
@@ -94,7 +98,8 @@ public class ReadOnlyTransactionIdStore implements TransactionIdStore
     }
 
     @Override
-    public void setLastCommittedAndClosedTransactionId( long transactionId, long checksum, long logVersion, long logByteOffset )
+    public void setLastCommittedAndClosedTransactionId( long transactionId, long checksum, long commitTimestamp,
+            long logByteOffset, long logVersion )
     {
         throw new UnsupportedOperationException( "Read-only transaction ID store" );
     }

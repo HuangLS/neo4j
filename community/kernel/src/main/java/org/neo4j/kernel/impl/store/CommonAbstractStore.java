@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,10 +21,11 @@ package org.neo4j.kernel.impl.store;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.StandardOpenOption;
 
 import org.neo4j.graphdb.config.Setting;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
-import org.neo4j.helpers.UTF8;
 import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.PageCursor;
@@ -41,11 +42,8 @@ import org.neo4j.logging.LogProvider;
 import org.neo4j.logging.Logger;
 
 import static org.neo4j.helpers.Exceptions.launderedException;
-import static org.neo4j.helpers.UTF8.encode;
 import static org.neo4j.io.pagecache.PagedFile.PF_READ_AHEAD;
 import static org.neo4j.io.pagecache.PagedFile.PF_SHARED_LOCK;
-import static org.neo4j.kernel.impl.store.StoreVersionTrailerUtil.getTrailerOffset;
-import static org.neo4j.kernel.impl.store.StoreVersionTrailerUtil.writeTrailer;
 
 /**
  * Contains common implementation for {@link AbstractStore} and
@@ -59,14 +57,12 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
     protected final PageCache pageCache;
     protected final File storageFileName;
     protected final IdType idType;
-    private final IdGeneratorFactory idGeneratorFactory;
-    private final StoreVersionMismatchHandler versionMismatchHandler;
+    protected final IdGeneratorFactory idGeneratorFactory;
     protected final Log log;
     protected PagedFile storeFile;
     private IdGenerator idGenerator;
     private boolean storeOk = true;
     private Throwable causeOfStoreNotOk;
-    private String readTypeDescriptorAndVersion;
 
     /**
      * Opens and validates the store contained in <CODE>fileName</CODE>
@@ -89,8 +85,7 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
             IdType idType,
             IdGeneratorFactory idGeneratorFactory,
             PageCache pageCache,
-            LogProvider logProvider,
-            StoreVersionMismatchHandler versionMismatchHandler )
+            LogProvider logProvider )
     {
         this.storageFileName = fileName;
         this.configuration = configuration;
@@ -98,12 +93,13 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         this.pageCache = pageCache;
         this.idType = idType;
         this.log = logProvider.getLog( getClass() );
-        this.versionMismatchHandler = versionMismatchHandler;
+    }
 
+    void initialise( boolean createIfNotExists )
+    {
         try
         {
-            checkStorage();
-            checkVersion(); // Overriden in NeoStore
+            checkStorage( createIfNotExists );
             loadStorage();
         }
         catch ( Exception e )
@@ -112,7 +108,7 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
             {
                 try
                 {
-                    storeFile.close();
+                    closeStoreFile();
                 }
                 catch ( IOException failureToClose )
                 {
@@ -125,56 +121,44 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         }
     }
 
-    public static String buildTypeDescriptorAndVersion( String typeDescriptor )
-    {
-        return buildTypeDescriptorAndVersion( typeDescriptor, ALL_STORES_VERSION );
-    }
-
-    public static String buildTypeDescriptorAndVersion( String typeDescriptor, String version )
-    {
-        return typeDescriptor + " " + version;
-    }
-
     protected static long longFromIntAndMod( long base, long modifier )
     {
         return modifier == 0 && base == IdGeneratorImpl.INTEGER_MINUS_ONE ? -1 : base | modifier;
     }
 
-    public String getTypeAndVersionDescriptor()
-    {
-        return buildTypeDescriptorAndVersion( getTypeDescriptor() );
-    }
+    protected abstract String getTypeDescriptor();
 
-    /**
-     * Returns the type and version that identifies this store.
-     *
-     * @return This store's implementation type and version identifier
-     */
-    public abstract String getTypeDescriptor();
+    protected abstract void initialiseNewStoreFile( PagedFile file ) throws IOException;
 
     /**
      * This method is called by constructors.
+     * @param createIfNotExists If true, creates and initialises the store file if it does not exist already. If false,
+     * this method will instead throw an exception in that situation.
      */
-    protected void checkStorage()
+    protected void checkStorage( boolean createIfNotExists )
     {
-        try ( PagedFile file = pageCache.map( storageFileName, pageCache.pageSize() ) )
+        try ( PagedFile ignore = pageCache.map( storageFileName, pageCache.pageSize() ) )
         {
+        }
+        catch ( NoSuchFileException e )
+        {
+            if ( createIfNotExists )
+            {
+                try ( PagedFile file = pageCache.map( storageFileName, pageCache.pageSize(), StandardOpenOption.CREATE ) )
+                {
+                    initialiseNewStoreFile( file );
+                    return;
+                }
+                catch ( IOException e1 )
+                {
+                    e.addSuppressed( e1 );
+                }
+            }
+            throw new StoreNotFoundException( "Store file not found: " + storageFileName, e );
         }
         catch ( IOException e )
         {
-            throw new UnderlyingStorageException( "Unable to open file " + storageFileName, e );
-        }
-    }
-
-    protected void checkVersion()
-    {
-        try
-        {
-            verifyCorrectTypeDescriptorAndVersion();
-        }
-        catch ( IOException e )
-        {
-            throw new UnderlyingStorageException( "Unable to check version " + getStorageFileName(), e );
+            throw new UnderlyingStorageException( "Unable to open store file: " + storageFileName, e );
         }
     }
 
@@ -191,7 +175,6 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         try
         {
             readAndVerifyBlockSize();
-            verifyRecordAlignmentAndRemoveTrailer();
             try
             {
                 int filePageSize = pageCache.pageSize() - pageCache.pageSize() % getRecordSize();
@@ -210,28 +193,6 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         }
     }
 
-    private void verifyRecordAlignmentAndRemoveTrailer() throws IOException
-    {
-        String versionTrailer = buildTypeDescriptorAndVersion( getTypeDescriptor() );
-        int expectedVersionLength = UTF8.encode( versionTrailer ).length;
-        try ( PagedFile pagedFile = pageCache
-                .map( getStorageFileName(), pageCache.pageSize() - pageCache.pageSize() % getRecordSize() ) )
-        {
-            long trailerOffset =
-                    getTrailerOffset( pagedFile, versionTrailer.split( " " )[0] );
-            if ( trailerOffset != -1 && trailerOffset % getRecordSize() == 0 )
-            {
-                writeTrailer( pagedFile, new byte[expectedVersionLength], trailerOffset );
-            }
-            else
-            {
-                setStoreNotOk( new IllegalStateException(
-                        "Misaligned file size " + trailerOffset + " for " + this + ", expected version length:" +
-                        expectedVersionLength ) );
-            }
-        }
-    }
-
     protected long pageIdForRecord( long id )
     {
         return id * getRecordSize() / storeFile.pageSize();
@@ -242,7 +203,7 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         return (int) (id * getRecordSize() % storeFile.pageSize());
     }
 
-    protected int recordsPerPage()
+    public int getRecordsPerPage()
     {
         return storeFile.pageSize() / getRecordSize();
     }
@@ -277,40 +238,10 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         }
     }
 
-    protected void verifyCorrectTypeDescriptorAndVersion() throws IOException
-    {
-        String expectedTypeDescriptorAndVersion = getTypeAndVersionDescriptor();
-        try ( PagedFile pagedFile = pageCache.map( storageFileName, pageCache.pageSize() ) )
-        {
-            readTypeDescriptorAndVersion = StoreVersionTrailerUtil
-                    .readTrailer( pagedFile, expectedTypeDescriptorAndVersion );
-        }
-        if ( readTypeDescriptorAndVersion == null )
-        {
-            setStoreNotOk( new IllegalStateException(
-                    "No trailer present in store, expected " + expectedTypeDescriptorAndVersion ) );
-            return;
-        }
-        if ( !expectedTypeDescriptorAndVersion.equals( readTypeDescriptorAndVersion ) )
-        {
-            if ( readTypeDescriptorAndVersion.startsWith( getTypeDescriptor() ) )
-            {
-                versionMismatchHandler.mismatch( ALL_STORES_VERSION, readTypeDescriptorAndVersion );
-            }
-            else
-            {
-                setStoreNotOk( new IllegalStateException(
-                        "Unexpected version " + readTypeDescriptorAndVersion + ", expected " +
-                        expectedTypeDescriptorAndVersion ) );
-            }
-        }
-    }
-
     protected int getHeaderRecord() throws IOException
     {
         int headerRecord = 0 ;
-        try ( PagedFile pagedFile = pageCache
-                .map( getStorageFileName(), pageCache.pageSize() ) )
+        try ( PagedFile pagedFile = pageCache.map( getStorageFileName(), pageCache.pageSize() ) )
         {
             try ( PageCursor pageCursor = pagedFile.io( 0, PF_SHARED_LOCK ) )
             {
@@ -324,10 +255,10 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
                 }
             }
         }
+
         if ( headerRecord <= 0 )
         {
-            throw new InvalidRecordException( "Illegal block size: " +
-                    headerRecord + " in " + getStorageFileName() );
+            throw new InvalidRecordException( "Illegal block size: " + headerRecord + " in " + getStorageFileName() );
         }
         return headerRecord;
     }
@@ -342,7 +273,8 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
      * map their own temporary PagedFile for the store file, and do their file IO through that,
      * if they need to access the data in the store file.
      */
-    protected void rebuildIdGenerator()
+    // accessible only for testing
+    final void rebuildIdGenerator()
     {
         int blockSize = getRecordSize();
         if ( blockSize <= 0 )
@@ -350,7 +282,7 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
             throw new InvalidRecordException( "Illegal blockSize: " + blockSize );
         }
 
-        log.debug( "Rebuilding id generator for[" + getStorageFileName() + "] ..." );
+        log.info( "Rebuilding id generator for[" + getStorageFileName() + "] ..." );
         closeIdGenerator();
         createIdGenerator( getIdFileName() );
         openIdGenerator();
@@ -360,14 +292,13 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
 
         try
         {
-            long foundHighId = findHighIdBackwards();
+            long foundHighId = scanForHighId();
             setHighId( foundHighId );
             if ( !fastRebuild )
             {
                 try ( PageCursor cursor = storeFile.io( 0, PagedFile.PF_EXCLUSIVE_LOCK | PF_READ_AHEAD ) )
                 {
-                    defraggedCount = rebuildIdGeneratorSlow( cursor, recordsPerPage(), blockSize,
-                            foundHighId );
+                    defraggedCount = rebuildIdGeneratorSlow( cursor, getRecordsPerPage(), blockSize, foundHighId );
                 }
             }
         }
@@ -376,10 +307,9 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
             throw new UnderlyingStorageException( "Unable to rebuild id generator " + getStorageFileName(), e );
         }
 
-        log.debug( "[" + getStorageFileName() + "] high id=" + getHighId()
-                            + " (defragged=" + defraggedCount + ")" );
-        log.debug( getStorageFileName() + " rebuild id generator, highId=" + getHighId() +
-                                 " defragged count=" + defraggedCount );
+        log.info( "[" + getStorageFileName() + "] high id=" + getHighId() + " (defragged=" + defraggedCount + ")" );
+        log.info( getStorageFileName() + " rebuild id generator, highId=" + getHighId() +
+                  " defragged count=" + defraggedCount );
 
         if ( !fastRebuild )
         {
@@ -448,19 +378,6 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
     }
 
     /**
-     * This method should close/release all resources that the implementation of
-     * this store has allocated and is called just before the <CODE>close()</CODE>
-     * method returns. Override this method to clean up stuff the constructor.
-     * <p>
-     * This default implementation does nothing.
-     * <p>
-     * Note: This method runs before the store file is unmapped from the page cache.
-     */
-    protected void closeStorage()
-    {
-    }
-
-    /**
      * Marks this store as "not ok".
      */
     protected void setStoreNotOk( Throwable cause )
@@ -483,11 +400,11 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
     /**
      * Throws cause of not being OK if {@link #getStoreOk()} returns {@code false}.
      */
-    protected void checkStoreOk()
+    protected final void checkStoreOk()
     {
         if ( !storeOk )
         {
-            throw launderedException( causeOfStoreNotOk );
+            throw new UnderlyingStorageException( "Store is not OK", causeOfStoreNotOk );
         }
     }
 
@@ -499,6 +416,10 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
     @Override
     public long nextId()
     {
+        if ( idGenerator == null )
+        {
+            throw new IllegalStateException( "IdGenerator is not initialized" );
+        }
         return idGenerator.nextId();
     }
 
@@ -518,12 +439,14 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
 
     /**
      * Return the highest id in use.
+     * If this store is not OK yet, the high id is calculated from the highest in use record on the store,
+     * using {@link #scanForHighId()}.
      *
-     * @return The highest id in use.
+     * @return The high id, highest id in use + 1
      */
     public long getHighId()
     {
-        return idGenerator != null ? idGenerator.getHighId() : -1;
+        return idGenerator != null ? idGenerator.getHighId() : scanForHighId();
     }
 
     /**
@@ -549,10 +472,13 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
 
     /**
      * If store is not ok a call to this method will rebuild the {@link
-     * IdGenerator} used by this store and if successful mark it as
-     * <CODE>ok</CODE>.
+     * IdGenerator} used by this store and if successful mark it as.
+     *
+     * WARNING: this method must NOT be called if recovery is required, but hasn't performed.
+     * To remove all negations from the above statement: Only call this method if store is in need of
+     * recovery and recovery has been performed.
      */
-    public void makeStoreOk()
+    public final void makeStoreOk()
     {
         if ( !storeOk )
         {
@@ -585,44 +511,35 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
      * map their own temporary PagedFile for the store file, and do their file IO through that,
      * if they need to access the data in the store file.
      */
+
     protected void openIdGenerator()
     {
-        idGenerator = openIdGenerator( getIdFileName(), idType.getGrabSize() );
+        idGenerator = idGeneratorFactory.open( getIdFileName(), getIdType(), scanForHighId() );
     }
 
     /**
-     * Opens the {@link IdGenerator} given by the fileName.
-     * <p>
-     * Note: This method may be called both while the store has the store file mapped in the
-     * page cache, and while the store file is not mapped. Implementers must therefore
-     * map their own temporary PagedFile for the store file, and do their file IO through that,
-     * if they need to access the data in the store file.
+     * Starts from the end of the file and scans backwards to find the highest in use record.
+     * Can be used even if {@link #makeStoreOk()} hasn't been called. Basically this method should be used
+     * over {@link #getHighestPossibleIdInUse()} and {@link #getHighId()} in cases where a store has been opened
+     * but is in a scenario where recovery isn't possible, like some tooling or migration.
+     *
+     * @return the id of the highest in use record + 1, i.e. highId.
      */
-    protected IdGenerator openIdGenerator( File fileName, int grabSize )
-    {
-        try
-        {
-            return idGeneratorFactory.open( fileName, grabSize, getIdType(), findHighIdBackwards() );
-        }
-        catch ( IOException e )
-        {
-            throw new UnderlyingStorageException(
-                    "Unable to find high id by scanning backwards " + getStorageFileName(), e );
-        }
-    }
-
-    protected long findHighIdBackwards() throws IOException
+    protected long scanForHighId()
     {
         try ( PageCursor cursor = storeFile.io( 0, PF_SHARED_LOCK ) )
         {
             long nextPageId = storeFile.getLastPageId();
-            int recordsPerPage = recordsPerPage();
+            int recordsPerPage = getRecordsPerPage();
             int recordSize = getRecordSize();
+            long highestId = getNumberOfReservedLowIds();
             while ( nextPageId >= 0 && cursor.next( nextPageId ) )
             {
                 nextPageId--;
+                boolean found;
                 do
                 {
+                    found = false;
                     int currentRecord = recordsPerPage;
                     while ( currentRecord-- > 0 )
                     {
@@ -631,14 +548,25 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
                         if ( isRecordInUse( cursor ) )
                         {
                             // We've found the highest id in use
-                            return recordId + 1 /*+1 since we return the high id*/;
+                            found = true;
+                            highestId = recordId + 1; /*+1 since we return the high id*/;
+                            break;
                         }
                     }
                 }
                 while ( cursor.shouldRetry() );
+                if ( found )
+                {
+                    return highestId;
+                }
             }
 
             return getNumberOfReservedLowIds();
+        }
+        catch ( IOException e )
+        {
+            throw new UnderlyingStorageException(
+                    "Unable to find high id by scanning backwards " + getStorageFileName(), e );
         }
     }
 
@@ -681,23 +609,31 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
     }
 
     /**
+     * Checks if this store is closed and throws exception if it is.
+     *
+     * @throws IllegalStateException if the store is closed
+     */
+    protected void assertNotClosed()
+    {
+        if ( storeFile == null )
+        {
+            throw new IllegalStateException( this + " for file '" + storageFileName + "' is closed" );
+        }
+    }
+
+    /**
      * Closes this store. This will cause all buffers and channels to be closed.
      * Requesting an operation from after this method has been invoked is
      * illegal and an exception will be thrown.
-     * <p>
-     * This method will start by invoking the {@link #closeStorage} method
-     * giving the implementing store way to do anything that it needs to do
-     * before the pagedFile is closed.
      */
     @Override
     public void close()
     {
-        closeStorage();
         if ( idGenerator == null || !storeOk )
         {
             try
             {
-                storeFile.close();
+                closeStoreFile();
             }
             catch ( IOException e )
             {
@@ -707,17 +643,32 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         }
         try
         {
-            long trailerOffset = idGenerator.getHighId() * getRecordSize();
-            idGenerator.close();
-
-            log.debug( "Closing " + storageFileName + ", writing trailer at " + trailerOffset );
-            writeTrailer( storeFile, encode( versionMismatchHandler.trailerToWrite( getTypeAndVersionDescriptor(),
-                    readTypeDescriptorAndVersion ) ), trailerOffset );
-            storeFile.close();
+            closeStoreFile();
         }
         catch ( IOException | IllegalStateException e )
         {
             throw new UnderlyingStorageException( "Failed to close store file: " + getStorageFileName(), e );
+        }
+    }
+
+    private void closeStoreFile() throws IOException
+    {
+        try
+        {
+            /*
+             * Note: the closing ordering here is important!
+             * It is the case since we wand to mark the id generator as closed cleanly ONLY IF
+             * also the store file is cleanly shutdown.
+             */
+            storeFile.close();
+            if ( idGenerator != null )
+            {
+                idGenerator.close();
+            }
+        }
+        finally
+        {
+            storeFile = null;
         }
     }
 
@@ -731,7 +682,7 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         else
         {   // If we ask for this before we've recovered we can only make a best-effort guess
             // about the highest possible id in use.
-            return calculateHighestIdInUseByLookingAtFileSize();
+            return scanForHighId() - 1;
         }
     }
 
@@ -745,27 +696,13 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         setHighId( highId + 1 );
     }
 
-    private long calculateHighestIdInUseByLookingAtFileSize()
-    {
-        int recordAlignedPageSize = pageCache.pageSize() - pageCache.pageSize() % getRecordSize();
-        try ( PagedFile pagedFile = pageCache.map( getStorageFileName(), recordAlignedPageSize ) )
-        {
-            long id = recordsPerPage() * (pagedFile.getLastPageId() + 1);
-            if ( id == 0 )
-            {
-                return -1;
-            }
-            return id;
-        }
-        catch ( IOException e )
-        {
-            throw new RuntimeException( e );
-        }
-    }
-
     /** @return The total number of ids in use. */
     public long getNumberOfIdsInUse()
     {
+        if ( idGenerator == null )
+        {
+            throw new IllegalStateException( "IdGenerator is not initialized" );
+        }
         return idGenerator.getNumberOfIdsInUse();
     }
 
@@ -783,15 +720,15 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
         return idType;
     }
 
-    public void logVersions( Logger logger )
+    public final void logVersions( Logger logger )
     {
-        logger.log( "  " + getTypeAndVersionDescriptor() );
+        logger.log( getTypeDescriptor() + " " + ALL_STORES_VERSION );
     }
 
-    public void logIdUsage( Logger logger )
+    public final void logIdUsage( Logger logger )
     {
         logger.log( String.format( "  %s: used=%s high=%s",
-                getTypeDescriptor(), getNumberOfIdsInUse(), getHighestPossibleIdInUse() ) );
+                getTypeDescriptor() + " " + ALL_STORES_VERSION, getNumberOfIdsInUse(), getHighestPossibleIdInUse() ) );
     }
 
     /**
@@ -799,14 +736,35 @@ public abstract class CommonAbstractStore implements IdSequence, AutoCloseable
      * TODO this could, and probably should, replace all override-and-do-the-same-thing-to-all-my-managed-stores
      * methods like:
      * {@link #makeStoreOk()},
-     * {@link #closeStorage()} (where that method could be deleted all together and do a visit in {@link #close()}),
+     * {@link #close()} (where that method could be deleted all together and do a visit in {@link #close()}),
      * {@link #logIdUsage(Logger)},
      * {@link #logVersions(Logger)}
      * For a good samaritan to pick up later.
      */
-    public void visitStore( Visitor<CommonAbstractStore,RuntimeException> visitor )
+    public final void visitStore( Visitor<CommonAbstractStore,RuntimeException> visitor )
     {
         visitor.visit( this );
+    }
+
+    /**
+     * Called from the part of the code that starts the {@link MetaDataStore} and friends, together with any
+     * existing transaction log, seeing that there are transactions to recover. Now, this shouldn't be
+     * needed because the state of the id generator _should_ reflect this fact, but turns out that,
+     * given HA and the nature of the .id files being like orphans to the rest of the store, we just
+     * can't trust that to be true. If we happen to have id generators open during recovery we delegate
+     * {@link #freeId(long)} calls to {@link IdGenerator#freeId(long)} and since the id generator is most likely
+     * out of date w/ regards to high id, it may very well blow up.
+     *
+     * This also marks the store as not OK. A call to {@link #makeStoreOk()} is needed once recovery is complete.
+     */
+    final void deleteIdGenerator()
+    {
+        if ( idGenerator != null )
+        {
+            idGenerator.delete();
+            idGenerator = null;
+            setStoreNotOk( new IllegalStateException( "IdGenerator is not initialized" ) );
+        }
     }
 
     @Override

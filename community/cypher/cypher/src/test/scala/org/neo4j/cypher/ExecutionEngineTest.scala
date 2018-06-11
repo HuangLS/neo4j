@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,7 @@ import org.neo4j.cypher.internal.tracing.TimingCompilationTracer.QueryEvent
 import org.neo4j.graphdb._
 import org.neo4j.graphdb.factory.GraphDatabaseSettings
 import org.neo4j.io.fs.FileUtils
-import org.neo4j.kernel.TopLevelTransaction
+import org.neo4j.kernel.{NeoStoreDataSource, TopLevelTransaction}
 import org.neo4j.test.{ImpermanentGraphDatabase, TestGraphDatabaseFactory}
 
 import scala.collection.JavaConverters._
@@ -284,9 +284,7 @@ with QueryStatisticsTestSupport with CreateTempFileTestSupport with NewPlannerTe
     for (i <- 1 to 10) createNode()
     val query = "match (pA) where id(pA) = {a} return pA"
 
-    intercept[CypherTypeException] {
-      executeWithAllPlanners(query, "a" -> "Andres").toList
-    }
+    executeWithAllPlanners(query, "a" -> "Andres") should be (empty)
   }
 
   test("shouldBeAbleToTakeParamsFromParsedStuff") {
@@ -423,8 +421,8 @@ order by a.COL1""")
 
     relate(refNode, a, "X")
 
-    executeWithAllPlannersAndRuntimes("match a-->b where a = {a} return b", "a" -> a) should have size 1
-    executeWithAllPlannersAndRuntimes("match a-->b where a = {a} return b", "a" -> b) shouldBe empty
+    executeWithAllPlanners("match a-->b where a = {a} return b", "a" -> a) should have size 1
+    executeWithAllPlanners("match a-->b where a = {a} return b", "a" -> b) shouldBe empty
   }
 
   test("shouldHandleParametersNamedAsIdentifiers") {
@@ -683,7 +681,7 @@ order by a.COL1""")
     relate(a, b)
     relate(b, c)
 
-    val result = executeWithAllPlannersAndRuntimes("MATCH n-[r]->m WHERE n = {a} AND m = {b} RETURN *", "a"->a, "b"->c)
+    val result = executeWithAllPlanners("MATCH n-[r]->m WHERE n = {a} AND m = {b} RETURN *", "a"->a, "b"->c)
 
     result.toList shouldBe empty
   }
@@ -982,7 +980,7 @@ order by a.COL1""")
     createNode("coll" -> Array(1, 2, 3), "bool" -> true)
     createLabeledNode("LABEL")
 
-    val foundNode = executeWithAllPlannersAndRuntimes("match (n:LABEL) where n.coll and n.bool return n").columnAs[Node]("n").next()
+    val foundNode = executeWithAllPlanners("match (n:LABEL) where n.coll and n.bool return n").columnAs[Node]("n").next()
 
     foundNode should equal(n)
   }
@@ -1047,14 +1045,14 @@ order by a.COL1""")
 
     // WHEN
     eengine.execute(s"match (n:Person) return n").toList
-    planningListener.planRequests.toSeq should equal(Seq(
+    planningListener.planRequests should equal(Seq(
       s"match (n:Person) return n"
     ))
-    (0 until 50).foreach { _ => createLabeledNode("Person") }
+    (0 until 301).foreach { _ => createLabeledNode("Person") }
     eengine.execute(s"match (n:Person) return n").toList
 
     //THEN
-    planningListener.planRequests.toSeq should equal (Seq(
+    planningListener.planRequests should equal (Seq(
       s"match (n:Person) return n",
       s"match (n:Person) return n"
     ))
@@ -1077,6 +1075,26 @@ order by a.COL1""")
     //THEN
     planningListener.planRequests.toSeq should equal(Seq(
       s"match (n:Person) return n"
+    ))
+  }
+
+  test("replanning should happen after data source restart") {
+    val planningListener = PlanningListener()
+    kernelMonitors.addMonitorListener(planningListener)
+
+    val result1 = eengine.execute("match (n) return n").toList
+    result1 shouldBe empty
+
+    val ds = graph.getDependencyResolver.resolveDependency(classOf[NeoStoreDataSource])
+    ds.stop()
+    ds.start()
+
+    val result2 = eengine.execute("match (n) return n").toList
+    result2 shouldBe empty
+
+    planningListener.planRequests.toSeq should equal(Seq(
+      s"match (n) return n",
+      s"match (n) return n"
     ))
   }
 

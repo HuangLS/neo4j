@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,7 +32,7 @@ import java.util.Set;
 import org.neo4j.cluster.com.message.Message;
 import org.neo4j.cluster.com.message.MessageHolder;
 import org.neo4j.cluster.com.message.MessageType;
-import org.neo4j.cluster.protocol.omega.MessageArgumentMatcher;
+import org.neo4j.cluster.protocol.MessageArgumentMatcher;
 import org.neo4j.cluster.statemachine.State;
 
 import static org.hamcrest.MatcherAssert.assertThat;

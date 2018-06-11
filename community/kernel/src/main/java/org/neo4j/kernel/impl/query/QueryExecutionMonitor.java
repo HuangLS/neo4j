@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.impl.query;
 
+import java.util.Map;
+
 /**
  * The current (December 2014) usage of this interface expects the {@code end*} methods to be idempotent.
  * That is, once either of them have been invoked with a particular session as parameter, invoking either
@@ -26,7 +28,7 @@ package org.neo4j.kernel.impl.query;
  */
 public interface QueryExecutionMonitor
 {
-    void startQueryExecution( QuerySession session, String query );
+    void startQueryExecution( QuerySession session, String query, Map<String,Object> parameters );
 
     void endFailure( QuerySession session, Throwable failure );
 

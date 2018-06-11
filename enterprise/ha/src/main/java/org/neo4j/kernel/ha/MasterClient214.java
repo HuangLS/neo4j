@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,12 +34,14 @@ public class MasterClient214 extends MasterClient210
 {
     public static final ProtocolVersion PROTOCOL_VERSION = new ProtocolVersion( (byte) 8, INTERNAL_PROTOCOL_VERSION );
 
-    public MasterClient214( String hostNameOrIp, int port, LogProvider logProvider, StoreId storeId, long readTimeoutSeconds,
+    public MasterClient214( String destinationHostNameOrIp, int destinationPort, String originHostNameOrIp,
+                            LogProvider logProvider, StoreId storeId, long readTimeoutSeconds,
                             long lockReadTimeout, int maxConcurrentChannels, int chunkSize, ResponseUnpacker unpacker,
                             ByteCounterMonitor byteCounterMonitor, RequestMonitor requestMonitor )
     {
-        super( hostNameOrIp, port, logProvider, storeId, readTimeoutSeconds, lockReadTimeout, maxConcurrentChannels,
-                chunkSize, PROTOCOL_VERSION, unpacker, byteCounterMonitor, requestMonitor );
+        super( destinationHostNameOrIp, destinationPort, originHostNameOrIp, logProvider, storeId, readTimeoutSeconds,
+                lockReadTimeout, maxConcurrentChannels, chunkSize, PROTOCOL_VERSION, unpacker, byteCounterMonitor,
+                requestMonitor );
     }
 
     @Override

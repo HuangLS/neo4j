@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,8 @@ package org.neo4j.kernel.impl.transaction.log.checkpoint;
 
 import java.io.IOException;
 
+import org.neo4j.function.Predicates;
+import org.neo4j.function.Supplier;
 import org.neo4j.kernel.impl.store.UnderlyingStorageException;
 import org.neo4j.kernel.impl.util.JobScheduler;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
@@ -40,12 +42,21 @@ public class CheckPointScheduler extends LifecycleAdapter
         {
             try
             {
-                checkPointer.checkPointIfNeeded();
+                checkPointing = true;
+                if ( stopped )
+                {
+                    return;
+                }
+                checkPointer.checkPointIfNeeded( new SimpleTriggerInfo( "scheduler" ) );
             }
             catch ( IOException e )
             {
                 // no need to reschedule since the check pointer has raised a kernel panic and a shutdown is expected
                 throw new UnderlyingStorageException( e );
+            }
+            finally
+            {
+                checkPointing = false;
             }
 
             // reschedule only if it is not stopped
@@ -57,7 +68,16 @@ public class CheckPointScheduler extends LifecycleAdapter
     };
 
     private volatile JobScheduler.JobHandle handle;
-    private volatile boolean stopped = false;
+    private volatile boolean stopped;
+    private volatile boolean checkPointing;
+    private final Supplier<Boolean> checkPointingCondition = new Supplier<Boolean>()
+    {
+        @Override
+        public Boolean get()
+        {
+            return !checkPointing;
+        }
+    };
 
     public CheckPointScheduler( CheckPointer checkPointer, JobScheduler scheduler, long recurringPeriodMillis )
     {
@@ -80,5 +100,6 @@ public class CheckPointScheduler extends LifecycleAdapter
         {
             handle.cancel( false );
         }
+        Predicates.awaitForever( checkPointingCondition, 100, MILLISECONDS );
     }
 }

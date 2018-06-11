@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,6 +54,8 @@ public interface IndexAccessor extends Closeable
      */
     IndexUpdater newUpdater( IndexUpdateMode mode );
 
+    void flush() throws IOException;
+
     /**
      * Forces this index to disk. Called at certain points from within Neo4j for example when
      * rotating the logical log. After completion of this call there cannot be any essential state that
@@ -69,6 +71,7 @@ public interface IndexAccessor extends Closeable
      *
      * @throws IOException if unable to close index.
      */
+    @Override
     void close() throws IOException;
 
     /**
@@ -97,6 +100,11 @@ public interface IndexAccessor extends Closeable
         public IndexUpdater newUpdater( IndexUpdateMode mode )
         {
             return SwallowingIndexUpdater.INSTANCE;
+        }
+
+        @Override
+        public void flush()
+        {
         }
 
         @Override
@@ -163,6 +171,12 @@ public interface IndexAccessor extends Closeable
         public IndexUpdater newUpdater( IndexUpdateMode mode )
         {
             return delegate.newUpdater( mode );
+        }
+
+        @Override
+        public void flush() throws IOException
+        {
+            delegate.flush();
         }
 
         @Override

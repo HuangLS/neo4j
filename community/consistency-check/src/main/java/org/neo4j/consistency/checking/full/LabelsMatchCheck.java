@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,7 +25,6 @@ import java.util.Set;
 import org.neo4j.consistency.checking.CheckerEngine;
 import org.neo4j.consistency.checking.RecordCheck;
 import org.neo4j.consistency.report.ConsistencyReport;
-import org.neo4j.consistency.store.DiffRecordAccess;
 import org.neo4j.consistency.store.RecordAccess;
 import org.neo4j.kernel.api.labelscan.LabelScanReader;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
@@ -56,11 +55,5 @@ public class LabelsMatchCheck implements
         {
             engine.report().nodeLabelNotInIndex( record, labelId );
         }
-    }
-
-    @Override
-    public void checkChange( NodeRecord oldRecord, NodeRecord newRecord, CheckerEngine<NodeRecord, ConsistencyReport.LabelsMatchReport> engine, DiffRecordAccess records )
-    {
-        check( newRecord, engine, records );
     }
 }

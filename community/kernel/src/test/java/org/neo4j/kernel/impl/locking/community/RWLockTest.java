@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -63,7 +63,7 @@ public class RWLockTest
     {
         final RagManager ragManager = new RagManager();
         final Object resource = new Object();
-        final RWLock lock = new RWLock( resource, ragManager );
+        final RWLock lock = new Neo4jRWLock( resource, ragManager );
         final Transaction tx1 = mock( Transaction.class );
 
         lock.mark();
@@ -80,7 +80,7 @@ public class RWLockTest
     {
         final RagManager ragManager = new RagManager();
         final Object resource = new Object();
-        final RWLock lock = new RWLock( resource, ragManager );
+        final RWLock lock = new Neo4jRWLock( resource, ragManager );
         final Transaction tx1 = mock( Transaction.class );
 
         lock.mark();
@@ -101,7 +101,7 @@ public class RWLockTest
     {
         RagManager ragManager = new RagManager();
         LockResource resource = new LockResource( ResourceTypes.NODE, 1l );
-        final RWLock lock = new RWLock( resource, ragManager );
+        final RWLock lock = new Neo4jRWLock( resource, ragManager );
         final LockTransaction lockTransaction = new LockTransaction();
         final LockTransaction anotherTransaction = new LockTransaction();
 
@@ -144,7 +144,7 @@ public class RWLockTest
     {
         RagManager ragManager = new RagManager();
         LockResource resource = new LockResource( ResourceTypes.NODE, 1l );
-        final RWLock lock = new RWLock( resource, ragManager );
+        final RWLock lock = new Neo4jRWLock( resource, ragManager );
         final LockTransaction transaction = new LockTransaction();
         final LockTransaction readerTransaction = new LockTransaction();
 
@@ -182,7 +182,7 @@ public class RWLockTest
     {
         RagManager ragManager = Mockito.mock( RagManager.class );
         LockResource resource = new LockResource( ResourceTypes.NODE, 1l );
-        final RWLock lock = new RWLock( resource, ragManager );
+        final RWLock lock = new Neo4jRWLock( resource, ragManager );
         final LockTransaction lockTransaction = new LockTransaction();
         final LockTransaction anotherTransaction = new LockTransaction();
 
@@ -247,7 +247,7 @@ public class RWLockTest
     {
         RagManager ragManager = new RagManager();
         LockResource resource = new LockResource( ResourceTypes.NODE, 1l );
-        final RWLock lock = new RWLock( resource, ragManager );
+        final RWLock lock = new Neo4jRWLock( resource, ragManager );
         LockTransaction lockTransaction = new LockTransaction();
         LockTransaction anotherTransaction = new LockTransaction();
         final LockTransaction writeTransaction = new LockTransaction();
@@ -300,9 +300,9 @@ public class RWLockTest
         LockResource node2 = new LockResource( ResourceTypes.NODE, 2l );
         LockResource node3 = new LockResource( ResourceTypes.NODE, 3l );
 
-        final RWLock lockNode1 = new RWLock( node1, ragManager );
-        final RWLock lockNode2 = new RWLock( node2, ragManager );
-        final RWLock lockNode3 = new RWLock( node3, ragManager );
+        final RWLock lockNode1 = new Neo4jRWLock( node1, ragManager );
+        final RWLock lockNode2 = new Neo4jRWLock( node2, ragManager );
+        final RWLock lockNode3 = new Neo4jRWLock( node3, ragManager );
 
         final LockTransaction client1Transaction = new LockTransaction();
         final LockTransaction client2Transaction = new LockTransaction();
@@ -322,8 +322,7 @@ public class RWLockTest
         executor.execute( readerLockNode1 );
 
         // Deadlock should occur
-        deadLockDetector.await( 1000, TimeUnit.MILLISECONDS );
-        Assert.assertTrue( "Deadlock was detected as expected.", true );
+        Assert.assertTrue( "Deadlock was detected as expected.", deadLockDetector.await( 1000, TimeUnit.MILLISECONDS ) );
     }
 
     @Test( timeout = 1000 )
@@ -332,7 +331,7 @@ public class RWLockTest
         // given
         RagManager ragManager = new RagManager();
         LockResource node1 = new LockResource( ResourceTypes.NODE, 1l );
-        final RWLock lock = new RWLock( node1, ragManager );
+        final RWLock lock = new Neo4jRWLock( node1, ragManager );
         final LockTransaction mainTransaction = new LockTransaction();
 
         final LockTransaction writerTransaction = new LockTransaction();

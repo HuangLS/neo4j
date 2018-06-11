@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,17 +19,17 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{Equals, Identifier, Not}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.LazyLabel
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{LogicalPlanningTestSupport2, PlannerQuery}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{Equals, Identifier, Not}
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class FindShortestPathsPlanningIntegrationTest extends CypherFunSuite with LogicalPlanningTestSupport2 {
 
   test("finds shortest paths") {
-    planFor("MATCH a, b, shortestPath(a-[r]->b) RETURN b").innerPlan should equal(
+    planFor("MATCH a, b, shortestPath(a-[r]->b) RETURN b").plan should equal(
       FindShortestPaths(
         CartesianProduct(
           AllNodesScan("b", Set.empty)(solved),
@@ -37,7 +37,7 @@ class FindShortestPathsPlanningIntegrationTest extends CypherFunSuite with Logic
         )(solved),
         ShortestPathPattern(
           None,
-          PatternRelationship("r", ("a", "b"), Direction.OUTGOING, Seq.empty, SimplePatternLength),
+          PatternRelationship("r", ("a", "b"), SemanticDirection.OUTGOING, Seq.empty, SimplePatternLength),
           single = true
         )(null)
       )(solved)
@@ -45,7 +45,7 @@ class FindShortestPathsPlanningIntegrationTest extends CypherFunSuite with Logic
   }
 
   test("finds all shortest paths") {
-    planFor("MATCH a, b, allShortestPaths(a-[r]->b) RETURN b").innerPlan should equal(
+    planFor("MATCH a, b, allShortestPaths(a-[r]->b) RETURN b").plan should equal(
       FindShortestPaths(
         CartesianProduct(
           AllNodesScan("b", Set.empty)(solved),
@@ -53,7 +53,7 @@ class FindShortestPathsPlanningIntegrationTest extends CypherFunSuite with Logic
         )(solved),
         ShortestPathPattern(
           None,
-          PatternRelationship("r", ("a", "b"), Direction.OUTGOING, Seq.empty, SimplePatternLength),
+          PatternRelationship("r", ("a", "b"), SemanticDirection.OUTGOING, Seq.empty, SimplePatternLength),
           single = false
         )(null)
       )(solved)
@@ -71,7 +71,7 @@ class FindShortestPathsPlanningIntegrationTest extends CypherFunSuite with Logic
         case PlannerQuery(queryGraph, _, _) if queryGraph.patternRelationships.size == 1 => 100.0
         case _                             => Double.MaxValue
       }
-    } planFor "MATCH (a:X)<-[r1]-(b)-[r2]->(c:X), p = shortestPath((a)-[r]->(c)) RETURN p").innerPlan
+    } planFor "MATCH (a:X)<-[r1]-(b)-[r2]->(c:X), p = shortestPath((a)-[r]->(c)) RETURN p").plan
 
     val expected =
       FindShortestPaths(
@@ -81,13 +81,13 @@ class FindShortestPathsPlanningIntegrationTest extends CypherFunSuite with Logic
             Set(IdName("b")),
             Expand(
               NodeByLabelScan(IdName("a"), LazyLabel("X"), Set.empty)(solved),
-              IdName("a"), Direction.INCOMING, Seq.empty, IdName("b"), IdName("r1"), ExpandAll)(solved),
+              IdName("a"), SemanticDirection.INCOMING, Seq.empty, IdName("b"), IdName("r1"), ExpandAll)(solved),
             Expand(
               NodeByLabelScan(IdName("c"), LazyLabel("X"), Set.empty)(solved),
-              IdName("c"), Direction.INCOMING, Seq.empty, IdName("b"), IdName("r2"), ExpandAll)(solved)
+              IdName("c"), SemanticDirection.INCOMING, Seq.empty, IdName("b"), IdName("r2"), ExpandAll)(solved)
           )(solved)
         )(solved),
-        ShortestPathPattern(Some(IdName("p")), PatternRelationship("r", ("a", "c"), Direction.OUTGOING, Seq.empty, SimplePatternLength), single = true)(null))(solved)
+        ShortestPathPattern(Some(IdName("p")), PatternRelationship("r", ("a", "c"), SemanticDirection.OUTGOING, Seq.empty, SimplePatternLength), single = true)(null))(solved)
 
     result should equal(expected)
   }

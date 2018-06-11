@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,29 +19,29 @@
  */
 package org.neo4j.cypher.internal.spi.v2_2
 
+import java.net.URL
+
 import org.neo4j.collection.primitive.PrimitiveLongIterator
 import org.neo4j.cypher.internal.compiler.v2_2.spi._
 import org.neo4j.cypher.internal.compiler.v2_2.{EntityNotFoundException, FailedIndexException}
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.JavaConversionSupport
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.JavaConversionSupport._
+import org.neo4j.cypher.internal.helpers.JavaConversionSupport._
 import org.neo4j.graphdb.DynamicRelationshipType._
 import org.neo4j.graphdb._
-import org.neo4j.graphdb.factory.GraphDatabaseSettings
 import org.neo4j.kernel.GraphDatabaseAPI
-import org.neo4j.kernel.api._
 import org.neo4j.kernel.api.constraints.UniquenessConstraint
 import org.neo4j.kernel.api.exceptions.schema.{AlreadyConstrainedException, AlreadyIndexedException}
 import org.neo4j.kernel.api.index.{IndexDescriptor, InternalIndexState}
-import org.neo4j.kernel.configuration.Config
+import org.neo4j.kernel.api.{exceptions, _}
 import org.neo4j.kernel.impl.api.KernelStatement
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge
+import org.neo4j.kernel.security.URLAccessValidationError
 import org.neo4j.tooling.GlobalGraphOperations
 
 import scala.collection.JavaConverters._
 import scala.collection.{Iterator, mutable}
 
 final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
-                                         var tx: Transaction,
+                                         private var tx: Transaction,
                                          val isTopLevelTx: Boolean,
                                          initialStatement: Statement)
   extends TransactionBoundTokenContext(initialStatement) with QueryContext {
@@ -60,17 +60,21 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
   }
 
   def close(success: Boolean) {
-    try {
-      statement.close()
+    if (isOpen) {
+      try {
+        statement.close()
 
-      if (success)
-        tx.success()
-      else
-        tx.failure()
-      tx.close()
-    }
-    finally {
-      open = false
+        if (success)
+          tx.success()
+        else
+          tx.failure()
+        tx.close()
+      }
+      finally {
+        statement = null
+        tx = null
+        open = false
+      }
     }
   }
 
@@ -108,13 +112,13 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
     statement.tokenWriteOperations().relationshipTypeGetOrCreateForName(relTypeName)
 
   def getLabelsForNode(node: Long) =
-    JavaConversionSupport.asScala(statement.readOperations().nodeGetLabels(node))
+    asScala(statement.readOperations().nodeGetLabels(node))
 
   def getPropertiesForNode(node: Long) =
-    JavaConversionSupport.mapToScala(statement.readOperations().nodeGetPropertyKeys(node))(_.toLong)
+    mapToScala(statement.readOperations().nodeGetPropertyKeys(node))(_.toLong)
 
   def getPropertiesForRelationship(relId: Long) =
-    JavaConversionSupport.mapToScala(statement.readOperations().relationshipGetPropertyKeys(relId))(_.toLong)
+    mapToScala(statement.readOperations().relationshipGetPropertyKeys(relId))(_.toLong)
 
   override def isLabelSetOnNode(label: Int, node: Long) =
     statement.readOperations().nodeHasLabel(node, label)
@@ -123,14 +127,14 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
     statement.tokenWriteOperations().labelGetOrCreateForName(labelName)
 
   def getRelationshipsForIds(node: Node, dir: Direction, types: Option[Seq[Int]]): Iterator[Relationship] = types match {
-    case None => JavaConversionSupport.asScala(statement.readOperations().nodeGetRelationships(node.getId, dir)).map(relationshipOps.getById)
-    case Some(typeIds) => JavaConversionSupport.asScala(statement.readOperations().nodeGetRelationships(node.getId, dir, typeIds: _* )).map(relationshipOps.getById)
+    case None => asScala(statement.readOperations().nodeGetRelationships(node.getId, dir)).map(relationshipOps.getById)
+    case Some(typeIds) => asScala(statement.readOperations().nodeGetRelationships(node.getId, dir, typeIds: _* )).map(relationshipOps.getById)
   }
 
   def exactIndexSearch(index: IndexDescriptor, value: Any) =
     mapToScala(statement.readOperations().nodesGetFromIndexSeek(index, value))(nodeOps.getById)
 
-  def exactUniqueIndexSearch(index: IndexDescriptor, value: Any): Option[Node] = {
+  def lockingExactUniqueIndexSearch(index: IndexDescriptor, value: Any): Option[Node] = {
     val nodeId: Long = statement.readOperations().nodeGetFromUniqueIndexSeek(index, value)
     if (StatementConstants.NO_SUCH_NODE == nodeId) None else Some(nodeOps.getById(nodeId))
   }
@@ -155,7 +159,11 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
 
   class NodeOperations extends BaseOperations[Node] {
     def delete(obj: Node) {
-      statement.dataWriteOperations().nodeDelete(obj.getId)
+      try {
+        statement.dataWriteOperations().nodeDelete(obj.getId)
+      } catch {
+        case _: exceptions.EntityNotFoundException => // node has been deleted by another transaction, oh well...
+      }
     }
 
     def propertyKeyIds(id: Long): Iterator[Int] =
@@ -191,12 +199,16 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
       graph.index.forNodes(name).query(query).iterator().asScala
 
     def isDeleted(n: Node): Boolean =
-      kernelStatement.txState().nodeIsDeletedInThisTx(n.getId)
+      kernelStatement.hasTxStateWithChanges && kernelStatement.txState().nodeIsDeletedInThisTx(n.getId)
   }
 
   class RelationshipOperations extends BaseOperations[Relationship] {
     def delete(obj: Relationship) {
-      statement.dataWriteOperations().relationshipDelete(obj.getId)
+      try {
+        statement.dataWriteOperations().relationshipDelete(obj.getId)
+      } catch {
+        case _: exceptions.EntityNotFoundException => // relationship has been deleted by another transaction, oh well...
+      }
     }
 
     def propertyKeyIds(id: Long): Iterator[Int] =
@@ -232,7 +244,7 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
       graph.index.forRelationships(name).query(query).iterator().asScala
 
     def isDeleted(r: Relationship): Boolean =
-      kernelStatement.txState().relationshipIsDeletedInThisTx(r.getId)
+      kernelStatement.hasTxStateWithChanges && kernelStatement.txState().relationshipIsDeletedInThisTx(r.getId)
   }
 
   def getOrCreatePropertyKeyId(propertyKey: String) =
@@ -289,9 +301,13 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
   def dropUniqueConstraint(labelId: Int, propertyKeyId: Int) =
     statement.schemaWriteOperations().constraintDrop(new UniquenessConstraint(labelId, propertyKeyId))
 
-  override def hasLocalFileAccess: Boolean = graph match {
-    case db: GraphDatabaseAPI => db.getDependencyResolver.resolveDependency(classOf[Config]).get(GraphDatabaseSettings.allow_file_urls)
-    case _ => true
+  override def getImportURL(url: URL): Either[String,URL] = graph match {
+    case db: GraphDatabaseAPI =>
+      try {
+        Right(db.validateURLAccess(url))
+      } catch {
+        case error: URLAccessValidationError => Left(error.getMessage)
+      }
   }
 
   def relationshipStartNode(rel: Relationship) = rel.getStartNode

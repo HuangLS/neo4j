@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,12 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.profiler
 
-import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription
-import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{Pipe, PipeDecorator, QueryState}
+import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription
+import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments
 import org.neo4j.cypher.internal.compiler.v2_3.spi.{DelegatingOperations, DelegatingQueryContext, Operations, QueryContext}
+import org.neo4j.cypher.internal.frontend.v2_3.ProfilerStatisticsNotReadyException
 import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
 
 import scala.collection.mutable
@@ -51,7 +52,7 @@ class Profiler extends PipeDecorator {
       case _ => new ProfilingQueryContext(state.query, pipe)
     })
 
-    state.copy(query = decoratedContext)
+    state.withQueryContext(decoratedContext)
   }
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -38,7 +38,7 @@ import org.neo4j.graphdb.factory.TestHighlyAvailableGraphDatabaseFactory;
 import org.neo4j.helpers.Args;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.ha.HighlyAvailableGraphDatabase;
-import org.neo4j.kernel.ha.UpdatePullerClient;
+import org.neo4j.kernel.ha.UpdatePuller;
 import org.neo4j.shell.impl.RmiLocation;
 import org.neo4j.test.ProcessStreamHandler;
 
@@ -333,7 +333,7 @@ public class LegacyDatabaseImpl extends UnicastRemoteObject implements LegacyDat
     {
         try
         {
-            db.getDependencyResolver().resolveDependency( UpdatePullerClient.class ).pullUpdates();
+            db.getDependencyResolver().resolveDependency( UpdatePuller.class ).pullUpdates();
         }
         catch ( Exception e )
         {

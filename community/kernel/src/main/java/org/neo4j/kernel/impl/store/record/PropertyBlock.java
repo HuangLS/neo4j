@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -57,8 +57,7 @@ public class PropertyBlock implements Cloneable
 
     public int getKeyIndexId()
     {
-        // [][][][][][kkkk,kkkk][kkkk,kkkk][kkkk,kkkk]
-        return (int) (valueBlocks[0] & KEY_BITMASK);
+        return keyIndexId( valueBlocks[0] );
     }
 
     public void setKeyIndexId( int key )
@@ -107,22 +106,22 @@ public class PropertyBlock implements Cloneable
      */
     public long getSingleValueLong()
     {
-        return (valueBlocks[0] & 0xFFFFFFFFF0000000L) >>> 28;
+        return fetchLong( valueBlocks[0] );
     }
 
     public int getSingleValueInt()
     {
-        return (int)((valueBlocks[0] & 0x0FFFFFFFF0000000L) >>> 28);
+        return fetchInt( valueBlocks[0] );
     }
 
     public short getSingleValueShort()
     {
-        return (short)((valueBlocks[0] & 0x00000FFFF0000000L) >>> 28);
+        return fetchShort( valueBlocks[0] );
     }
 
     public byte getSingleValueByte()
     {
-        return (byte)((valueBlocks[0] & 0x0000000FF0000000L) >>> 28);
+        return fetchByte( valueBlocks[0] );
     }
 
     public long[] getValueBlocks()
@@ -137,9 +136,6 @@ public class PropertyBlock implements Cloneable
 
     public void setValueBlocks( long[] blocks )
     {
-        int expectedPayloadSize = PropertyType.getPayloadSizeLongs();
-        assert ( blocks == null || blocks.length <= expectedPayloadSize) : (
-                "I was given an array of size " + blocks.length +", but I wanted it to be " + expectedPayloadSize );
         this.valueBlocks = blocks;
         if ( valueRecords != null )
         {
@@ -254,5 +250,37 @@ public class PropertyBlock implements Cloneable
     public DefinedProperty newPropertyData( Supplier<PropertyStore> propertyStore )
     {
         return getType().readProperty( getKeyIndexId(), this, propertyStore );
+    }
+
+    public static int keyIndexId( long valueBlock )
+    {
+        // [][][][][][kkkk,kkkk][kkkk,kkkk][kkkk,kkkk]
+        return (int) (valueBlock & KEY_BITMASK);
+    }
+
+    public static long fetchLong( long valueBlock )
+    {
+        return (valueBlock & 0xFFFFFFFFF0000000L) >>> 28;
+    }
+
+    public static int fetchInt( long valueBlock )
+    {
+        return (int) ((valueBlock & 0x0FFFFFFFF0000000L) >>> 28);
+    }
+
+    public static short fetchShort( long valueBlock )
+    {
+        return (short) ((valueBlock & 0x00000FFFF0000000L) >>> 28);
+    }
+
+    public static byte fetchByte( long valueBlock )
+    {
+        return (byte) ((valueBlock & 0x0000000FF0000000L) >>> 28);
+    }
+
+    public static boolean valueIsInlined( long valueBlock )
+    {
+        // [][][][][   i,tttt][kkkk,kkkk][kkkk,kkkk][kkkk,kkkk]
+        return (valueBlock & 0x10000000L) > 0;
     }
 }

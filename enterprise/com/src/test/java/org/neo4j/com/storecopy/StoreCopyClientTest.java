@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -43,13 +43,13 @@ import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.NeoStoreDataSource;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.extension.KernelExtensionFactory;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.MetaDataStore;
 import org.neo4j.kernel.impl.store.StoreId;
 import org.neo4j.kernel.impl.transaction.log.LogicalTransactionStore;
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
+import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointer;
 import org.neo4j.kernel.impl.transaction.log.entry.LogHeader;
-import org.neo4j.kernel.impl.transaction.log.rotation.StoreFlusher;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.PageCacheRule;
@@ -235,8 +235,8 @@ public class StoreCopyClientTest
             initialDatabase.shutdown();
 
             long originalTransactionOffset =
-                    NeoStore.getRecord( pageCache, new File( initialStore, NeoStore.DEFAULT_NAME ),
-                            NeoStore.Position.LAST_CLOSED_TRANSACTION_LOG_BYTE_OFFSET );
+                    MetaDataStore.getRecord( pageCache, new File( initialStore, MetaDataStore.DEFAULT_NAME ),
+                            MetaDataStore.Position.LAST_CLOSED_TRANSACTION_LOG_BYTE_OFFSET );
             initialDatabase = startDatabase( initialStore );
 
             StoreCopyClient copier =
@@ -258,8 +258,8 @@ public class StoreCopyClientTest
 
             // THEN
             long updatedTransactionOffset =
-                    NeoStore.getRecord( pageCache, new File( backupStore, NeoStore.DEFAULT_NAME ), NeoStore.Position
-                            .LAST_CLOSED_TRANSACTION_LOG_BYTE_OFFSET );
+                    MetaDataStore.getRecord( pageCache, new File( backupStore, MetaDataStore.DEFAULT_NAME ),
+                            MetaDataStore.Position.LAST_CLOSED_TRANSACTION_LOG_BYTE_OFFSET );
             Assert.assertNotEquals( originalTransactionOffset, updatedTransactionOffset );
             Assert.assertEquals( LogHeader.LOG_HEADER_SIZE, updatedTransactionOffset );
         }
@@ -290,20 +290,22 @@ public class StoreCopyClientTest
                     NeoStoreDataSource neoStoreDataSource =
                             original.getDependencyResolver().resolveDependency( NeoStoreDataSource.class );
 
-                    TransactionIdStore transactionIdStore = original.getDependencyResolver().resolveDependency(
-                            TransactionIdStore.class );
+                    TransactionIdStore transactionIdStore =
+                            original.getDependencyResolver().resolveDependency( TransactionIdStore.class );
 
-                    LogicalTransactionStore logicalTransactionStore  = original.getDependencyResolver().resolveDependency(
-                            LogicalTransactionStore.class );
+                    LogicalTransactionStore logicalTransactionStore  =
+                            original.getDependencyResolver().resolveDependency( LogicalTransactionStore.class );
 
-                    StoreFlusher storeFlusher = original.getDependencyResolver().resolveDependency(
-                            StoreFlusher.class );
+                    CheckPointer checkPointer =
+                            original.getDependencyResolver().resolveDependency( CheckPointer.class );
 
-                    RequestContext requestContext = new StoreCopyServer(transactionIdStore, neoStoreDataSource,
-                            storeFlusher, fs, originalDir, new Monitors().newMonitor( StoreCopyServer.Monitor.class ) )
-                            .flushStoresAndStreamStoreFiles( writer, false );
+                    RequestContext requestContext = new StoreCopyServer( neoStoreDataSource,
+                            checkPointer, fs, originalDir, new Monitors().newMonitor( StoreCopyServer.Monitor.class ) )
+                            .flushStoresAndStreamStoreFiles( "test", writer, false );
 
-                    final StoreId storeId = original.getDependencyResolver().resolveDependency( NeoStoreSupplier.class ).get().getStoreId();
+                    final StoreId storeId =
+                            original.getDependencyResolver().resolveDependency( NeoStoresSupplier.class ).get()
+                                    .getMetaDataStore().getStoreId();
 
                     ResponsePacker responsePacker = new ResponsePacker( logicalTransactionStore,
                             transactionIdStore, new Supplier<StoreId>()

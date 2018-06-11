@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,8 @@ package org.neo4j.kernel.impl.transaction.state;
 import java.util.Collection;
 
 import org.neo4j.collection.primitive.PrimitiveLongObjectMap;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.MetaDataStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeStore;
 import org.neo4j.kernel.impl.store.PropertyStore;
 import org.neo4j.kernel.impl.store.RelationshipStore;
@@ -37,14 +38,14 @@ public class PropertyLoader
     private final NodeStore nodeStore;
     private final RelationshipStore relationshipStore;
     private final PropertyStore propertyStore;
-    private final NeoStore neoStore;
+    private final MetaDataStore metaDataStore;
 
-    public PropertyLoader( NeoStore neoStore )
+    public PropertyLoader( NeoStores neoStores )
     {
-        this.neoStore = neoStore;
-        this.nodeStore = neoStore.getNodeStore();
-        this.relationshipStore = neoStore.getRelationshipStore();
-        this.propertyStore = neoStore.getPropertyStore();
+        this.nodeStore = neoStores.getNodeStore();
+        this.metaDataStore = neoStores.getMetaDataStore();
+        this.relationshipStore = neoStores.getRelationshipStore();
+        this.propertyStore = neoStores.getPropertyStore();
     }
 
     public <RECEIVER extends PropertyReceiver> RECEIVER nodeLoadProperties( long nodeId, RECEIVER receiver )
@@ -68,7 +69,7 @@ public class PropertyLoader
 
     public <RECEIVER extends PropertyReceiver> RECEIVER graphLoadProperties( RECEIVER records )
     {
-        return loadProperties( neoStore.asRecord().getNextProp(), records );
+        return loadProperties( metaDataStore.asRecord().getNextProp(), records );
     }
 
     private <RECEIVER extends PropertyReceiver> RECEIVER loadProperties( long nextProp, RECEIVER receiver )

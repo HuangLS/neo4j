@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -37,7 +37,6 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.TransactionFailureException;
 import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
-import org.neo4j.helpers.Settings;
 import org.neo4j.helpers.UTF8;
 import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.io.fs.FileSystemAbstraction;
@@ -46,13 +45,13 @@ import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.kernel.impl.store.id.IdGenerator;
 import org.neo4j.kernel.impl.store.id.IdGeneratorImpl;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.transaction.log.PhysicalLogFile;
 import org.neo4j.logging.NullLogProvider;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.test.PageCacheRule;
 import org.neo4j.test.TestGraphDatabaseFactory;
 import org.neo4j.unsafe.batchinsert.BatchInserters;
@@ -317,7 +316,7 @@ public class UpgradeStoreIT
     private void setOlderNeoStoreVersion( File path ) throws IOException
     {
         String oldVersion = "NeoStore v0.9.6";
-        FileChannel channel = new RandomAccessFile( new File( path, NeoStore.DEFAULT_NAME ), "rw" ).getChannel();
+        FileChannel channel = new RandomAccessFile( new File( path, MetaDataStore.DEFAULT_NAME ), "rw" ).getChannel();
         channel.position( channel.size() - UTF8.encode( oldVersion ).length );
         ByteBuffer buffer = ByteBuffer.wrap( UTF8.encode( oldVersion ) );
         channel.write( buffer );
@@ -342,22 +341,14 @@ public class UpgradeStoreIT
     private void createManyRelationshipTypes( File path, int numberOfTypes )
     {
         File fileName = new File( path, "neostore.relationshiptypestore.db" );
-        Monitors monitors = new Monitors();
         Config config = new Config();
         DefaultFileSystemAbstraction fs = new DefaultFileSystemAbstraction();
         PageCache pageCache = pageCacheRule.getPageCache( fs );
-        DynamicStringStore stringStore = new DynamicStringStore(
-                new File( fileName.getPath() + ".names"),
-                config,
-                IdType.RELATIONSHIP_TYPE_TOKEN_NAME,
-                new DefaultIdGeneratorFactory( fs ),
-                pageCache,
-                fs,
-                NullLogProvider.getInstance(),
-                StoreVersionMismatchHandler.FORCE_CURRENT_VERSION,
-                monitors );
-        RelationshipTypeTokenStore store = new RelationshipTypeTokenStoreWithOneOlderVersion(
-                fileName, stringStore, monitors, fs, pageCache );
+        DynamicStringStore stringStore = new DynamicStringStore( new File( fileName.getPath() + ".names" ), config,
+                IdType.RELATIONSHIP_TYPE_TOKEN_NAME, new DefaultIdGeneratorFactory( fs ), pageCache,
+                NullLogProvider.getInstance(), TokenStore.NAME_STORE_BLOCK_SIZE );
+        RelationshipTypeTokenStore store =
+                new RelationshipTypeTokenStoreWithOneOlderVersion( fileName, stringStore, fs, pageCache );
         for ( int i = 0; i < numberOfTypes; i++ )
         {
             String name = "type" + i;
@@ -381,19 +372,11 @@ public class UpgradeStoreIT
         public RelationshipTypeTokenStoreWithOneOlderVersion(
                 File fileName,
                 DynamicStringStore stringStore,
-                Monitors monitors,
                 FileSystemAbstraction fs,
                 PageCache pageCache )
         {
-            super( fileName,
-                    config,
-                    new NoLimitIdGeneratorFactory( fs ),
-                    pageCache,
-                    fs,
-                    NullLogProvider.getInstance(),
-                    stringStore,
-                    StoreVersionMismatchHandler.FORCE_CURRENT_VERSION,
-                    monitors );
+            super( fileName, config, new NoLimitIdGeneratorFactory( fs ), pageCache, NullLogProvider.getInstance(),
+                    stringStore );
         }
 
         @Override
@@ -424,6 +407,12 @@ public class UpgradeStoreIT
         public NoLimitIdGeneratorFactory( FileSystemAbstraction fs )
         {
             this.fs = fs;
+        }
+
+        @Override
+        public IdGenerator open( File filename, IdType idType, long highId )
+        {
+            return open( filename, 0, idType, highId );
         }
 
         @Override

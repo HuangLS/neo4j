@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,12 @@
  */
 package org.neo4j.kernel.impl.transaction.log.pruning;
 
-import java.io.File;
-
 import org.junit.Test;
+
+import java.io.File;
 
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.impl.transaction.log.LogFileInformation;
-import org.neo4j.kernel.impl.transaction.log.pruning.FileSizeThreshold;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -34,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 public class FileSizeThresholdTest
 {
+
     private FileSystemAbstraction fs = mock( FileSystemAbstraction.class );
     private final LogFileInformation source = mock( LogFileInformation.class );
     private final File file = mock( File.class );
@@ -60,10 +60,11 @@ public class FileSizeThresholdTest
     public void shouldReturnTrueWhenASingleFileSizeIsGreaterOrEqualThanMaxSize()
     {
         // given
-        final long maxSize = 10;
-        final FileSizeThreshold threshold = new FileSizeThreshold( fs, maxSize );
+        long sixteenGigabytes = 16l * 1024 * 1024 * 1024;
 
-        when( fs.getFileSize( file ) ).thenReturn( 10l );
+        final FileSizeThreshold threshold = new FileSizeThreshold( fs, sixteenGigabytes );
+
+        when( fs.getFileSize( file ) ).thenReturn( sixteenGigabytes );
 
         // when
         threshold.init();

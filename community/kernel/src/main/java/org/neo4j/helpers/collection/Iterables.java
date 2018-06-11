@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,10 +33,10 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.neo4j.cursor.Cursor;
+import org.neo4j.function.Function;
 import org.neo4j.function.Predicate;
 import org.neo4j.graphdb.ResourceIterable;
 import org.neo4j.graphdb.ResourceIterator;
-import org.neo4j.function.Function;
 import org.neo4j.kernel.impl.transaction.log.IOCursor;
 
 import static java.util.Arrays.asList;
@@ -221,6 +221,10 @@ public final class Iterables
 
     /**
      * @deprecated use {@link #filter(Predicate, Iterable)} instead
+     * @param specification filter
+     * @param i source iterable
+     * @param <X> the type of the elements
+     * @return a filtering iterable
      */
     @Deprecated
     public static <X> Iterable<X> filter( org.neo4j.helpers.Predicate<? super X> specification, Iterable<X> i )
@@ -235,6 +239,10 @@ public final class Iterables
 
     /**
      * @deprecated use {@link #filter(Predicate, Iterator)} instead
+     * @param specification filter
+     * @param i source iterator
+     * @param <X> the type of the elements
+     * @return a filtering iterator
      */
     @Deprecated
     public static <X> Iterator<X> filter( org.neo4j.helpers.Predicate<? super X> specification, Iterator<X> i )
@@ -1092,6 +1100,12 @@ public final class Iterables
      * More formally, returns the lowest index <tt>i</tt> such that
      * <tt>(o==null&nbsp;?&nbsp;get(i)==null&nbsp;:&nbsp;o.equals(get(i)))</tt>,
      * or -1 if there is no such index.
+     * 
+     * @param itemToFind element to find
+     * @param iterable iterable to look for the element in
+     * @param <T> the type of the elements
+     * @return the index of the first occurrence of the specified element
+     *         (or {@code null} if that was specified) or {@code -1}
      */
     public static <T> int indexOf( T itemToFind, Iterable<T> iterable )
     {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,10 @@ package org.neo4j.test;
 
 import org.neo4j.function.Function;
 
+/**
+ * @deprecated This class will be removed in the next major release.
+ */
+@Deprecated
 public abstract class AlgebraicFunction<FROM, TO> implements Function<FROM, TO>
 {
     public <NEXT> AlgebraicFunction<FROM, NEXT> then( final Function<TO, NEXT> function )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -109,22 +109,7 @@ public interface Schema
      * a constraint for the given {@linkplain Label label}.
      */
     ConstraintCreator constraintFor( Label label );
-
-    /**
-     * Returns a {@link RelationshipConstraintCreator} where details about the constraint can be
-     * specified. When all details have been entered {@link RelationshipConstraintCreator#create()}
-     * must be called for it to actually be created.
-     *
-     * Creating a constraint will block on the {@linkplain RelationshipConstraintCreator#create() create method} until
-     * all existing data has been verified for compliance. If any existing data doesn't comply with the constraint an
-     * exception will be thrown, and the constraint will not be created.
-     *
-     * @param type the relationship type this constraint is for.
-     * @return a {@link RelationshipConstraintCreator} capable of providing details for, as well as creating
-     * a constraint for the given {@linkplain RelationshipType relationship type}.
-     */
-    RelationshipConstraintCreator constraintFor( RelationshipType type );
-
+    
     /**
      * @param label the {@linkplain Label label} to get constraints for.
      * @return all constraints for the given label.

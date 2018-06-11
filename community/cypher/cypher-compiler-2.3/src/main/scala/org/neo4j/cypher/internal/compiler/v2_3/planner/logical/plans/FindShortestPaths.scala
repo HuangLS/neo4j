@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,9 @@
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans
 
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{CardinalityEstimation, PlannerQuery}
+import org.neo4j.cypher.internal.frontend.v2_3.ast.Expression
 
-case class FindShortestPaths(left: LogicalPlan, shortestPath: ShortestPathPattern)
+case class FindShortestPaths(left: LogicalPlan, shortestPath: ShortestPathPattern, predicates: Seq[Expression] = Seq.empty)
                             (val solved: PlannerQuery with CardinalityEstimation)
   extends LogicalPlan with LogicalPlanWithoutExpressions with LazyLogicalPlan {
 

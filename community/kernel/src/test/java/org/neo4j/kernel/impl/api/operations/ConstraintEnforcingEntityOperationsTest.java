@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,14 +21,21 @@ package org.neo4j.kernel.impl.api.operations;
 
 import org.junit.Before;
 import org.junit.Test;
+
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.impl.api.ConstraintEnforcingEntityOperations;
 import org.neo4j.kernel.impl.api.KernelStatement;
+import org.neo4j.kernel.impl.constraints.StandardConstraintSemantics;
 import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.locking.SimpleStatementLocks;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 import static org.neo4j.kernel.api.StatementConstants.NO_SUCH_NODE;
 import static org.neo4j.kernel.impl.locking.ResourceTypes.INDEX_ENTRY;
 import static org.neo4j.kernel.impl.locking.ResourceTypes.indexEntryResourceId;
@@ -53,9 +60,9 @@ public class ConstraintEnforcingEntityOperationsTest
         this.state = mock( KernelStatement.class );
         when( schemaReadOps.indexGetState( state, indexDescriptor ) ).thenReturn( InternalIndexState.ONLINE );
         this.locks = mock( Locks.Client.class );
-        when( state.locks() ).thenReturn( locks );
+        when( state.locks() ).thenReturn( new SimpleStatementLocks( locks ) );
 
-        this.ops = new ConstraintEnforcingEntityOperations( null, readOps, schemaWriteOps, schemaReadOps );
+        this.ops = new ConstraintEnforcingEntityOperations( new StandardConstraintSemantics(), null, readOps, schemaWriteOps, schemaReadOps );
     }
 
     @Test

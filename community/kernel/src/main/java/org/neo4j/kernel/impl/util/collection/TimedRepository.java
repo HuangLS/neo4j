@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,6 @@ import org.neo4j.helpers.Clock;
 
 import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
-
 import static org.neo4j.helpers.Format.duration;
 
 /**
@@ -117,28 +116,18 @@ public class TimedRepository<KEY, VALUE> implements Runnable
         }
     }
 
-    public void remove( KEY key )
-    {
-        Entry entry = repo.get( key );
-        if (entry == null)
-        {
-            return;
-        }
-        end0(key, entry.value);
-    }
-
     /**
      * End the life of a stored entry. If the entry is currently in use, it will be thrown out as soon as the other client
      * is done with it.
      */
-    public void end( KEY key )
+    public VALUE end( KEY key )
     {
         while(true)
         {
             Entry entry = repo.get( key );
             if ( entry == null )
             {
-                return;
+                return null;
             }
 
             // Ending the life of an entry is somewhat complicated, because we promise the callee here that if someone
@@ -150,7 +139,7 @@ public class TimedRepository<KEY, VALUE> implements Runnable
             {
                 // The entry was indeed in use, and we successfully marked it to be ended. That's all we need to do here,
                 // the other user will see the ending flag when releasing the entry.
-                return;
+                return entry.value;
             }
 
             // Marking it for ending failed, likely because the entry is currently idle - lets try and just acquire it
@@ -159,7 +148,7 @@ public class TimedRepository<KEY, VALUE> implements Runnable
             {
                 // Got it, just throw it away
                 end0( key, entry.value );
-                return;
+                return entry.value;
             }
 
             // We didn't manage to mark this for ending, and we didn't manage to acquire it to end it ourselves, which
@@ -168,7 +157,7 @@ public class TimedRepository<KEY, VALUE> implements Runnable
             if ( entry.isMarkedForEnding() )
             {
                 // Someone did indeed manage to mark it for ending, which means it will be thrown out (or has already).
-                return;
+                return entry.value;
             }
         }
     }
@@ -210,9 +199,9 @@ public class TimedRepository<KEY, VALUE> implements Runnable
         for ( KEY key : keys() )
         {
             Entry entry = repo.get( key );
-            if(entry != null && entry.latestActivityTimestamp < maxAllowedAge)
+            if ( (entry != null) && (entry.latestActivityTimestamp < maxAllowedAge) )
             {
-                if(entry.acquire() && entry.latestActivityTimestamp < maxAllowedAge)
+                if ( (entry.latestActivityTimestamp < maxAllowedAge) && entry.acquire() )
                 {
                     end0( key, entry.value );
                 }

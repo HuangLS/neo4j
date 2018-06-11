@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -46,17 +46,15 @@ import org.neo4j.kernel.impl.api.index.IndexUpdateMode;
 import org.neo4j.register.Registers;
 import org.neo4j.test.ThreadingRule;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.SECONDS;
-
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import static org.neo4j.helpers.collection.IteratorUtil.asSet;
 import static org.neo4j.helpers.collection.IteratorUtil.asUniqueSet;
 import static org.neo4j.helpers.collection.IteratorUtil.emptySetOf;
 import static org.neo4j.kernel.api.impl.index.IndexWriterFactories.reserving;
-import static org.neo4j.test.ThreadingRule.stackTracePredicate;
+import static org.neo4j.test.ThreadingRule.waitingWhileIn;
 
 @RunWith( Parameterized.class )
 public class LuceneIndexAccessorTest
@@ -177,7 +175,7 @@ public class LuceneIndexAccessorTest
                 accessor.drop();
                 return nothing;
             }
-        }, null, stackTracePredicate( 3, TaskCoordinator.class, "awaitCompletion" ), 3, SECONDS );
+        }, null, waitingWhileIn( TaskCoordinator.class, "awaitCompletion" ), 3, SECONDS );
 
         try ( IndexReader reader = indexReader /* do not inline! */ )
         {
@@ -217,7 +215,8 @@ public class LuceneIndexAccessorTest
                     public LuceneIndexAccessor apply( DirectoryFactory dirFactory )
                             throws IOException
                     {
-                        return new NonUniqueLuceneIndexAccessor( documentLogic, reserving(), dirFactory, dir, 100_000 );
+                        return new NonUniqueLuceneIndexAccessor( documentLogic, false, reserving(), dirFactory, dir,
+                                100_000 );
                     }
 
                     @Override
@@ -232,7 +231,7 @@ public class LuceneIndexAccessorTest
                     public LuceneIndexAccessor apply( DirectoryFactory dirFactory )
                             throws IOException
                     {
-                        return new UniqueLuceneIndexAccessor( documentLogic, reserving(), dirFactory, dir );
+                        return new UniqueLuceneIndexAccessor( documentLogic, false, reserving(), dirFactory, dir );
                     }
 
                     @Override

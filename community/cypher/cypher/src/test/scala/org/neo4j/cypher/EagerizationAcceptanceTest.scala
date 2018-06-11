@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,41 @@
  */
 package org.neo4j.cypher
 
+import org.neo4j.graphdb.Node
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.util.matching.Regex
 
-class EagerizationAcceptanceTest extends ExecutionEngineFunSuite with TableDrivenPropertyChecks {
+class EagerizationAcceptanceTest extends ExecutionEngineFunSuite
+  with TableDrivenPropertyChecks
+  with QueryStatisticsTestSupport {
+
   val EagerRegEx: Regex = "Eager(?!A)".r
+
+  test("should plan eagerness for delete on paths") {
+    val node0 = createLabeledNode("L")
+    val node1 = createLabeledNode("L")
+    relate(node0, node1)
+
+    val query = "MATCH p=(:L)-[*]-() DELETE p"
+
+    assertNumberOfEagerness(query, 1)
+  }
+
+  test("should plan eagerness for detach delete on paths") {
+    val node0 = createLabeledNode("L")
+    val node1 = createLabeledNode("L")
+    relate(node0, node1)
+
+    val query = "MATCH p=(:L)-[*]-() DETACH DELETE p"
+
+    assertNumberOfEagerness(query, 1)
+  }
+
+  test("github issue ##5653") {
+    assertNumberOfEagerness(
+      "MATCH (p1:Person {name:'Michal'})-[r:FRIEND_OF {since:2007}]->(p2:Person {name:'Daniela'}) DELETE r, p1, p2", 1)
+  }
 
   test("should introduce eagerness between DELETE and MERGE for node") {
     val query =
@@ -161,6 +190,12 @@ class EagerizationAcceptanceTest extends ExecutionEngineFunSuite with TableDrive
     val query = "MATCH (n {name : 'thing'}) SET n:Lol"
 
     assertNumberOfEagerness(query, 0)
+  }
+
+  test("matching property and also matching label, and then writing label should be eager") {
+    val query = "MATCH (a:Lol) MATCH (n {name : 'thing'}) SET n:Lol"
+
+    assertNumberOfEagerness(query, 1)
   }
 
   test("matching label and writing property should not be eager") {
@@ -370,10 +405,10 @@ class EagerizationAcceptanceTest extends ExecutionEngineFunSuite with TableDrive
     assertNumberOfEagerness(query, 0)
   }
 
-  test("matching property using LABELS and writing should be eager") {
+  test("matching all nodes using LABELS and writing should not be eager") {
     val query = "MATCH n WHERE labels(n) = [] SET n:Lol"
 
-    assertNumberOfEagerness(query, 1)
+    assertNumberOfEagerness(query, 0)
   }
 
   test("matching property using LABELS and not writing should not be eager") {
@@ -596,6 +631,113 @@ class EagerizationAcceptanceTest extends ExecutionEngineFunSuite with TableDrive
     val query = "MATCH ()-[r]-() WHERE has(r.prop1) SET r.prop2 = 'foo'"
 
     assertNumberOfEagerness(query, 0)
+  }
+
+  test("should not be eager when merging on two different labels") {
+    val query = "MERGE(:L1) MERGE(p:L2) ON CREATE SET p.name = 'Blaine'"
+
+    assertNumberOfEagerness(query, 0)
+  }
+
+  test("should be eager when merging on the same label") {
+    val query = "MERGE(:L1) MERGE(p:L1) ON CREATE SET p.name = 'Blaine'"
+
+    assertNumberOfEagerness(query, 1)
+  }
+
+  test("should be eager when only one merge has labels") {
+    val query = "MERGE() MERGE(p: Person) ON CREATE SET p.name = 'Blaine'"
+
+    assertNumberOfEagerness(query, 1)
+  }
+
+  test("should be eager when no merge has labels") {
+    val query = "MERGE() MERGE(p) ON CREATE SET p.name = 'Blaine'"
+
+    assertNumberOfEagerness(query, 1)
+  }
+
+  test("should not be eager when merging on already bound identifiers") {
+    val query = "MERGE (city:City) MERGE (country:Country) MERGE (city)-[:IN]->(country)"
+
+    assertNumberOfEagerness(query,  0)
+  }
+
+  ignore("should not be eager when creating single node after matching on pattern with relationship") {
+    val query = "MATCH ()--() CREATE ()"
+
+    assertNumberOfEagerness(query,  0)
+  }
+
+  ignore("should not be eager when creating single node after matching on pattern with relationship and also matching on label") {
+    val query = "MATCH (:L) MATCH ()--() CREATE ()"
+
+    assertNumberOfEagerness(query,  0)
+  }
+
+  test("should be eager when creating single node after matching on empty node") {
+    val query = "MATCH () CREATE ()"
+
+    assertNumberOfEagerness(query,  1)
+  }
+
+  test("should always be eager after deleted relationships if there are any subsequent expands that might load them") {
+    val device = createLabeledNode("Device")
+    val cookies = (0 until 2).foldLeft(Map.empty[String, Node]) { (nodes, index) =>
+      val name = s"c$index"
+      val cookie = createLabeledNode(Map("name" -> name), "Cookie")
+      relate(device, cookie)
+      relate(cookie, createNode())
+      nodes + (name -> cookie)
+    }
+
+    val query =
+      """
+        |MATCH (c:Cookie {name: {cookie}})<-[r2]-(d:Device)
+        |WITH c, d
+        |MATCH (c)-[r]-()
+        |DELETE c, r
+        |WITH d
+        |MATCH (d)-->(c2:Cookie)
+        |RETURN d, c2""".stripMargin
+
+    cookies.foreach { case (name, node)  =>
+      val result = execute(query, ("cookie" -> name))
+      assertStats(result, nodesDeleted = 1, relationshipsDeleted = 2)
+    }
+    assertNumberOfEagerness(query, 2)
+  }
+
+  test("should always be eager after deleted nodes if there are any subsequent matches that might load them") {
+    val cookies = (0 until 2).foldLeft(Map.empty[String, Node]) { (nodes, index) =>
+      val name = s"c$index"
+      val cookie = createLabeledNode(Map("name" -> name), "Cookie")
+      nodes + (name -> cookie)
+    }
+
+    val query = "MATCH (c:Cookie) DELETE c WITH 1 as t MATCH (x:Cookie) RETURN count(*) as count"
+
+    val result = execute(query)
+
+    result.columnAs[Int]("count").next should equal(0)
+    assertStats(result, nodesDeleted = 2)
+    assertNumberOfEagerness(query, 2)
+  }
+
+  test("should always be eager after deleted paths if there are any subsequent matches that might load them") {
+    val cookies = (0 until 2).foldLeft(Map.empty[String, Node]) { (nodes, index) =>
+      val name = s"c$index"
+      val cookie = createLabeledNode(Map("name" -> name), "Cookie")
+      nodes + (name -> cookie)
+    }
+
+    val query = "MATCH p=(:Cookie) DELETE p WITH 1 as t MATCH (x:Cookie) RETURN count(*) as count"
+
+    val result = execute(query)
+
+    result.columnAs[Int]("count").next should equal(0)
+    assertStats(result, nodesDeleted = 2)
+    assertNumberOfEagerness(query, 2)
   }
 
   private def assertNumberOfEagerness(query: String, expectedEagerCount: Int) {

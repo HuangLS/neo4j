@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.cypher.internal.compiler.v2_3
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.StringHelper
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
+import org.neo4j.cypher.internal.frontend.v2_3.IncomparableValuesException
 
 /**
  * Comparer is a trait that enables it's subclasses to compare to AnyRef with each other.
@@ -29,15 +30,22 @@ trait Comparer extends StringHelper {
 
   import Comparer._
 
-  def compare(l: Any, r: Any)(implicit qtx: QueryState): Int = {
+  def compare(operator: Option[String], l: Any, r: Any)(implicit qtx: QueryState): Int = {
     try {
-      if ( (isString(l) && isString(r)) || (isNumber(l) && isNumber(r)))
+      if ((isString(l) && isString(r)) || (isNumber(l) && isNumber(r)) || (isBoolean(l) && isBoolean(r)))
         CypherOrdering.DEFAULT.compare(l, r)
       else
-        throw new IncomparableValuesException(textWithType(l), textWithType(r))
+        throw new IncomparableValuesException(operator.map( reason(l, r) ), textWithType(l), textWithType(r))
     } catch {
       case _: IllegalArgumentException =>
-        throw new IncomparableValuesException(textWithType(l), textWithType(r))
+        throw new IncomparableValuesException(operator.map( reason(l, r) ), textWithType(l), textWithType(r))
+    }
+  }
+
+  private def reason(l:Any, r:Any)(operator: String):String = {
+    (l, r) match {
+      case (_:List[_], _:List[_]) => s"Cannot perform $operator on lists, consider using UNWIND."
+      case (_, _) => s"Cannot perform $operator on mixed types."
     }
   }
 }
@@ -51,6 +59,11 @@ object Comparer {
 
   def isNumber(value: Any): Boolean = value match {
     case _: Number => true
+    case _ => value == null
+  }
+
+  def isBoolean(value: Any): Boolean = value match {
+    case _: Boolean => true
     case _ => value == null
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,9 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.FreshIdNameGenerator
-import org.neo4j.cypher.internal.compiler.v2_3.{CypherException, InputPosition, Rewriter, bottomUp, topDown}
+import org.neo4j.cypher.internal.frontend.v2_3._
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
 
 /**
  * This rewriter normalizes the scoping structure of a query, ensuring it is able to
@@ -60,10 +60,11 @@ case class normalizeWithClauses(mkException: (String, InputPosition) => CypherEx
       Seq(clause.copy(returnItems = ri.copy(items = initialReturnItems)(ri.position))(clause.position))
 
     case clause @ With(distinct, ri, orderBy, skip, limit, where) =>
-      clause.verifyOrderByAggregationUse(mkException)
+      clause.verifyOrderByAggregationUse((s,i) => throw mkException(s,i))
       val (unaliasedReturnItems, aliasedReturnItems) = partitionReturnItems(ri.items)
       val initialReturnItems = unaliasedReturnItems ++ aliasedReturnItems
       val (introducedReturnItems, updatedOrderBy, updatedWhere) = aliasOrderByAndWhere(aliasedReturnItems.map(i => i.expression -> i.alias.get.copyId).toMap, orderBy, where)
+      val requiredIdentifiersForOrderBy = updatedOrderBy.map(_.dependencies).getOrElse(Set.empty) diff (introducedReturnItems.map(_.identifier).toSet ++ initialReturnItems.flatMap(_.alias))
 
       if (orderBy == updatedOrderBy && where == updatedWhere) {
         Seq(clause.copy(returnItems = ri.copy(items = initialReturnItems)(ri.position))(clause.position))
@@ -73,15 +74,21 @@ case class normalizeWithClauses(mkException: (String, InputPosition) => CypherEx
         val secondProjection = if (ri.includeExisting) {
           introducedReturnItems
         } else {
+
           initialReturnItems.map(item =>
             item.alias.fold(item)(alias => AliasedReturnItem(alias.copyId, alias.copyId)(item.position))
-          ) ++ introducedReturnItems
+          ) ++
+            requiredIdentifiersForOrderBy.toVector.map(i => AliasedReturnItem(i.copyId, i.copyId)(i.position)) ++
+            introducedReturnItems
         }
 
         val firstProjection = if (distinct || ri.containsAggregate || ri.includeExisting) {
           initialReturnItems
         } else {
-          val requiredIdentifiers = introducedReturnItems.map(_.expression.dependencies).flatten.toSet diff initialReturnItems.flatMap(_.alias).toSet
+          val requiredReturnItems = introducedReturnItems.flatMap(_.expression.dependencies).toSet diff initialReturnItems
+            .flatMap(_.alias).toSet
+          val requiredIdentifiers = requiredReturnItems ++ requiredIdentifiersForOrderBy
+
           requiredIdentifiers.toVector.map(i => AliasedReturnItem(i.copyId, i.copyId)(i.position)) ++ initialReturnItems
         }
 

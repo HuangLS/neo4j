@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,7 +23,9 @@ import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Expression
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.Effects
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
-import org.neo4j.cypher.internal.compiler.v2_3.symbols.{CypherType, SymbolTable}
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.symbols.CypherType
+import org.neo4j.cypher.internal.frontend.v2_3.{PatternException, UniquePathNotUniqueException}
 import org.neo4j.graphdb.PropertyContainer
 import org.neo4j.helpers.ThisShouldNotHappenError
 
@@ -49,7 +51,7 @@ case class CreateUniqueAction(incomingLinks: UniqueLink*) extends UpdateAction {
         val lockingContext = state.query.upgradeToLockingQueryContext
 
         try {
-          executionContext = tryAgain(linksToDo, executionContext, state.copy(query = lockingContext))
+          executionContext = tryAgain(linksToDo, executionContext, state.withQueryContext(lockingContext))
         } finally {
           lockingContext.releaseLocks()
         }

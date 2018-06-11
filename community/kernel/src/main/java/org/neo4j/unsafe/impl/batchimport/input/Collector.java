@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,6 +30,8 @@ public interface Collector extends AutoCloseable
     void collectBadRelationship( InputRelationship relationship, Object specificValue );
 
     void collectDuplicateNode( Object id, long actualId, String group, String firstSource, String otherSource );
+
+    void collectExtraColumns( final String source, final long row, final String value );
 
     int badEntries();
 

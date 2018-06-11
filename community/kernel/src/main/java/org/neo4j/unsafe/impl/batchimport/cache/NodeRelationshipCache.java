@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.unsafe.impl.batchimport.cache;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.neo4j.graphdb.Direction;
 
@@ -27,20 +27,27 @@ import org.neo4j.graphdb.Direction;
  * Caches of parts of node store and relationship group store. A crucial part of batch import where
  * any random access must be covered by this cache. All I/O, both read and write must be sequential.
  */
-public class NodeRelationshipCache implements MemoryStatsVisitor.Home
+public class NodeRelationshipCache implements MemoryStatsVisitor.Visitable
 {
     private static final long EMPTY = -1;
 
     private LongArray array;
     private final int denseNodeThreshold;
     private final RelGroupCache relGroupCache;
+    private final long base;
 
     public NodeRelationshipCache( NumberArrayFactory arrayFactory, int denseNodeThreshold )
+    {
+        this( arrayFactory, denseNodeThreshold, 0 );
+    }
+
+    NodeRelationshipCache( NumberArrayFactory arrayFactory, int denseNodeThreshold, long base )
     {
         int chunkSize = 1_000_000;
         this.array = arrayFactory.newDynamicLongArray( chunkSize, IdFieldManipulator.emptyField() );
         this.denseNodeThreshold = denseNodeThreshold;
-        this.relGroupCache = new RelGroupCache( arrayFactory, chunkSize );
+        this.base = base;
+        this.relGroupCache = new RelGroupCache( arrayFactory, chunkSize, base );
     }
 
     /**
@@ -181,7 +188,7 @@ public class NodeRelationshipCache implements MemoryStatsVisitor.Home
         }
     };
 
-    private static class RelGroupCache implements AutoCloseable, MemoryStatsVisitor.Home
+    private static class RelGroupCache implements AutoCloseable, MemoryStatsVisitor.Visitable
     {
         private static final int ENTRY_SIZE = 4;
 
@@ -190,13 +197,17 @@ public class NodeRelationshipCache implements MemoryStatsVisitor.Home
         private static final int INDEX_IN = 2;
         private static final int INDEX_LOOP = 3;
 
+        // Used for testing high id values. Should always be zero in production
+        private long base;
         private LongArray array;
-        private final AtomicInteger nextFreeId = new AtomicInteger();
+        private final AtomicLong nextFreeId;
 
-        RelGroupCache( NumberArrayFactory arrayFactory, long chunkSize )
+        RelGroupCache( NumberArrayFactory arrayFactory, long chunkSize, long base )
         {
+            this.base = base;
             assert chunkSize > 0;
             this.array = arrayFactory.newDynamicLongArray( chunkSize, -1 );
+            this.nextFreeId = new AtomicLong( base );
         }
 
         private void clearRelationships()
@@ -213,10 +224,18 @@ public class NodeRelationshipCache implements MemoryStatsVisitor.Home
         private void clearRelationshipId( long relGroupIndex, int fieldIndex )
         {
             long index = index( relGroupIndex, fieldIndex );
-            array.set( index, IdFieldManipulator.cleanId( array.get( index ) ) );
+            array.set( rebase( index ), IdFieldManipulator.cleanId( array.get( index ) ) );
         }
 
-        private int nextFreeId()
+        /**
+         * Compensate for test value of index (to avoid allocating all your RAM)
+         */
+        private long rebase( long index )
+        {
+            return index - base;
+        }
+
+        private long nextFreeId()
         {
             return nextFreeId.getAndIncrement();
         }
@@ -268,7 +287,7 @@ public class NodeRelationshipCache implements MemoryStatsVisitor.Home
 
         private long index( long relGroupIndex, int fieldIndex )
         {
-            return relGroupIndex*ENTRY_SIZE + fieldIndex;
+            return rebase( relGroupIndex ) * ENTRY_SIZE + fieldIndex;
         }
 
         public long allocate( int type, Direction direction, long relId, boolean incrementCount )

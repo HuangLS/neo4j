@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -39,8 +39,8 @@ public class LabelChainWalker<RECORD extends AbstractBaseRecord, REPORT extends 
 {
     private final Validator<RECORD, REPORT> validator;
 
-    private HashMap<Long, DynamicRecord> recordIds = new HashMap<>();
-    private List<DynamicRecord> recordList = new ArrayList<>();
+    private final HashMap<Long, DynamicRecord> recordIds = new HashMap<>();
+    private final List<DynamicRecord> recordList = new ArrayList<>();
     private boolean allInUse = true;
 
     public LabelChainWalker( Validator<RECORD, REPORT> validator )
@@ -87,7 +87,7 @@ public class LabelChainWalker<RECORD extends AbstractBaseRecord, REPORT extends 
         }
     }
 
-    private long[] labelIds( List<DynamicRecord> recordList )
+    public static long[] labelIds( List<DynamicRecord> recordList )
     {
         long[] idArray =
                 (long[]) getRightArray( readFullByteArrayFromHeavyRecords( recordList, PropertyType.ARRAY ) );

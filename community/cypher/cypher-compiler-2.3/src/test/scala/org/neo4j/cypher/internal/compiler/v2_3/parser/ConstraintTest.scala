@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.parser
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.StatementConverters
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.StatementConverters._
-import org.neo4j.cypher.internal.compiler.v2_3.{commands => legacyCommands, _}
+import org.neo4j.cypher.internal.compiler.v2_3.{commands => legacyCommands, devNullLogger}
+import org.neo4j.cypher.internal.frontend.v2_3.ast
+import org.neo4j.cypher.internal.frontend.v2_3.parser.{Command, ParserTest}
 import org.parboiled.scala._
 
 class ConstraintTest extends ParserTest[ast.Command, legacyCommands.AbstractQuery] with Command {

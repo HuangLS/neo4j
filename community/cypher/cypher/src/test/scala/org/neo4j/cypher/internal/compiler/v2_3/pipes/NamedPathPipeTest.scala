@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import org.neo4j.cypher.GraphDatabaseFunSuite
 import org.neo4j.cypher.internal._
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 import org.neo4j.graphdb._
 
 class NamedPathPipeTest extends GraphDatabaseFunSuite {
@@ -39,13 +40,13 @@ class NamedPathPipeTest extends GraphDatabaseFunSuite {
     props = Map.empty, start = ParsedEntity("a"),
     end = ParsedEntity("c"),
     typ = Seq.empty,
-    dir = Direction.OUTGOING,
+    dir = SemanticDirection.OUTGOING,
     optional = false,
     minHops = None,
     maxHops = None,
     relIterator = None
   )
-  private val singleRelationship = ParsedRelation("r1", "a", "b", Seq.empty, Direction.OUTGOING)
+  private val singleRelationship = ParsedRelation("r1", "a", "b", Seq.empty, SemanticDirection.OUTGOING)
 
   override def beforeEach() {
     super.beforeEach()

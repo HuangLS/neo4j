@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,7 +31,6 @@ import java.util.regex.Pattern;
 import org.neo4j.cypher.NodeStillHasRelationshipsException;
 import org.neo4j.graphdb.ConstraintViolationException;
 import org.neo4j.graphdb.Direction;
-import org.neo4j.graphdb.DynamicLabel;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Node;
@@ -402,7 +401,7 @@ public class TestApps extends AbstractShellTest
     public void createNodeWithArrayProperty() throws Exception
     {
         executeCommand( "mknode --np \"{'values':[1,2,3,4]}\" --cd" );
-        assertThat( getCurrentNode(), inTx( db, hasProperty( "values" ).withValue( new int[] {1,2,3,4} ) ) );
+        assertThat( getCurrentNode(), inTx( db, hasProperty( "values" ).withValue( new int[]{1, 2, 3, 4} ) ) );
     }
 
     @Test
@@ -535,7 +534,7 @@ public class TestApps extends AbstractShellTest
     @Test
     public void startCypherQueryWithUnwind() throws Exception
     {
-        executeCommand( "unwind [1,2,3] as x return x;", "| x |", "| 1 |");
+        executeCommand( "unwind [1,2,3] as x return x;", "| x |", "| 1 |" );
     }
 
     @Test
@@ -575,7 +574,7 @@ public class TestApps extends AbstractShellTest
     public void canSetInitialSessionVariables() throws Exception
     {
         Map<String, Serializable> values = genericMap( "mykey", "myvalue",
-                                                       "my_other_key", "My other value" );
+                "my_other_key", "My other value" );
         ShellClient client = newShellClient( shellServer, values );
         String[] allStrings = new String[values.size()*2];
         int i = 0;
@@ -595,7 +594,8 @@ public class TestApps extends AbstractShellTest
         ShellClient client = new SameJvmClient( values, shellServer, out );
         client.shutdown();
         final String outString = out.asString();
-        assertEquals( "Shows welcome message: " + outString, false, outString.contains( "Welcome to the Neo4j Shell! Enter 'help' for a list of commands" ) );
+        assertEquals( "Shows welcome message: " + outString, false,
+                outString.contains( "Welcome to the Neo4j Shell! Enter 'help' for a list of commands" ) );
     }
 
     @Test
@@ -870,32 +870,6 @@ public class TestApps extends AbstractShellTest
     }
 
     @Test
-    public void canListMandatoryNodePropertyConstraints() throws Exception
-    {
-        // GIVEN
-        Label label = label( "Person" );
-        beginTx();
-        db.schema().constraintFor( label ).assertPropertyExists( "name" ).create();
-        finishTx();
-
-        // WHEN / THEN
-        executeCommand( "schema ls", "ON \\(person:Person\\) ASSERT person.name IS NOT NULL" );
-    }
-
-    @Test
-    public void canListMandatoryRelationshipPropertyConstraints() throws Exception
-    {
-        // GIVEN
-        RelationshipType relType = DynamicRelationshipType.withName( "KNOWS" );
-        beginTx();
-        db.schema().constraintFor( relType ).assertPropertyExists( "since" ).create();
-        finishTx();
-
-        // WHEN / THEN
-        executeCommand( "schema ls", "ON \\(\\)-\\[knows:KNOWS\\]-\\(\\) ASSERT knows.since IS NOT NULL" );
-    }
-
-    @Test
     public void canListUniquePropertyConstraintsByLabel() throws Exception
     {
         // GIVEN
@@ -909,119 +883,6 @@ public class TestApps extends AbstractShellTest
     }
 
     @Test
-    public void canListMandatoryNodePropertyConstraintsByLabel() throws Exception
-    {
-        // GIVEN
-        Label label1 = label( "Person" );
-        beginTx();
-        db.schema().constraintFor( label1 ).assertPropertyExists( "name" ).create();
-        finishTx();
-
-        // WHEN / THEN
-        executeCommand( "schema ls -l :Person", "ON \\(person:Person\\) ASSERT person.name IS NOT NULL" );
-    }
-
-    @Test
-    public void canListMandatoryRelationshipPropertyConstraintsByType() throws Exception
-    {
-        // GIVEN
-        RelationshipType relType = DynamicRelationshipType.withName( "KNOWS" );
-        beginTx();
-        db.schema().constraintFor( relType ).assertPropertyExists( "since" ).create();
-        finishTx();
-
-        // WHEN / THEN
-        executeCommand( "schema ls -r :KNOWS", "ON \\(\\)-\\[knows:KNOWS\\]-\\(\\) ASSERT knows.since IS NOT NULL" );
-    }
-
-    @Test
-    public void canListMandatoryRelationshipPropertyConstraintsByTypeAndProperty() throws Exception
-    {
-        // GIVEN
-        RelationshipType relType = DynamicRelationshipType.withName( "KNOWS" );
-        beginTx();
-        db.schema().constraintFor( relType ).assertPropertyExists( "since" ).create();
-        finishTx();
-
-        // WHEN / THEN
-        executeCommand( "schema ls -r :KNOWS -p since", "ON \\(\\)-\\[knows:KNOWS\\]-\\(\\) ASSERT knows.since IS NOT NULL" );
-    }
-
-    @Test
-    public void canListBothNodeAndRelationshipMandatoryPropertyConstraints() throws Exception
-    {
-        // GIVEN
-        Label label = DynamicLabel.label( "Person" );
-        RelationshipType relType = DynamicRelationshipType.withName( "KNOWS" );
-
-        // WHEN
-        beginTx();
-        db.schema().constraintFor( label ).assertPropertyExists( "name" ).create();
-        finishTx();
-
-        beginTx();
-        db.schema().constraintFor( relType ).assertPropertyExists( "since" ).create();
-        finishTx();
-
-        // THEN
-        executeCommand( "schema ls",
-                "ON \\(person:Person\\) ASSERT person.name IS NOT NULL",
-                "ON \\(\\)-\\[knows:KNOWS\\]-\\(\\) ASSERT knows.since IS NOT NULL" );
-    }
-
-    @Test
-    public void canListBothNodeAndRelationshipMandatoryPropertyConstraintsByLabelAndType() throws Exception
-    {
-        // GIVEN
-        Label label = DynamicLabel.label( "Person" );
-        RelationshipType relType = DynamicRelationshipType.withName( "KNOWS" );
-
-        // WHEN
-        beginTx();
-        db.schema().constraintFor( label ).assertPropertyExists( "name" ).create();
-        finishTx();
-
-        beginTx();
-        db.schema().constraintFor( relType ).assertPropertyExists( "since" ).create();
-        finishTx();
-
-        // THEN
-        executeCommand( "schema ls -l :Person -r :KNOWS",
-                "ON \\(person:Person\\) ASSERT person.name IS NOT NULL",
-                "ON \\(\\)-\\[knows:KNOWS\\]-\\(\\) ASSERT knows.since IS NOT NULL" );
-    }
-
-    @Test
-    public void shouldHaveCorrectIndentationsInSchemaListing() throws Exception
-    {
-        // GIVEN
-        Label label = DynamicLabel.label( "Person" );
-        RelationshipType relType = DynamicRelationshipType.withName( "KNOWS" );
-
-        // WHEN
-        beginTx();
-        db.schema().constraintFor( label ).assertPropertyIsUnique( "name" ).create();
-        finishTx();
-
-        beginTx();
-        db.schema().constraintFor( label ).assertPropertyExists( "name" ).create();
-        finishTx();
-
-        beginTx();
-        db.schema().constraintFor( relType ).assertPropertyExists( "since" ).create();
-        finishTx();
-
-        // THEN
-        executeCommand( "schema",
-                "Indexes",
-                "  ON :Person\\(name\\) ONLINE \\(for uniqueness constraint\\)",
-                "Constraints",
-                "  ON \\(person:Person\\) ASSERT person.name IS UNIQUE",
-                "  ON \\(person:Person\\) ASSERT person.name IS NOT NULL",
-                "  ON \\(\\)-\\[knows:KNOWS\\]-\\(\\) ASSERT knows.since IS NOT NULL" );
-    }
-
-    @Test
     public void canListUniquePropertyConstraintsByLabelAndProperty() throws Exception
     {
         // GIVEN
@@ -1032,19 +893,6 @@ public class TestApps extends AbstractShellTest
 
         // WHEN / THEN
         executeCommand( "schema ls -l :Person -p name", "ON \\(person:Person\\) ASSERT person.name IS UNIQUE" );
-    }
-
-    @Test
-    public void canListMandatoryNodePropertyConstraintsByLabelAndProperty() throws Exception
-    {
-        // GIVEN
-        Label label1 = label( "Person" );
-        beginTx();
-        db.schema().constraintFor( label1 ).assertPropertyExists( "name" ).create();
-        finishTx();
-
-        // WHEN / THEN
-        executeCommand( "schema ls -l :Person -p name", "ON \\(person:Person\\) ASSERT person.name IS NOT NULL" );
     }
 
     @Test
@@ -1287,6 +1135,12 @@ public class TestApps extends AbstractShellTest
     }
 
     @Test
+    public void allowsCypherToContainExclamationMarks() throws Exception
+    {
+        executeCommand( "RETURN \"a\"+\"!b\";", "a!b" );
+    }
+
+    @Test
     public void shouldAllowQueriesToStartWithOptionalMatch() throws Exception
     {
         executeCommand( "OPTIONAL MATCH (n) RETURN n;" );
@@ -1331,13 +1185,6 @@ public class TestApps extends AbstractShellTest
     }
 
     @Test
-    public void shouldBeAbleToSwitchBetweenRuntimes() throws Exception
-    {
-        executeCommand( "CYPHER runtime=compiled MATCH (n)-[:T]-(n) RETURN n;" );
-        executeCommand( "CYPHER runtime=interpreted MATCH (n)-[:T]-(n) RETURN n;" );
-    }
-
-    @Test
     public void canListAllConfiguration() throws Exception
     {
         executeCommand( "dbinfo -g Configuration", "\"ephemeral\": \"true\"" );
@@ -1365,6 +1212,19 @@ public class TestApps extends AbstractShellTest
         });
         thread.start();
 
-        executeCommandExpectingException("CYPHER 2.2 FOREACH(i IN range(0, 10000) | CREATE ());", "has been terminated" );
+        executeCommandExpectingException( "CYPHER 2.2 FOREACH(i IN range(0, 10000) | CREATE ());",
+                "has been terminated" );
+    }
+
+    @Test
+    public void canUseForeach() throws Exception
+    {
+        executeCommand( "FOREACH (x in range(0,10) | CREATE ()));" );
+    }
+
+    @Test
+    public void canUseCommandsWithoutSpaceBeforeLeftParenthesis() throws Exception
+    {
+        executeCommand( "FOREACH(x in range(0,10) | CREATE ()));" );
     }
 }

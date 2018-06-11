@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,7 +27,6 @@ import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 
 import static java.lang.String.format;
-
 import static org.neo4j.helpers.collection.IteratorUtil.first;
 import static org.neo4j.kernel.impl.store.AbstractDynamicStore.readFullByteArrayFromHeavyRecords;
 import static org.neo4j.kernel.impl.store.DynamicArrayStore.getRightArray;
@@ -36,6 +35,7 @@ import static org.neo4j.kernel.impl.store.LabelIdArray.stripNodeId;
 import static org.neo4j.kernel.impl.store.NodeLabelsField.fieldPointsToDynamicRecordOfLabels;
 import static org.neo4j.kernel.impl.store.NodeLabelsField.firstDynamicLabelRecordId;
 import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsBody;
+import static org.neo4j.kernel.impl.store.NodeStore.getDynamicLabelsArrayFromHeavyRecords;
 import static org.neo4j.kernel.impl.store.PropertyType.ARRAY;
 
 public class DynamicNodeLabels implements NodeLabels
@@ -202,6 +202,6 @@ public class DynamicNodeLabels implements NodeLabels
             return format( "Dynamic(id:%d)", firstDynamicLabelRecordId( node.getLabelField() ) );
         }
         return format( "Dynamic(id:%d,[%s])", firstDynamicLabelRecordId( node.getLabelField() ),
-                Arrays.toString( NodeStore.getDynamicLabelsArrayFromHeavyRecords( node.getDynamicLabelRecords() ) ) );
+                Arrays.toString( getDynamicLabelsArrayFromHeavyRecords( node.getUsedDynamicLabelRecords() ) ) );
     }
 }

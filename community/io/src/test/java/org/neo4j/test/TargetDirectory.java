@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.test;
 
+import org.junit.Rule;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
@@ -57,8 +58,20 @@ public class TargetDirectory
     public class TestDirectory implements TestRule
     {
         private File subdir = null;
+        private boolean keepDirectoryAfterSuccefulTest;
 
         private TestDirectory() { }
+
+        /**
+         * Tell this {@link Rule} to keep the store directory, even after a successful test.
+         * It's just a useful debug mechanism to have for analyzing store after a test.
+         * by default directories aren't kept.
+         */
+        public TestDirectory keepDirectoryAfterSuccefulTest()
+        {
+            keepDirectoryAfterSuccefulTest = true;
+            return this;
+        }
 
         public String absolutePath()
         {
@@ -89,7 +102,18 @@ public class TargetDirectory
             return dir;
         }
 
-        public File graphDbDir() {
+        public File cleanDirectory( String name ) throws IOException
+        {
+            File directory = directory( name );
+            for ( File file : fileSystem.listFiles( directory ) )
+            {
+                fileSystem.deleteRecursively( file );
+            }
+            return directory;
+        }
+
+        public File graphDbDir()
+        {
             return directory( "graph-db" );
         }
 
@@ -125,7 +149,7 @@ public class TargetDirectory
 
         private void complete( boolean success )
         {
-            if ( success && subdir != null )
+            if ( success && subdir != null && !keepDirectoryAfterSuccefulTest )
             {
                 try
                 {

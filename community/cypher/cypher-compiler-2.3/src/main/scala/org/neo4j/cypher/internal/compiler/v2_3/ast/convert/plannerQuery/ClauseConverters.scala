@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,12 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.convert.plannerQuery
 
-import org.neo4j.cypher.internal.compiler.v2_3.InternalException
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.plannerQuery.ExpressionConverters._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.plannerQuery.PatternConverters._
 import org.neo4j.cypher.internal.compiler.v2_3.planner._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.IdName
+import org.neo4j.cypher.internal.frontend.v2_3.InternalException
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
 
 object ClauseConverters {
 
@@ -79,7 +79,7 @@ object ClauseConverters {
 
   implicit class ReturnConverter(val clause: Return) extends AnyVal {
     def addReturnToLogicalPlanInput(acc: PlannerQueryBuilder): PlannerQueryBuilder = clause match {
-      case Return(distinct, ri, optOrderBy, skip, limit) if !ri.includeExisting =>
+      case Return(distinct, ri, optOrderBy, skip, limit, _) if !ri.includeExisting =>
 
         val shuffle = optOrderBy.asQueryShuffle.
           withSkip(skip).
@@ -115,7 +115,6 @@ object ClauseConverters {
       val patternContent = clause.pattern.destructed
 
       val selections = clause.where.asSelections
-      val subQueries = selections.getContainedPatternExpressions
 
       if (clause.optional) {
         acc.

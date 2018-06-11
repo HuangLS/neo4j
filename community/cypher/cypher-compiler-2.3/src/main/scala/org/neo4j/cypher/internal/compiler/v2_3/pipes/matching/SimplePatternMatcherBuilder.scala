@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,14 +20,15 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes.matching
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import commands.Predicate
-import pipes.QueryState
-import symbols._
-import org.neo4j.graphdb.{Relationship, Node, DynamicRelationshipType}
-import org.neo4j.graphmatching.{PatternMatcher => SimplePatternMatcher, PatternNode => SimplePatternNode,
-PatternRelationship => SimplePatternRelationship, PatternMatch}
-import collection.{immutable, Map}
-import collection.JavaConverters._
+import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.DirectionConverter._
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.Predicate
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.graphdb.{DynamicRelationshipType, Node, Relationship}
+import org.neo4j.graphmatching.{PatternMatch, PatternMatcher => SimplePatternMatcher, PatternNode => SimplePatternNode, PatternRelationship => SimplePatternRelationship}
+
+import scala.collection.JavaConverters._
+import scala.collection.{Map, Set, immutable}
 
 class SimplePatternMatcherBuilder(pattern: PatternGraph,
                                   predicates: Seq[Predicate],
@@ -35,31 +36,30 @@ class SimplePatternMatcherBuilder(pattern: PatternGraph,
                                   identifiersInClause: Set[String]) extends MatcherBuilder {
   def createPatternNodes: immutable.Map[String, SimplePatternNode] = {
     pattern.patternNodes.map {
-      case (key, pn) => {
+      case (key, pn) =>
         key -> {
           new SimplePatternNode(pn.key)
         }
-      }
     }
   }
 
-  def createPatternRels(patternNodes:immutable.Map[String, SimplePatternNode]):immutable.Map[String, SimplePatternRelationship]  = pattern.patternRels.map {
-    case (key, pr) => {
+  def createPatternRels(patternNodes: immutable.Map[String, SimplePatternNode]): immutable.Map[String, SimplePatternRelationship] = pattern.patternRels.flatMap {
+    case (key, prs) => prs.map(pr => {
       val start = patternNodes(pr.startNode.key)
       val end = patternNodes(pr.endNode.key)
 
       val patternRel = if (pr.relTypes.isEmpty)
-        start.createRelationshipTo(end, pr.dir)
+        start.createRelationshipTo(end, toGraphDb(pr.dir))
       else {
         // The SimplePatternMatcher does not support multiple relationship types
         // re-visit this if it ever does
-        start.createRelationshipTo(end, DynamicRelationshipType.withName(pr.relTypes.head), pr.dir)
+        start.createRelationshipTo(end, DynamicRelationshipType.withName(pr.relTypes.head), toGraphDb(pr.dir))
       }
 
       patternRel.setLabel(pr.key)
 
       key -> patternRel
-    }
+    })
   }
 
   def setAssociations(sourceRow: Map[String, Any]): (immutable.Map[String, SimplePatternNode], immutable.Map[String, SimplePatternRelationship]) = {
@@ -85,7 +85,10 @@ class SimplePatternMatcherBuilder(pattern: PatternGraph,
   def getMatches(ctx: ExecutionContext, state: QueryState) = {
     val (patternNodes, patternRels) = setAssociations(ctx)
     val validPredicates = predicates.filter(p => p.symbolDependenciesMet(symbolTable))
-    val startPoint = patternNodes.values.find(_.getAssociation != null).get
+    // We sort the patternNodes here to always start at the lexicographically smaller identifier
+    // This is suboptimal and will be superseded by a better planner
+    val values = patternNodes.values.toList.sortBy(pn => pn.toString)
+    val startPoint = values.find(_.getAssociation != null).get
 
     val incomingRels: Set[Relationship] = ctx.collect {
       case (k, r: Relationship) if identifiersInClause.contains(k) => r
@@ -124,15 +127,17 @@ class SimplePatternMatcherBuilder(pattern: PatternGraph,
   }
 
   def name = "SimplePatternMatcher"
+
+  override def startPoint: String = pattern.patternNodes.values.head.key
 }
 
 object SimplePatternMatcherBuilder {
   def canHandle(graph: PatternGraph): Boolean = {
-    val a = !graph.patternRels.values.exists(pr => pr.isInstanceOf[VariableLengthPatternRelationship] || pr.startNode == pr.endNode || pr.relTypes.size > 1)
+    val a = !graph.patternRels.values.exists(_.forall(pr => pr.isInstanceOf[VariableLengthPatternRelationship] || pr.startNode == pr.endNode || pr.relTypes.size > 1))
     val b = !graph.patternRels.keys.exists(graph.boundElements.contains)
-    val c = !graph.patternNodes.values.exists(pn => pn.relationships.isEmpty )
+    val c = !graph.patternNodes.values.exists(pn => pn.relationships.isEmpty)
     val d = !graph.patternNodes.values.exists(node => node.labels.nonEmpty || node.properties.nonEmpty)
-    val e = !graph.patternRels.values.exists(rel => rel.properties.nonEmpty)
+    val e = !graph.patternRels.values.exists(_.forall(rel => rel.properties.nonEmpty))
     a && b && c && d && e
   }
 }

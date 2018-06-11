@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,6 @@ import org.neo4j.kernel.impl.util.Access;
 /**
  * Queues {@link TransactionRepresentation} for application at a later point. Queued transactions can be visited
  * with {@link #accept(TransactionVisitor)} where the transactions are intact in the queue after that call.
- * Or using {@link #acceptAndRemove(TransactionVisitor)} which clear the queue after that call.
  */
 public class TransactionQueue
 {
@@ -67,6 +66,29 @@ public class TransactionQueue
     public void clear()
     {
         queueIndex = 0;
+    }
+
+    public CommittedTransactionRepresentation last()
+    {
+        if ( isEmpty() )
+        {
+            throw new IllegalStateException( "Nothing in queue" );
+        }
+        return queue[queueIndex - 1].transaction;
+    }
+
+    public boolean isEmpty()
+    {
+        return queueIndex == 0;
+    }
+
+    public CommittedTransactionRepresentation first()
+    {
+        if ( isEmpty() )
+        {
+            throw new IllegalStateException( "Nothing in queue" );
+        }
+        return queue[0].transaction;
     }
 
     private static class Transaction implements Access<Commitment>

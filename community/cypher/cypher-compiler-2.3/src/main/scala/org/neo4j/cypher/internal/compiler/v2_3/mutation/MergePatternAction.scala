@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,23 +19,28 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.mutation
 
+import org.neo4j.cypher.internal.compiler.v2_3.ExecutionContext
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Expression
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, _}
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.PropertySupport
-import org.neo4j.cypher.internal.compiler.v2_3.pipes.{Pipe, QueryState}
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
-import org.neo4j.cypher.internal.compiler.v2_3.{ExecutionContext, InternalException, InvalidSemanticsException}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.{MatchPipe, Pipe, QueryState}
+import org.neo4j.cypher.internal.compiler.v2_3.planDescription.Argument
+import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments.MergePattern
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.{InternalException, InvalidSemanticsException}
 import org.neo4j.graphdb.Node
 import org.neo4j.helpers.ThisShouldNotHappenError
 
 case class MergePatternAction(patterns: Seq[Pattern],
                               actions: Seq[UpdateAction],
-                              onMatch: Seq[UpdateAction],
+                              onCreate: Seq[SetAction],
+                              onMatch: Seq[SetAction],
                               maybeUpdateActions: Option[Seq[UpdateAction]] = None,
                               maybeMatchPipe: Option[Pipe] = None) extends UpdateAction {
 
-  def children: Seq[AstNode[_]] = patterns ++ actions ++ onMatch
+  def children: Seq[AstNode[_]] = patterns ++ actions ++ onCreate ++ onMatch
 
   def readyToExecute = maybeMatchPipe.nonEmpty && maybeUpdateActions.nonEmpty
 
@@ -61,7 +66,7 @@ case class MergePatternAction(patterns: Seq[Pattern],
   private def matchPipe: Pipe =
     maybeMatchPipe.getOrElse(throw new InternalException("Query not prepared correctly!"))
 
-  private def updateActions: Seq[UpdateAction] =
+  private def updateActions(): Seq[UpdateAction] =
     maybeUpdateActions.getOrElse(throw new InternalException("Query not prepared correctly!"))
 
   private def doMatch(state: QueryState) = matchPipe.createResults(state)
@@ -76,7 +81,7 @@ case class MergePatternAction(patterns: Seq[Pattern],
 
   private def createThePattern(state: QueryState, ctx: ExecutionContext) = {
     // Runs all commands, from left to right, updating the execution context as it passes through
-    val resultingContext = updateActions.foldLeft(ctx) {
+    val resultingContext = updateActions().foldLeft(ctx) {
       case (accumulatedContext, action) => singleElementOrFail(action.exec(accumulatedContext, state))
     }
     Iterator(resultingContext)
@@ -97,6 +102,7 @@ case class MergePatternAction(patterns: Seq[Pattern],
     MergePatternAction(
       patterns = patterns.map(_.rewrite(f)),
       actions = actions.map(_.rewrite(f)),
+      onCreate = onCreate.map(_.rewrite(f)),
       onMatch = onMatch.map(_.rewrite(f)),
       maybeUpdateActions = maybeUpdateActions.map(_.map(_.rewrite(f))),
       maybeMatchPipe = maybeMatchPipe)
@@ -105,6 +111,7 @@ case class MergePatternAction(patterns: Seq[Pattern],
     val dependencies = (
       patterns.flatMap(_.symbolTableDependencies) ++
       actions.flatMap(_.symbolTableDependencies) ++
+      onCreate.flatMap(_.symbolTableDependencies) ++
       onMatch.flatMap(_.symbolTableDependencies)).toSet
 
     val introducedIdentifiers = patterns.flatMap(_.identifiers).toSet
@@ -114,7 +121,7 @@ case class MergePatternAction(patterns: Seq[Pattern],
 
   private def readEffects(symbols: SymbolTable): Effects = {
     val collect: Seq[Effect] = identifiers.collect {
-      case (k, CTNode) if !symbols.hasIdentifierNamed(k) => ReadsNodes
+      case (k, CTNode) if !symbols.hasIdentifierNamed(k) => ReadsAllNodes
       case (k, CTRelationship) if !symbols.hasIdentifierNamed(k) => ReadsRelationships
     }
 
@@ -128,13 +135,23 @@ case class MergePatternAction(patterns: Seq[Pattern],
 
     val allSymbols = updateSymbols(externalSymbols)
     val actionEffects = actions.effects(allSymbols)
+    val onCreateEffects = onCreate.effects(allSymbols)
     val onMatchEffects = onMatch.effects(allSymbols)
-    val updateActionsEffects = updateActions.effects(allSymbols)
+    val updateActionsEffects = updateActions().effects(allSymbols)
 
-    actionEffects | onMatchEffects | updateActionsEffects | effectsFromReading
+    actionEffects | onCreateEffects | onMatchEffects | updateActionsEffects | effectsFromReading
   }
 
   override def updateSymbols(symbol: SymbolTable): SymbolTable = symbol.add(identifiers.toMap)
+
+  override def arguments: Seq[Argument] = {
+    val startPoint: Option[String] = maybeMatchPipe.map {
+      case m: MatchPipe => m.mergeStartPoint
+      case _ => ""
+    }
+    Seq(MergePattern(startPoint.getOrElse("")))
+  }
+
 }
 
 object MergePatternAction {

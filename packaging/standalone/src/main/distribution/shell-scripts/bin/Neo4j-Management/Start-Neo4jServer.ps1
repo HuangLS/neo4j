@@ -1,4 +1,4 @@
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -17,7 +17,50 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+<#
+.SYNOPSIS
+Starts a Neo4j Server instance
 
+.DESCRIPTION
+Starts a Neo4j Server instance either as a java console application or Windows Service
+
+.PARAMETER Neo4jServer
+An object representing a Neo4j Server.  Either an empty string (path determined by Get-Neo4jHome), a string (path to Neo4j installation) or a valid Neo4j Server object
+
+.PARAMETER Console
+Start the Neo4j Server instance as a java console application
+
+.PARAMETER ServiceName
+The name of the Neo4j Server Windows Service.  If no name is specified, the name is determined from the Neo4j Configuration files (default)
+
+.PARAMETER Wait
+Wait for the java console application to finish execution
+
+.PARAMETER PassThru
+Pass through the Neo4j Server object instead of the result of the start operation
+
+.EXAMPLE
+'C:\Neo4j\neo4j-enterprise' | Start-Neo4jServer
+
+Start the Neo4j Server Windows Service for the Neo4j installation at 'C:\Neo4j\neo4j-enterprise'
+Assumes the Neo4j Windows Service has already been installed
+
+.EXAMPLE
+'C:\Neo4j\neo4j-enterprise' | Start-Neo4jServer -Console -Wait
+
+Start the Neo4j Server for the Neo4j installation at 'C:\Neo4j\neo4j-enterprise' and wait for the execution to complete
+
+.OUTPUTS
+System.Management.Automation.PSCustomObject
+Neo4j Server object
+
+System.Int
+Process ExitCode for the console application
+
+System.ServiceProcess.ServiceController
+Windows Service object
+
+#>
 Function Start-Neo4jServer
 {
   [cmdletBinding(SupportsShouldProcess=$true,ConfirmImpact='Medium',DefaultParameterSetName='WindowsService')]
@@ -28,7 +71,7 @@ Function Start-Neo4jServer
     ,[Parameter(Mandatory=$true,ParameterSetName='Console')]
     [switch]$Console
 
-    ,[Parameter(Mandatory=$false)]
+    ,[Parameter(Mandatory=$false,ParameterSetName='Console')]
     [switch]$Wait
 
     ,[Parameter(Mandatory=$false)]
@@ -74,7 +117,7 @@ Function Start-Neo4jServer
       }
 
       $result = 0
-      if ($PSCmdlet.ShouldProcess("$($JavaCMD.java) $($ShellArgs)", 'Start Neo4j'))
+      if ($PSCmdlet.ShouldProcess("$($JavaCMD.java) $($JavaCMD.args)", 'Start Neo4j'))
       {
         $result = (Start-Process -FilePath $JavaCMD.java -ArgumentList $JavaCMD.args -Wait:$Wait -NoNewWindow:$Wait -PassThru -WorkingDirectory $thisServer.Home)
       }

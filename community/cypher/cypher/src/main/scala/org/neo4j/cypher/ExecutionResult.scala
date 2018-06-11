@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,11 @@ import java.io.PrintWriter
 
 import org.neo4j.graphdb.ResourceIterator
 
+/**
+  * @deprecated See { @link org.neo4j.graphdb.Result}, and use
+  * { @link org.neo4j.graphdb.GraphDatabaseService#execute(String, Map)} instead.
+  */
+@Deprecated
 trait ExecutionResult extends Iterator[Map[String, Any]] {
   def columns: List[String]
   def javaColumns: java.util.List[String]
@@ -67,5 +72,30 @@ case class QueryStatistics(nodesCreated: Int = 0,
       indexesRemoved > 0 ||
       constraintsAdded > 0 ||
       constraintsRemoved > 0
+
+  override def toString = {
+    val builder = new StringBuilder
+
+    includeIfNonZero(builder, "Nodes created: ", nodesCreated)
+    includeIfNonZero(builder, "Relationships created: ", relationshipsCreated)
+    includeIfNonZero(builder, "Properties set: ", propertiesSet)
+    includeIfNonZero(builder, "Nodes deleted: ", nodesDeleted)
+    includeIfNonZero(builder, "Relationships deleted: ", relationshipsDeleted)
+    includeIfNonZero(builder, "Labels added: ", labelsAdded)
+    includeIfNonZero(builder, "Labels removed: ", labelsRemoved)
+    includeIfNonZero(builder, "Indexes added: ", indexesAdded)
+    includeIfNonZero(builder, "Indexes removed: ", indexesRemoved)
+    includeIfNonZero(builder, "Constraints added: ", constraintsAdded)
+    includeIfNonZero(builder, "Constraints removed: ", constraintsRemoved)
+
+    val result = builder.toString()
+
+    if (result.isEmpty) "<Nothing happened>" else result
+  }
+
+  private def includeIfNonZero(builder:StringBuilder, message: String, count:Long) = if(count>0) {
+    builder.append(message + count.toString + "\n")
+  }
+
 }
 

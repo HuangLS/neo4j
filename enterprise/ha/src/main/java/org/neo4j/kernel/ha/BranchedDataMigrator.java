@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 
 import org.neo4j.io.fs.FileUtils;
+import org.neo4j.kernel.impl.util.StoreUtil;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
 public class BranchedDataMigrator extends LifecycleAdapter
@@ -42,7 +43,7 @@ public class BranchedDataMigrator extends LifecycleAdapter
 
     private void migrateBranchedDataDirectoriesToRootDirectory()
     {
-        File branchedDir = BranchedDataPolicy.getBranchedDataRootDirectory( storeDir );
+        File branchedDir = StoreUtil.getBranchedDataRootDirectory( storeDir );
         branchedDir.mkdirs();
         for ( File oldBranchedDir : storeDir.listFiles() )
         {
@@ -62,7 +63,7 @@ public class BranchedDataMigrator extends LifecycleAdapter
                 continue;
             }
 
-            File targetDir = BranchedDataPolicy.getBranchedDataDirectory( storeDir, timestamp );
+            File targetDir = StoreUtil.getBranchedDataDirectory( storeDir, timestamp );
             try
             {
                 FileUtils.moveFile( oldBranchedDir, targetDir );

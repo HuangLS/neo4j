@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -62,7 +62,7 @@ public enum NotificationCode
     JOIN_HINT_UNFULFILLABLE(
         SeverityLevel.WARNING,
         Status.Statement.JoinHintUnfulfillableWarning,
-        "The hinted hash join was not planned"
+        "The hinted join was not planned. This could happen because no generated plan contained the join key, please try using a different join key or restructure your query."
     ),
     JOIN_HINT_UNSUPPORTED(
         SeverityLevel.WARNING,
@@ -74,11 +74,55 @@ public enum NotificationCode
         Status.Statement.DeprecationWarning,
         "Using 'length' on anything that is not a path is deprecated, please use 'size' instead"
     ),
+    INDEX_LOOKUP_FOR_DYNAMIC_PROPERTY(
+        SeverityLevel.WARNING,
+        Status.Statement.DynamicPropertyWarning,
+        "Using a dynamic property makes it impossible to use an index lookup for this query"
+    ),
     BARE_NODE_SYNTAX_DEPRECATED(
         SeverityLevel.WARNING,
         Status.Statement.DeprecationWarning,
         "Use of bare node patterns has been deprecated. Please enclose the identifier in parenthesis."
-    ) ;
+    ),
+    EAGER_LOAD_CSV(
+        SeverityLevel.WARNING,
+        Status.Statement.EagerWarning,
+        "Using LOAD CSV with a large data set in a query where the execution plan contains the " +
+        "Eager operator could potentially consume a lot of memory and is likely to not perform well. " +
+        "See the Neo4j Manual entry on the Eager operator for more information and hints on " +
+        "how problems could be avoided."
+    ),
+    LARGE_LABEL_LOAD_CSV(
+        SeverityLevel.WARNING,
+        Status.Statement.IndexMissingWarning,
+        "Using LOAD CSV followed by a MATCH or MERGE that matches a non-indexed label will most likely " +
+        "not perform well on large data sets. Please consider using a schema index."
+        ),
+    MISSING_LABEL(
+            SeverityLevel.WARNING,
+            Status.Statement.LabelMissingWarning,
+            "One of the labels in your query is not available in the database, make sure you didn't " +
+            "misspell it or that the label is available when you run this statement in your application"
+    ),
+    MISSING_REL_TYPE(
+            SeverityLevel.WARNING,
+            Status.Statement.RelTypeMissingWarning,
+            "One of the relationship types in your query is not available in the database, make sure you didn't " +
+            "misspell it or that the label is available when you run this statement in your application"
+    ),
+    MISSING_PROPERTY_NAME(
+            SeverityLevel.WARNING,
+            Status.Statement.PropertyNameMissingWarning,
+            "One of the property names in your query is not available in the database, make sure you didn't " +
+            "misspell it or that the label is available when you run this statement in your application"
+    ),
+    UNBOUNDED_SHORTEST_PATH(
+            SeverityLevel.WARNING,
+            Status.Statement.UnboundedPatternWarning,
+            "Using shortest path with an unbounded pattern will likely result in long execution times. " +
+            "It is recommended to use an upper limit to the number of node hops in your pattern."
+    )
+    ;
 
     private final Status status;
     private final String description;
@@ -152,6 +196,14 @@ public enum NotificationCode
         public SeverityLevel getSeverity()
         {
             return severity;
+        }
+
+        @Override
+        public String toString() {
+            return "Notification{" +
+                    "position=" + position +
+                    ", detailedDescription='" + detailedDescription + '\'' +
+                    '}';
         }
     }
 }

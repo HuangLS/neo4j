@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.function;
 
 /**
  * Represents a supplier of long-valued results. This is the long-producing primitive specialization of {@link Supplier}.
+ * @deprecated Usages will be replaced by corresponding {@code java.util.function} interface and classes in 3.0.
  */
 public interface LongSupplier extends ThrowingLongSupplier<RuntimeException>, org.neo4j.function.primitive.LongSupplier
 {

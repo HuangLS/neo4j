@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.kernel.impl.store;
 
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -29,7 +30,6 @@ import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.PageCacheRule;
 import org.neo4j.test.TargetDirectory;
@@ -39,8 +39,8 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.pagecache_memory;
-import static org.neo4j.helpers.Settings.osIsWindows;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
+
 
 public class TestGrowingFileMemoryMapping
 {
@@ -50,7 +50,7 @@ public class TestGrowingFileMemoryMapping
     public void shouldGrowAFileWhileContinuingToMemoryMapNewRegions() throws Exception
     {
         // don't run on windows because memory mapping doesn't work properly there
-        assumeTrue( !osIsWindows() );
+        assumeTrue( !SystemUtils.IS_OS_WINDOWS );
 
         // given
         int NUMBER_OF_RECORDS = 1000000;
@@ -60,31 +60,12 @@ public class TestGrowingFileMemoryMapping
                 pagecache_memory.name(), mmapSize( NUMBER_OF_RECORDS, NodeStore.RECORD_SIZE ) ), NodeStore.Configuration.class );
         DefaultFileSystemAbstraction fileSystemAbstraction = new DefaultFileSystemAbstraction();
         DefaultIdGeneratorFactory idGeneratorFactory = new DefaultIdGeneratorFactory( fileSystemAbstraction );
-        Monitors monitors = new Monitors();
         PageCache pageCache = pageCacheRule.getPageCache( fileSystemAbstraction, config );
-        StoreFactory storeFactory = new StoreFactory(
-                storeDir,
-                config,
-                idGeneratorFactory,
-                pageCache,
-                fileSystemAbstraction,
-                NullLogProvider.getInstance(),
-                monitors );
+        StoreFactory storeFactory = new StoreFactory( storeDir, config, idGeneratorFactory, pageCache,
+                fileSystemAbstraction, NullLogProvider.getInstance() );
 
-        File fileName = new File( storeDir, NeoStore.DEFAULT_NAME + ".nodestore.db" );
-        storeFactory.createEmptyStore( fileName, storeFactory.buildTypeDescriptorAndVersion(
-                NodeStore.TYPE_DESCRIPTOR ) );
-
-        NodeStore nodeStore = new NodeStore(
-                fileName,
-                config,
-                idGeneratorFactory,
-                pageCache,
-                fileSystemAbstraction,
-                NullLogProvider.getInstance(),
-                null,
-                StoreVersionMismatchHandler.FORCE_CURRENT_VERSION,
-                monitors );
+        NeoStores neoStores = storeFactory.openAllNeoStores( true );
+        NodeStore nodeStore = neoStores.getNodeStore();
 
         // when
         int iterations = 2 * NUMBER_OF_RECORDS;
@@ -109,7 +90,7 @@ public class TestGrowingFileMemoryMapping
                     record.getNextRel(), is( (long) i ) );
         }
 
-        nodeStore.close();
+        neoStores.close();
     }
 
     private String mmapSize( int numberOfRecords, int recordSize )

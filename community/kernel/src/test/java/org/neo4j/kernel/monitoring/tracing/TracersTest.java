@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,8 @@ import org.junit.Test;
 
 import org.neo4j.io.pagecache.tracing.DefaultPageCacheTracer;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
+import org.neo4j.kernel.impl.api.DefaultTransactionTracer;
+import org.neo4j.kernel.impl.transaction.log.checkpoint.DefaultCheckPointerTracer;
 import org.neo4j.logging.AssertableLogProvider;
 import org.neo4j.kernel.impl.transaction.tracing.TransactionTracer;
 import org.neo4j.logging.Log;
@@ -98,7 +100,8 @@ public class TracersTest
     private void assertDefaultImplementation( Tracers tracers )
     {
         assertThat( tracers.pageCacheTracer, instanceOf( DefaultPageCacheTracer.class ) );
-        assertThat( tracers.transactionTracer, is( TransactionTracer.NULL ) );
+        assertThat( tracers.transactionTracer, instanceOf( DefaultTransactionTracer.class ) );
+        assertThat( tracers.checkPointTracer, instanceOf( DefaultCheckPointerTracer.class ) );
     }
 
     private void assertNoWarning()

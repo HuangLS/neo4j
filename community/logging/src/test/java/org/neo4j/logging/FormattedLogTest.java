@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,7 +27,6 @@ import java.util.Date;
 import java.util.IllegalFormatException;
 
 import org.neo4j.function.Suppliers;
-import org.neo4j.logging.FormattedLog.Level;
 
 import static java.lang.String.format;
 import static org.hamcrest.CoreMatchers.equalTo;

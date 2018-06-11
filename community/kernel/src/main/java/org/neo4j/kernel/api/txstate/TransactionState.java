@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,14 +21,18 @@ package org.neo4j.kernel.api.txstate;
 
 import java.util.Map;
 
-import org.neo4j.kernel.api.constraints.MandatoryNodePropertyConstraint;
-import org.neo4j.kernel.api.constraints.MandatoryRelationshipPropertyConstraint;
 import org.neo4j.kernel.api.constraints.NodePropertyConstraint;
+import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.RelationshipPropertyConstraint;
+import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.index.IndexDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureSignature;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
+import org.neo4j.kernel.api.properties.TemporalProperty;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 /**
  * Kernel transaction state, please see {@link org.neo4j.kernel.impl.api.state.TxState} for implementation details.
@@ -40,6 +44,21 @@ import org.neo4j.kernel.api.properties.Property;
  */
 public interface TransactionState extends ReadableTxState
 {
+    // write/mutate temporal property
+    void nodeDoSetTemporalProperty( TemporalPropertyWriteOperation op );
+    void relationshipDoSetTemporalProperty( TemporalPropertyWriteOperation op );
+
+//    void nodeDoCreateTemporalPropertyRecord( long nodeId, TemporalProperty temporalProperty );
+//    void nodeDoCreateTemporalPropertyInvalidRecord( long nodeId, TemporalProperty temporalProperty );
+//    void nodeDoDeleteTemporalPropertyRecord( long nodeId, TemporalProperty temporalProperty );
+//    void nodeDoDeleteTemporalProperty( long nodeId, int propertyKeyId );
+//    void relationshipDoCreateTemporalProperty( long relationshipId, TemporalProperty temporalProperty );
+//    void relationshipDoCreateTemporalPropertyInvalidRecord( long relationshipId, TemporalProperty temporalProperty );
+//    void relationshipDoDeleteTemporalPropertyRecord( long relationshipId, TemporalProperty temporalProperty);
+//    void relationshipDoDeleteTemporalProperty( long relationshipId, int propertyKeyId );
+
+
+
     // ENTITY RELATED
 
     void relationshipDoCreate( long id, int relationshipTypeId, long startNodeId, long endNodeId );
@@ -89,9 +108,9 @@ public interface TransactionState extends ReadableTxState
 
     void constraintDoAdd( UniquenessConstraint constraint, long indexId );
 
-    void constraintDoAdd( MandatoryNodePropertyConstraint constraint );
+    void constraintDoAdd( NodePropertyExistenceConstraint constraint );
 
-    void constraintDoAdd( MandatoryRelationshipPropertyConstraint constraint );
+    void constraintDoAdd( RelationshipPropertyExistenceConstraint constraint );
 
     void constraintDoDrop( NodePropertyConstraint constraint );
 
@@ -108,4 +127,8 @@ public interface TransactionState extends ReadableTxState
     // </Legacy index>
 
     void indexDoUpdateProperty( IndexDescriptor descriptor, long nodeId, DefinedProperty before, DefinedProperty after );
+
+    void procedureDoCreate( ProcedureSignature signature, String language, String code );
+
+    void procedureDoDrop( ProcedureDescriptor name );
 }

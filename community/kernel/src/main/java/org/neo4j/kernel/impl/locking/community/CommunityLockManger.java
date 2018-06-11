@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,10 +25,18 @@ import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 public class CommunityLockManger extends LifecycleAdapter implements Locks
 {
     private final LockManagerImpl manager = new LockManagerImpl( new RagManager() );
+    private volatile boolean closed;
 
     @Override
     public Client newClient()
     {
+        // We check this volatile closed flag here, which may seem like a contention overhead, but as the time
+        // of writing we apply pooling of transactions and in extension pooling of lock clients,
+        // so this method is called very rarely.
+        if ( closed )
+        {
+            throw new IllegalStateException( this + " already closed" );
+        }
         return new CommunityLockClient( manager );
     }
 
@@ -50,5 +58,11 @@ public class CommunityLockManger extends LifecycleAdapter implements Locks
                 return false;
             }
         } );
+    }
+
+    @Override
+    public void shutdown() throws Throwable
+    {
+        closed = true;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,14 +40,12 @@ import static org.neo4j.helpers.collection.MapUtil.stringMap;
  * If you want to change configuration for your
  * {@link WrappingNeoServerBootstrapper}, create an instance of this class, and
  * add configuration like so:
- * <p>
  * <pre>
  * {
  *     &#064;code ServerConfigurator conf = new ServerConfigurator( myDb );
  *     conf.setProperty( ServerSettings.webserver_port.name(), "8080" );
  * }
  * </pre>
- * <p>
  * See the neo4j manual for information about what configuration directives the
  * server takes, or take a look at the settings in {@link ServerSettings}.
  *

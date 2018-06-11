@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -34,6 +34,7 @@ public interface BranchSelector
      * {@link TraversalBranch#lastRelationship()} to how it got there, decisions
      * can be based on the current expansion source and the given rules.
      * 
+     * @param metadata the context for the traversal
      * @return the next position based on the current position and the
      * {@code rules} of the traversal.
      */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,20 +24,21 @@ import org.neo4j.helpers.Clock
 
 case class PlanFingerprint(creationTimeMillis: Long, txId: Long, snapshot: GraphStatisticsSnapshot)
 
-case class PlanFingerprintReference(clock: Clock, ttl: Long, statsDivergenceThreshold : Double,
-                                    var fingerprint: Option[PlanFingerprint])
-{
-  def isStale(lastTxId: () => Long, statistics: GraphStatistics): Boolean = {
-    fingerprint.fold(false) { f =>
-      lazy val currentTimeMillis = clock.currentTimeMillis()
-      lazy val currentTxId = lastTxId()
+class PlanFingerprintReference(clock: Clock, minimalTimeToLive: Long, statsDivergenceThreshold : Double,
+                               private var fingerprint: Option[PlanFingerprint]) {
 
-      check(f.creationTimeMillis + ttl <= currentTimeMillis, {}) &&
-      check(currentTxId != f.txId, { fingerprint = Some(f.copy(creationTimeMillis = currentTimeMillis)) }) &&
+  def isStale(lastCommittedTxId: () => Long, statistics: GraphStatistics): Boolean = {
+    fingerprint.fold(false) { f =>
+      val currentTimeMillis = clock.currentTimeMillis()
+      lazy val currentTxId = lastCommittedTxId()
+
+      f.creationTimeMillis + minimalTimeToLive <= currentTimeMillis &&
+      check(currentTxId != f.txId,
+        () => { fingerprint = Some(f.copy(creationTimeMillis = currentTimeMillis)) }) &&
       check(f.snapshot.diverges(f.snapshot.recompute(statistics), statsDivergenceThreshold),
-            { fingerprint = Some(f.copy(creationTimeMillis = currentTimeMillis, txId = currentTxId)) })
+        () => { fingerprint = Some(f.copy(creationTimeMillis = currentTimeMillis, txId = currentTxId)) })
     }
   }
 
-  private def check(test: => Boolean, ifFalse: => Unit ) = if (test) { true } else { ifFalse ; false }
+  private def check(test: => Boolean, ifFalse: () => Unit ) = if (test) { true } else { ifFalse ; false }
 }

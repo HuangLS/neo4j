@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -36,10 +36,10 @@ import org.neo4j.cluster.timeout.TimeoutStrategy;
  */
 public interface ProtocolServerFactory
 {
-    ProtocolServer newProtocolServer( InstanceId me, TimeoutStrategy timeouts, MessageSource input, MessageSender output,
+    ProtocolServer newProtocolServer( InstanceId me, int maxAcceptors, TimeoutStrategy timeouts, MessageSource input, MessageSender output,
                                       AcceptorInstanceStore acceptorInstanceStore,
                                       ElectionCredentialsProvider electionCredentialsProvider,
                                       Executor stateMachineExecutor,
                                       ObjectInputStreamFactory objectInputStreamFactory,
-                                      ObjectOutputStreamFactory objectOutputStreamFactory);
+                                      ObjectOutputStreamFactory objectOutputStreamFactory );
 }

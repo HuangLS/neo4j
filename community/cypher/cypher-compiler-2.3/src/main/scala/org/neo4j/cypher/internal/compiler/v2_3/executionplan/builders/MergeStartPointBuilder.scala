@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.{Equals, HasLabel}
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{PartiallySolvedQuery, PlanBuilder}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
@@ -30,8 +31,6 @@ import org.neo4j.cypher.internal.compiler.v2_3.mutation.MergeNodeAction
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.ExecutionPlanInProgress
 import org.neo4j.cypher.internal.compiler.v2_3.commands.SchemaIndex
 import org.neo4j.cypher.internal.compiler.v2_3.mutation.PlainMergeNodeProducer
-import org.neo4j.cypher.internal.compiler.v2_3.commands.HasLabel
-import org.neo4j.cypher.internal.compiler.v2_3.commands.Equals
 import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.PipeMonitor
 
@@ -80,7 +79,7 @@ class MergeStartPointBuilder extends PlanBuilder {
           case other                                             => other
         }
 
-        val nodeProducer = PlainMergeNodeProducer(entityProducerFactory.nodeStartItems((ctx, startItem.s)))
+        val nodeProducer = PlainMergeNodeProducer(entityProducerFactory.updateNodeStartItems((ctx, startItem.s)))
         val solvedPredicates = startItem.solvedPredicates
         val predicatesLeft = where.toSet -- solvedPredicates
 
@@ -93,15 +92,12 @@ class MergeStartPointBuilder extends PlanBuilder {
               Equals(Property(Identifier(identifier), key), props(key)),
               Equals(props(key), Property(Identifier(identifier), key))
             )
-            val hasLabelPredicates = labels.map {
-              HasLabel(Identifier(identifier), _)
-            }
-            val predicates = equalsPredicates ++ hasLabelPredicates
+            val predicates = equalsPredicates :+ HasLabel(Identifier(identifier), label)
             (label, key, RatedStartItem(SchemaIndex(identifier, label.name, key.name, UniqueIndex, Some(SingleQueryExpression(props(key)))), NodeFetchStrategy.IndexEquality, predicates))
         }
 
         val nodeProducer = UniqueMergeNodeProducers(startItems.map {
-          case (label: KeyToken, propertyKey: KeyToken, item: RatedStartItem) => IndexNodeProducer(label, propertyKey, entityProducerFactory.nodeStartItems((ctx, item.s)))
+          case (label: KeyToken, propertyKey: KeyToken, item: RatedStartItem) => IndexNodeProducer(label, propertyKey, entityProducerFactory.updateNodeStartItems((ctx, item.s)))
         })
         val solvedPredicates = startItems.flatMap {
           case (_, _, item: RatedStartItem) => item.solvedPredicates

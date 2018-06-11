@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,7 +33,6 @@ import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
 import org.neo4j.kernel.impl.storemigration.StoreMigrationParticipant;
-import org.neo4j.kernel.impl.storemigration.UpgradableDatabase;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
 import static org.neo4j.helpers.collection.IteratorUtil.addToCollection;
@@ -126,8 +125,7 @@ public abstract class SchemaIndexProvider extends LifecycleAdapter implements Co
                 }
 
                 @Override
-                public StoreMigrationParticipant storeMigrationParticipant( FileSystemAbstraction fs,
-                        PageCache pageCache, UpgradableDatabase upgradableDatabase )
+                public StoreMigrationParticipant storeMigrationParticipant( FileSystemAbstraction fs, PageCache pageCache )
                 {
                     return StoreMigrationParticipant.NOT_PARTICIPATING;
                 }
@@ -240,8 +238,7 @@ public abstract class SchemaIndexProvider extends LifecycleAdapter implements Co
         return new File( new File( new File( storeDir, "schema" ), "index" ), key );
     }
 
-    public abstract StoreMigrationParticipant storeMigrationParticipant( FileSystemAbstraction fs, PageCache pageCache,
-                                                                         UpgradableDatabase upgradableDatabase );
+    public abstract StoreMigrationParticipant storeMigrationParticipant( FileSystemAbstraction fs, PageCache pageCache );
 
     /**
      * Provides a snapshot of meta files about this index provider, not the indexes themselves.

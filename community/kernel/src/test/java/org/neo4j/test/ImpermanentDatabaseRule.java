@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,14 @@
  */
 package org.neo4j.test;
 
+import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Relationship;
+import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.logging.LogProvider;
+import org.neo4j.temporal.TemporalIndexManager;
 
 /**
  * JUnit @Rule for configuring, creating and managing an ImpermanentGraphDatabase instance.
@@ -68,5 +73,11 @@ public class ImpermanentDatabaseRule extends DatabaseRule
     private TestGraphDatabaseFactory maybeSetInternalLogProvider( TestGraphDatabaseFactory factory )
     {
         return ( internalLogProvider == null ) ? factory : factory.setInternalLogProvider( internalLogProvider );
+    }
+
+    @Override
+    public TemporalIndexManager temporalIndex()
+    {
+        throw new TGraphNoImplementationException();
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,11 +20,10 @@
 package org.neo4j.cypher.internal.compiler.v2_3.planner
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.plannerQuery.StatementConverters._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters.{normalizeReturnClauses, normalizeWithClauses}
-import org.neo4j.cypher.internal.compiler.v2_3.parser.CypherParser
-import org.neo4j.cypher.internal.compiler.v2_3.pipes.LazyLabel
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.{ExpanderStep, TraversalMatcher}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.{EntityProducer, LazyLabel}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.Metrics._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality.QueryGraphCardinalityModel
@@ -32,15 +31,20 @@ import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.greedy.{GreedyPla
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.rewriter.{LogicalPlanRewriter, unnestApply}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.steps.LogicalPlanProducer
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.{IndexDescriptor, UniquenessConstraint}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.{GraphStatistics, PlanContext}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.{CypherFunSuite, CypherTestSupport}
 import org.neo4j.cypher.internal.compiler.v2_3.tracing.rewriters.RewriterStepSequencer
+import org.neo4j.cypher.internal.frontend.v2_3._
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.parser.CypherParser
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.{CypherFunSuite, CypherTestSupport}
+import org.neo4j.graphdb.Node
 import org.neo4j.helpers.collection.Visitable
-import org.neo4j.kernel.api.constraints.{UniquenessConstraint, PropertyConstraint}
-import org.neo4j.kernel.api.index.IndexDescriptor
 import org.neo4j.kernel.impl.util.dbstructure.DbStructureVisitor
+import org.scalatest.matchers.{BeMatcher, MatchResult}
 
 import scala.language.reflectiveCalls
+import scala.reflect.ClassTag
 
 case class SemanticPlan(plan: LogicalPlan, semanticTable: SemanticTable)
 
@@ -88,7 +92,7 @@ trait LogicalPlanningTestSupport2 extends CypherTestSupport with AstConstruction
 
       def getUniqueIndexRule(labelName: String, propertyKey: String): Option[IndexDescriptor] =
         if (config.uniqueIndexes((labelName, propertyKey)))
-          Some(new IndexDescriptor(
+          Some(IndexDescriptor(
             semanticTable.resolvedLabelIds(labelName).id,
             semanticTable.resolvedPropertyKeyNames(propertyKey).id
           ))
@@ -97,7 +101,7 @@ trait LogicalPlanningTestSupport2 extends CypherTestSupport with AstConstruction
 
       def getUniquenessConstraint(labelName: String, propertyKey: String): Option[UniquenessConstraint] = {
         if (config.uniqueIndexes((labelName, propertyKey)))
-          Some(new UniquenessConstraint(
+          Some(UniquenessConstraint(
             semanticTable.resolvedLabelIds(labelName).id,
             semanticTable.resolvedPropertyKeyNames(propertyKey).id
           ))
@@ -107,12 +111,15 @@ trait LogicalPlanningTestSupport2 extends CypherTestSupport with AstConstruction
 
       def getIndexRule(labelName: String, propertyKey: String): Option[IndexDescriptor] =
         if (config.indexes((labelName, propertyKey)) || config.uniqueIndexes((labelName, propertyKey)))
-          Some(new IndexDescriptor(
+          Some(IndexDescriptor(
             semanticTable.resolvedLabelIds(labelName).id,
             semanticTable.resolvedPropertyKeyNames(propertyKey).id
           ))
         else
           None
+
+      def hasIndexRule(labelName: String): Boolean =
+        config.indexes.exists(_._1 == labelName) || config.uniqueIndexes.exists(_._1 == labelName)
 
       def getOptPropertyKeyId(propertyKeyName: String) =
         semanticTable.resolvedPropertyKeyNames.get(propertyKeyName).map(_.id)
@@ -142,15 +149,19 @@ trait LogicalPlanningTestSupport2 extends CypherTestSupport with AstConstruction
       def getLabelId(labelName: String): Int = ???
 
       def txIdProvider: () => Long = ???
+
+      override def monoDirectionalTraversalMatcher(steps: ExpanderStep, start: EntityProducer[Node]): TraversalMatcher = ???
+
+      override def bidirectionalTraversalMatcher(steps: ExpanderStep, start: EntityProducer[Node], end: EntityProducer[Node]): TraversalMatcher = ???
     }
 
     def planFor(queryString: String): SemanticPlan = {
       val parsedStatement = parser.parse(queryString)
       val mkException = new SyntaxExceptionCreator(queryString, Some(pos))
       val cleanedStatement: Statement = parsedStatement.endoRewrite(inSequence(normalizeReturnClauses(mkException), normalizeWithClauses(mkException)))
-      val semanticState = semanticChecker.check(queryString, cleanedStatement, devNullLogger, mkException)
+      val semanticState = semanticChecker.check(queryString, cleanedStatement, mkException)
       val (rewrittenStatement, _, postConditions) = astRewriter.rewrite(queryString, cleanedStatement, semanticState)
-      val postRewriteSemanticState = semanticChecker.check(queryString, rewrittenStatement, devNullLogger, mkException)
+      val postRewriteSemanticState = semanticChecker.check(queryString, rewrittenStatement, mkException)
       val semanticTable = SemanticTable(types = postRewriteSemanticState.typeTable)
       CostBasedExecutablePlanBuilder.rewriteStatement(rewrittenStatement, postRewriteSemanticState.scopeTree, semanticTable, rewriterSequencer, semanticChecker, postConditions, mock[AstRewritingMonitor]) match {
         case (ast: Query, newTable) =>
@@ -161,14 +172,14 @@ trait LogicalPlanningTestSupport2 extends CypherTestSupport with AstConstruction
           val context = LogicalPlanningContext(planContext, logicalPlanProducer, metrics, newTable, queryGraphSolver, QueryGraphSolverInput.empty)
           val plannerQuery = unionQuery.queries.head
           val resultPlan = planner.internalPlan(plannerQuery)(context)
-          SemanticPlan(resultPlan.endoRewrite(unnestApply), newTable)
+          SemanticPlan(resultPlan.endoRewrite(repeat(unnestApply)), newTable)
       }
     }
 
     def getLogicalPlanFor(queryString: String): (LogicalPlan, SemanticTable) = {
       val parsedStatement = parser.parse(queryString)
       val mkException = new SyntaxExceptionCreator(queryString, Some(pos))
-      val semanticState = semanticChecker.check(queryString, parsedStatement, devNullLogger, mkException)
+      val semanticState = semanticChecker.check(queryString, parsedStatement, mkException)
       val (rewrittenStatement, _, postConditions) = astRewriter.rewrite(queryString, parsedStatement, semanticState)
 
       val table = SemanticTable(types = semanticState.typeTable, recordedScopes = semanticState.recordedScopes)
@@ -222,9 +233,16 @@ trait LogicalPlanningTestSupport2 extends CypherTestSupport with AstConstruction
   implicit def propertyKeyId(label: String)(implicit plan: SemanticPlan): PropertyKeyId =
     plan.semanticTable.resolvedPropertyKeyNames(label)
 
-  implicit class RichPlan(plan: SemanticPlan) {
-    def innerPlan = plan.plan match {
-      case Projection(inner, _) => inner
+  def using[T <: LogicalPlan](implicit tag: ClassTag[T]): BeMatcher[SemanticPlan] = new BeMatcher[SemanticPlan] {
+    import Foldable._
+    override def apply(actual: SemanticPlan): MatchResult = {
+      val matches = actual.treeFold(false) {
+        case lp if tag.runtimeClass.isInstance(lp) => (acc, children) => true
+      }
+      MatchResult(
+        matches = matches,
+        rawFailureMessage = s"Plan should use ${tag.runtimeClass.getSimpleName}",
+        rawNegatedFailureMessage = s"Plan should not use ${tag.runtimeClass.getSimpleName}")
     }
   }
 }

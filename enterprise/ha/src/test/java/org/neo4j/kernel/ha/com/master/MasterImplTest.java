@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -61,7 +61,7 @@ import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -172,30 +172,53 @@ public class MasterImplTest
         final CountDownLatch latch = new CountDownLatch( 1 );
         try
         {
-            MasterImpl.SPI spi = mockedSpi();
-            DefaultConversationSPI conversationSpi = mockedConversationSpi();
-            when( spi.isAccessible() ).thenReturn( true );
-            Client client = mock( Client.class );
-            doAnswer( new Answer<Void>()
-            {
-                @Override
-                public Void answer( InvocationOnMock invocation ) throws Throwable
-                {
-                    latch.await();
-                    return null;
-                }
-            } ).when( client ).acquireExclusive( any( ResourceType.class ), anyLong() );
-            when( conversationSpi.acquireClient() ).thenReturn( client );
-            Config config = config( 20 );
-            ConversationManager conversationManager = new ConversationManager( conversationSpi, config );
-            final MasterImpl master = new MasterImpl( spi, conversationManager, mock( Monitor.class ), config );
-            master.start();
+            Client client = newWaitingLocksClient( latch );
+            final MasterImpl master = newMasterWithLocksClient( client );
             HandshakeResult handshake = master.handshake( 1, new StoreId() ).response();
 
             // WHEN
             final RequestContext context = new RequestContext( handshake.epoch(), 1, 2, 0, 0 );
             master.newLockSession( context );
-            Future<Void> acquireFuture = otherThread.execute( new WorkerCommand<Void, Void>()
+            Future<Void> acquireFuture = otherThread.execute( new WorkerCommand<Void,Void>()
+            {
+                @Override
+                public Void doWork( Void state ) throws Exception
+                {
+                    master.acquireExclusiveLock( context, ResourceTypes.NODE, 1L );
+                    return null;
+                }
+            } );
+            otherThread.get().waitUntilWaiting();
+            master.endLockSession( context, true );
+            verify( client, never() ).stop();
+            verify( client, never() ).close();
+            latch.countDown();
+            acquireFuture.get();
+
+            // THEN
+            verify( client ).close();
+        }
+        finally
+        {
+            latch.countDown();
+        }
+    }
+
+    @Test
+    public void shouldStopLockSessionOnFailureWhereThereIsAnActiveLockAcquisition() throws Throwable
+    {
+        // GIVEN
+        final CountDownLatch latch = new CountDownLatch( 1 );
+        try
+        {
+            Client client = newWaitingLocksClient( latch );
+            final MasterImpl master = newMasterWithLocksClient( client );
+            HandshakeResult handshake = master.handshake( 1, new StoreId() ).response();
+
+            // WHEN
+            final RequestContext context = new RequestContext( handshake.epoch(), 1, 2, 0, 0 );
+            master.newLockSession( context );
+            Future<Void> acquireFuture = otherThread.execute( new WorkerCommand<Void,Void>()
             {
                 @Override
                 public Void doWork( Void state ) throws Exception
@@ -206,17 +229,49 @@ public class MasterImplTest
             } );
             otherThread.get().waitUntilWaiting();
             master.endLockSession( context, false );
-            verify( client, times( 0 ) ).close();
+            verify( client ).stop();
+            verify( client, never() ).close();
             latch.countDown();
             acquireFuture.get();
 
             // THEN
-            verify( client, times( 1 ) ).close();
+            verify( client ).close();
         }
         finally
         {
             latch.countDown();
         }
+    }
+
+    private MasterImpl newMasterWithLocksClient( Client client ) throws Throwable
+    {
+        SPI spi = mockedSpi();
+        DefaultConversationSPI conversationSpi = mockedConversationSpi();
+        when( spi.isAccessible() ).thenReturn( true );
+        when( conversationSpi.acquireClient() ).thenReturn( client );
+        Config config = config( 20 );
+        ConversationManager conversationManager = new ConversationManager( conversationSpi, config );
+
+        MasterImpl master = new MasterImpl( spi, conversationManager, mock( Monitor.class ), config );
+        master.start();
+        return master;
+    }
+
+    private Client newWaitingLocksClient( final CountDownLatch latch )
+    {
+        Client client = mock( Client.class );
+
+        doAnswer( new Answer<Void>()
+        {
+            @Override
+            public Void answer( InvocationOnMock invocation ) throws Throwable
+            {
+                latch.await();
+                return null;
+            }
+        } ).when( client ).acquireExclusive( any( ResourceType.class ), anyLong() );
+
+        return client;
     }
 
     @Test
@@ -304,7 +359,7 @@ public class MasterImplTest
         // When
         master.newLockSession( requestContext );
         master.acquireSharedLock( requestContext, ResourceTypes.NODE, 1L );
-        conversationManager.remove( requestContext );
+        conversationManager.stop( requestContext );
         master.newLockSession( requestContext );
 
         //Then

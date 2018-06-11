@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,6 +26,7 @@ import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.function.Predicate;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
+import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 
 /**
  * Super class of diff sets where use of {@link PrimitiveLongIterator} can be parameterized
@@ -55,5 +56,6 @@ public interface SuperReadableDiffSets<T,LONGITERATOR extends PrimitiveLongItera
 
     SuperReadableDiffSets<T,LONGITERATOR> filterAdded( Predicate<T> addedFilter );
 
-    void accept( DiffSetsVisitor<T> visitor ) throws ConstraintValidationKernelException;
+    void accept( DiffSetsVisitor<T> visitor )
+            throws ConstraintValidationKernelException, CreateConstraintFailureException;
 }

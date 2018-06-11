@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,28 +21,49 @@ package org.neo4j.server.rrd.sampler;
 
 import org.rrd4j.DsType;
 
-import org.neo4j.kernel.impl.store.NeoStore;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
+import org.neo4j.kernel.AvailabilityGuard;
+import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
 import org.neo4j.server.rrd.Sampleable;
 
 public abstract class DatabasePrimitivesSampleableBase implements Sampleable
 {
-    private final NeoStoreSupplier neoStoreSupplier;
+    private final NeoStoresSupplier neoStore;
+    private final AvailabilityGuard guard;
+    private double lastReadValue = 0d;
 
-    public DatabasePrimitivesSampleableBase( NeoStoreSupplier neoStoreSupplier )
+    public DatabasePrimitivesSampleableBase( NeoStoresSupplier neoStore, AvailabilityGuard guard )
     {
-        if( neoStoreSupplier == null )
+        if ( neoStore == null )
         {
-            throw new RuntimeException( "Database sampler needs a NeoStore to work, was given null." );
+            throw new RuntimeException( "Database sampler needs a NeoStores to work, was given null." );
         }
-        this.neoStoreSupplier = neoStoreSupplier;
-
+        this.neoStore = neoStore;
+        this.guard = guard;
     }
 
-    protected NeoStore getNeoStore()
+    @Override
+    public double getValue()
     {
-        return neoStoreSupplier.get();
+        if ( guard.isAvailable( 0 ) )
+        {
+            try
+            {
+                lastReadValue = readValue( neoStore.get() );
+            }
+            catch ( Exception e )
+            {
+                /*
+                 * oh well, this is unfortunate, perhaps the db went down after the check, so let's ignore this problem
+                 * and return the old value, we'll sample again when the db is online again
+                 */
+            }
+        }
+
+        return lastReadValue;
     }
+
+    protected abstract double readValue( NeoStores neoStore );
 
     @Override
     public DsType getType()

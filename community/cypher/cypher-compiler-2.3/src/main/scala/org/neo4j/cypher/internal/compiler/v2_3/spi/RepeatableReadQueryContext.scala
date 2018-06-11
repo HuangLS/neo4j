@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,9 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.spi
 
-import org.neo4j.graphdb.{PropertyContainer, Relationship, Direction, Node}
-import org.neo4j.kernel.api.index.IndexDescriptor
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
 
 
 trait Locker {
@@ -36,12 +37,12 @@ final class RepeatableReadQueryContext(inner: QueryContext, locker: Locker) exte
     inner.getLabelsForNode(node)
   }
 
-  override def nodeGetDegree(node: Long, dir: Direction): Int = {
+  override def nodeGetDegree(node: Long, dir: SemanticDirection): Int = {
     lockNode(node)
     inner.nodeGetDegree(node, dir)
   }
 
-  override def nodeGetDegree(node: Long, dir: Direction, relTypeId: Int): Int = {
+  override def nodeGetDegree(node: Long, dir: SemanticDirection, relTypeId: Int): Int = {
     lockNode(node)
     inner.nodeGetDegree(node, dir, relTypeId)
   }

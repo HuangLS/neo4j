@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,13 +20,37 @@
 package org.neo4j.internal.cypher.acceptance
 
 import org.neo4j.cypher._
-import org.neo4j.graphdb.{Node, Path, Relationship}
+import org.neo4j.graphdb.{Direction, Node, Path, Relationship}
 
 import scala.collection.JavaConverters._
 
 class CreateUniqueAcceptanceTest extends ExecutionEngineFunSuite with QueryStatisticsTestSupport {
 
   val stats = QueryStatistics()
+
+  test("should create unique relations in reverse direction when path variable is not specified") {
+    val a = createLabeledNode("A")
+    val b = createLabeledNode("B")
+    val rel = executeScalar[Relationship]("MATCH (a:A), (b:B) CREATE UNIQUE (a)<-[r:X]-(b) RETURN r")
+    graph.inTx {
+      a.getRelationships(Direction.OUTGOING).iterator().hasNext should equal(false)
+      b.getRelationships(Direction.OUTGOING).iterator().hasNext should equal(true)
+      rel.getEndNode should be(a)
+      rel.getStartNode should be(b)
+    }
+  }
+
+  test("should create unique relations in reverse direction even when path variable is specified") {
+    val a = createLabeledNode("A")
+    val b = createLabeledNode("B")
+    val rel = executeScalar[Relationship]("MATCH (a:A), (b:B) CREATE UNIQUE p = (a)<-[r:X]-(b) RETURN r")
+    graph.inTx {
+      a.getRelationships(Direction.OUTGOING).iterator().hasNext should equal(false)
+      b.getRelationships(Direction.OUTGOING).iterator().hasNext should equal(true)
+      rel.getEndNode should be(a)
+      rel.getStartNode should be(b)
+    }
+  }
 
   test("create unique accepts undirected relationship") {
     createNode("id" -> 1)
@@ -36,6 +60,28 @@ class CreateUniqueAcceptanceTest extends ExecutionEngineFunSuite with QueryStati
     graph.inTx {
       rel.getStartNode.getProperty("id") should equal(1)
       rel.getEndNode.getProperty("id") should equal(2)
+    }
+  }
+
+  test("create unique accepts undirected relationship with second node needing to be created") {
+    createNode("existing" -> true)
+
+    val rel = executeScalar[Relationship]("MATCH (a {existing: true}) CREATE UNIQUE (a)-[r:X]-(b) RETURN r")
+    graph.inTx {
+      // De-facto behavior in Rule planner was to create relationships from new node to existing node
+      rel.getStartNode.hasProperty("existing") should equal(false)
+      rel.getEndNode.hasProperty("existing") should equal(true)
+    }
+  }
+
+  test("create unique accepts undirected relationship with first node needing to be created") {
+    createNode("existing" -> true)
+
+    val rel = executeScalar[Relationship]("MATCH (b {existing: true}) CREATE UNIQUE (a)-[r:X]-(b) RETURN r")
+    graph.inTx {
+      // De-facto behavior in Rule planner was to create relationships from new node to existing node
+      rel.getStartNode.hasProperty("existing") should equal(false)
+      rel.getEndNode.hasProperty("existing") should equal(true)
     }
   }
 

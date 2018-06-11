@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.greedy
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.UsingJoinHint
+import org.neo4j.cypher.internal.frontend.v2_3.ast.UsingJoinHint
 import org.neo4j.cypher.internal.compiler.v2_3.planner.QueryGraph
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, LogicalPlan}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{CandidateGenerator, LogicalPlanningContext}
@@ -27,6 +27,9 @@ import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{CandidateGenerat
 import scala.collection.mutable.ArrayBuffer
 
 object join extends CandidateGenerator[GreedyPlanTable] {
+
+  import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.LogicalPlanningSupport._
+
   def apply(planTable: GreedyPlanTable, queryGraph: QueryGraph)(implicit context: LogicalPlanningContext): Seq[LogicalPlan] = {
 
     def isApplicable(id: IdName): Boolean =  queryGraph.patternNodes(id) && !queryGraph.argumentIds(id)
@@ -42,7 +45,7 @@ object join extends CandidateGenerator[GreedyPlanTable] {
         if (shared.nonEmpty && shared.forall(isApplicable)) {
 
           val hints = queryGraph.hints.collect {
-            case hint@UsingJoinHint(identifier) if shared contains IdName(identifier.name) => hint
+            case hint: UsingJoinHint if hint.coveredBy(shared) => hint
           }
 
           joinPlans += context.logicalPlanProducer.planNodeHashJoin(shared, left, right, hints)

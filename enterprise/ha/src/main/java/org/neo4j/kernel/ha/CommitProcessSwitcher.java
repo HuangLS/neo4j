@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,15 +19,14 @@
  */
 package org.neo4j.kernel.ha;
 
-import java.net.URI;
-
 import org.neo4j.kernel.ha.cluster.AbstractModeSwitcher;
-import org.neo4j.kernel.ha.cluster.HighAvailabilityMemberStateMachine;
+import org.neo4j.kernel.ha.cluster.ModeSwitcherNotifier;
 import org.neo4j.kernel.ha.com.RequestContextFactory;
 import org.neo4j.kernel.ha.com.master.Master;
 import org.neo4j.kernel.ha.transaction.TransactionPropagator;
 import org.neo4j.kernel.impl.api.TransactionCommitProcess;
 import org.neo4j.kernel.impl.transaction.state.NeoStoreInjectedTransactionValidator;
+import org.neo4j.kernel.lifecycle.LifeSupport;
 
 public class CommitProcessSwitcher extends AbstractModeSwitcher<TransactionCommitProcess>
 {
@@ -38,23 +37,23 @@ public class CommitProcessSwitcher extends AbstractModeSwitcher<TransactionCommi
                                   Master master,
                                   DelegateInvocationHandler<TransactionCommitProcess> delegate,
                                   RequestContextFactory requestContextFactory,
-                                  HighAvailabilityMemberStateMachine memberStateMachine,
+                                  ModeSwitcherNotifier modeSwitcherNotifier,
                                   NeoStoreInjectedTransactionValidator validator,
                                   TransactionCommitProcess innerCommitProcess )
     {
-        super( memberStateMachine, delegate );
+        super( modeSwitcherNotifier, delegate );
         this.masterImpl = new MasterTransactionCommitProcess( innerCommitProcess, pusher, validator );
         this.slaveImpl = new SlaveTransactionCommitProcess( master, requestContextFactory );
     }
 
     @Override
-    protected TransactionCommitProcess getSlaveImpl( URI serverHaUri )
+    protected TransactionCommitProcess getSlaveImpl( LifeSupport life )
     {
         return slaveImpl;
     }
 
     @Override
-    protected TransactionCommitProcess getMasterImpl()
+    protected TransactionCommitProcess getMasterImpl( LifeSupport life )
     {
         return masterImpl;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -26,13 +26,13 @@ import org.neo4j.graphdb.GraphDatabaseService;
 
 /**
  *  Interface to be implemented and exposed via the Java ServiceLocator mechanism that allows
- *  plugins to provide their own initialization.<br/>
+ *  plugins to provide their own initialization.<br>
  *  The implementations of this interface have to be listed in a file
  *  META-INF/services/org.neo4j.server.plugins.PluginLifecycle
  *  that contains the fully qualified class names of the individual plugin. This file
- *  has to be supplied with the plugin jar to the Neo4j server.<br/>
+ *  has to be supplied with the plugin jar to the Neo4j server.<br>
  *  The plugin might return a collection of {@link Injectable}s that can later be used with
- *  @Context injections.
+ *  {@literal @Context} injections.
  */
 public interface PluginLifecycle
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -71,12 +71,12 @@ public class InputNodeCacher extends InputEntityCacher<InputNode>
 
     protected void writeDiff( byte mode, String[] compare, String[] with ) throws IOException
     {
-        for ( int i = 0; i < compare.length; i++ )
+        for ( String value : compare )
         {
-            if ( !contains( with, compare[i] ) )
+            if ( !contains( with, value ) )
             {
                 channel.put( mode );
-                writeToken( compare[i] );
+                writeToken( value );
             }
         }
     }

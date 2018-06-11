@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,7 @@ package org.neo4j.kernel.ha.shell;
 
 import java.rmi.RemoteException;
 
-import org.neo4j.kernel.ha.UpdatePullerClient;
+import org.neo4j.kernel.ha.UpdatePuller;
 import org.neo4j.shell.AppCommandParser;
 import org.neo4j.shell.Continuation;
 import org.neo4j.shell.Output;
@@ -37,7 +37,7 @@ public class Pullupdates extends NonTransactionProvidingApp
     {
         try
         {
-            getServer().getDb().getDependencyResolver().resolveDependency( UpdatePullerClient.class ).pullUpdates();
+            getServer().getDb().getDependencyResolver().resolveDependency( UpdatePuller.class ).pullUpdates();
         }
         catch ( IllegalArgumentException e )
         {

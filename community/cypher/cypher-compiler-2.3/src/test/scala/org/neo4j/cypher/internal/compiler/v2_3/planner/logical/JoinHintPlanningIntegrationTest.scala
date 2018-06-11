@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,19 +25,20 @@ import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.greedy.{GreedyQue
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.idp.{IDPQueryGraphSolver, IDPQueryGraphSolverMonitor}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, LogicalPlan, NodeHashJoin}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{LogicalPlanningTestSupport2, PlannerQuery}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.Direction
-import org.neo4j.graphdb.Direction._
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection.{OUTGOING, INCOMING, BOTH}
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.PropertyChecks
+import org.neo4j.cypher.internal.frontend.v2_3.Foldable.FoldableAny
 
 import scala.util.Random
 
 class JoinHintPlanningIntegrationTest extends CypherFunSuite with PropertyChecks with LogicalPlanningTestSupport2 {
 
   val MinPatternLength = 2
-  val MaxPatternLength = 10
+  val MaxPatternLength = 8
   val NumberOfTestRuns = 100
   val MaxDiscardedInputs = 500
 
@@ -115,7 +116,6 @@ class JoinHintPlanningIntegrationTest extends CypherFunSuite with PropertyChecks
   }
 
   def joinSymbolsIn(plan: LogicalPlan) = {
-    import org.neo4j.cypher.internal.compiler.v2_3.Foldable.FoldableAny
     val flattenedPlan = plan.treeFold(Seq.empty[LogicalPlan]) {
       case plan: LogicalPlan => (acc, r) => r(acc :+ plan)
     }
@@ -188,39 +188,39 @@ class JoinHintPlanningIntegrationTest extends CypherFunSuite with PropertyChecks
     val string = s"($name:$label)"
   }
 
-  case class EmptyRelationship(direction: Direction) extends Relationship {
+  case class EmptyRelationship(direction: SemanticDirection) extends Relationship {
     val string = formatRelationship("", direction)
   }
 
-  case class EmptyRelationshipWithLength(length: String, direction: Direction) extends Relationship {
+  case class EmptyRelationshipWithLength(length: String, direction: SemanticDirection) extends Relationship {
     val string = formatRelationship(s"[$length]", direction)
   }
 
-  case class NamedRelationship(name: String, direction: Direction) extends Relationship {
+  case class NamedRelationship(name: String, direction: SemanticDirection) extends Relationship {
     val string = formatRelationship(s"[$name]", direction)
   }
 
-  case class NamedRelationshipWithLength(name: String, length: String, direction: Direction) extends Relationship {
+  case class NamedRelationshipWithLength(name: String, length: String, direction: SemanticDirection) extends Relationship {
     val string = formatRelationship(s"[$name $length]", direction)
   }
 
-  case class TypedRelationship(relType: String, direction: Direction) extends Relationship {
+  case class TypedRelationship(relType: String, direction: SemanticDirection) extends Relationship {
     val string = formatRelationship(s"[:$relType]", direction)
   }
 
-  case class TypedRelationshipWithLength(relType: String, length: String, direction: Direction) extends Relationship {
+  case class TypedRelationshipWithLength(relType: String, length: String, direction: SemanticDirection) extends Relationship {
     val string = formatRelationship(s"[:$relType $length]", direction)
   }
 
-  case class NamedTypedRelationship(name: String, relType: String, direction: Direction) extends Relationship {
+  case class NamedTypedRelationship(name: String, relType: String, direction: SemanticDirection) extends Relationship {
     val string = formatRelationship(s"[$name:$relType]", direction)
   }
 
-  case class NamedTypedRelationshipWithLength(name: String, relType: String, length: String, direction: Direction) extends Relationship {
+  case class NamedTypedRelationshipWithLength(name: String, relType: String, length: String, direction: SemanticDirection) extends Relationship {
     val string = formatRelationship(s"[$name:$relType $length]", direction)
   }
 
-  def formatRelationship(definition: String, direction: Direction) = direction match {
+  def formatRelationship(definition: String, direction: SemanticDirection) = direction match {
     case BOTH => s"-$definition-"
     case INCOMING => s"<-$definition-"
     case OUTGOING => s"-$definition->"

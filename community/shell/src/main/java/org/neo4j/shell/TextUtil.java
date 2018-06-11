@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -170,9 +170,9 @@ public class TextUtil
     /**
      * Tokenizes a string, regarding quotes. Examples:
      * 
-     * o '"One two"'              ==> [ "One two" ]
-     * o 'One two'                ==> [ "One", "two" ]
-     * o 'One "two three" four'   ==> [ "One", "two three", "four" ]
+     * o '"One two"'              ==&gt; [ "One two" ]
+     * o 'One two'                ==&gt; [ "One", "two" ]
+     * o 'One "two three" four'   ==&gt; [ "One", "two three", "four" ]
      *
      * @param string the string to tokenize.
      * @param trim  whether or not to trim each token.

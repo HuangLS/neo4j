@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,13 +20,14 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands.{QueryExpression, RangeQueryExpression}
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
 import org.neo4j.graphdb.Node
-import org.neo4j.kernel.api.index.IndexDescriptor
 
-case class IndexSeekModeFactory(unique: Boolean) {
+case class IndexSeekModeFactory(unique: Boolean, readOnly: Boolean) {
   def fromQueryExpression[T](qexpr: QueryExpression[T]) = qexpr match {
     case _: RangeQueryExpression[_] if unique => UniqueIndexSeekByRange
     case _: RangeQueryExpression[_] => IndexSeekByRange
+    case _ if unique && !readOnly => LockingUniqueIndexSeek
     case _ if unique => UniqueIndexSeek
     case _ => IndexSeek
   }
@@ -34,37 +35,42 @@ case class IndexSeekModeFactory(unique: Boolean) {
 
 sealed trait IndexSeekMode {
   def indexFactory(descriptor: IndexDescriptor): (QueryState) => (Any) => Iterator[Node]
+
   def name: String
 }
 
-case object IndexSeek extends IndexSeekMode {
-
+sealed trait ExactSeek {
+  self: IndexSeekMode =>
   override def indexFactory(descriptor: IndexDescriptor): (QueryState) => (Any) => Iterator[Node] =
     (state: QueryState) => (x: Any) => state.query.indexSeek(descriptor, x)
+}
 
+case object IndexSeek extends IndexSeekMode with ExactSeek {
   override def name: String = "NodeIndexSeek"
 }
 
-case object UniqueIndexSeek extends IndexSeekMode {
+case object UniqueIndexSeek extends IndexSeekMode with ExactSeek {
+  override def name: String = "NodeUniqueIndexSeek"
+}
+
+case object LockingUniqueIndexSeek extends IndexSeekMode {
 
   override def indexFactory(descriptor: IndexDescriptor): (QueryState) => (Any) => Iterator[Node] =
-    (state: QueryState) => (x: Any) => state.query.uniqueIndexSeek(descriptor, x).toIterator
+    (state: QueryState) => (x: Any) => state.query.lockingExactUniqueIndexSearch(descriptor, x).toIterator
 
   override def name: String = "NodeUniqueIndexSeek"
 }
 
-case object IndexSeekByRange extends IndexSeekMode {
-
+sealed trait SeekByRange {
+  self: IndexSeekMode =>
   override def indexFactory(descriptor: IndexDescriptor): (QueryState) => (Any) => Iterator[Node] =
     (state: QueryState) => (x: Any) => state.query.indexSeekByRange(descriptor, x)
+}
 
+case object IndexSeekByRange extends IndexSeekMode with SeekByRange {
   override def name: String = "NodeIndexSeekByRange"
 }
 
-case object UniqueIndexSeekByRange extends IndexSeekMode {
-
-  override def indexFactory(descriptor: IndexDescriptor): (QueryState) => (Any) => Iterator[Node] =
-    (state: QueryState) => (x: Any) => state.query.indexSeekByRange(descriptor, x)
-
+case object UniqueIndexSeekByRange extends IndexSeekMode with SeekByRange {
   override def name: String = "NodeUniqueIndexSeekByRange"
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -113,6 +113,26 @@ final class BigEndianByteArrayBuffer implements ReadableBuffer, WritableBuffer
         for ( byte b : buffer )
         {
             if ( b != 0 )
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean minusOneAtTheEnd()
+    {
+        for ( int i = 0; i < buffer.length / 2; i++ )
+        {
+            if ( buffer[i] != 0 )
+            {
+                return false;
+            }
+        }
+
+        for ( int i = buffer.length / 2; i < buffer.length; i++)
+        {
+            if ( buffer[i] != -1 )
             {
                 return false;
             }
@@ -240,11 +260,11 @@ final class BigEndianByteArrayBuffer implements ReadableBuffer, WritableBuffer
         return this;
     }
 
-    public void putIntegerAtEnd( long value ) throws IOException
+    void putIntegerAtEnd( long value ) throws IOException
     {
-        if ( value < 0 )
+        if ( value < -1 )
         {
-            throw new IllegalArgumentException( "Negative values not supported." );
+            throw new IllegalArgumentException( "Negative values different form -1 are not supported." );
         }
         if ( this.size() < 8 )
         {
@@ -261,7 +281,7 @@ final class BigEndianByteArrayBuffer implements ReadableBuffer, WritableBuffer
         }
     }
 
-    public long getIntegerFromEnd()
+    long getIntegerFromEnd()
     {
         long value = 0;
         for ( int i = Math.max( 0, buffer.length - 8 ); i < buffer.length; i++ )

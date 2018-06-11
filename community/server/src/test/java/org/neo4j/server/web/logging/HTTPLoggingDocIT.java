@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.server.web.logging;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -49,7 +50,7 @@ import org.neo4j.test.server.HTTP;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
-import static org.neo4j.helpers.Settings.osIsWindows;
+import static org.junit.Assume.assumeThat;
 import static org.neo4j.io.fs.FileUtils.readTextFile;
 import static org.neo4j.test.Assert.assertEventually;
 import static org.neo4j.test.server.HTTP.RawPayload.rawPayload;
@@ -85,7 +86,7 @@ public class HTTPLoggingDocIT extends ExclusiveServerTestBase
             FunctionalTestHelper functionalTestHelper = new FunctionalTestHelper( server );
 
             // when
-            String query = "?implicitlyDisabled" + UUID.randomUUID().toString();
+            String query = "?implicitlyDisabled" + randomString();
             JaxRsResponse response = new RestRequest().get( functionalTestHelper.webAdminUri() + query );
             assertThat( response.getStatus(), is( 200 ) );
             response.close();
@@ -114,7 +115,7 @@ public class HTTPLoggingDocIT extends ExclusiveServerTestBase
         final File configFile = HTTPLoggingPreparednessRuleTest.createConfigFile(
                 HTTPLoggingPreparednessRuleTest.createLogbackConfigXml( logDirectory ), confDir );
 
-        final String query = "?explicitlyEnabled=" + UUID.randomUUID().toString();
+        final String query = "?explicitlyEnabled=" + randomString();
 
         NeoServer server = CommunityServerBuilder.server().withDefaultDatabaseTuning()
                 .withProperty( Configurator.HTTP_LOGGING, "true" )
@@ -197,7 +198,6 @@ public class HTTPLoggingDocIT extends ExclusiveServerTestBase
                 Configurator.HTTP_LOGGING, "true",
                 Configurator.HTTP_LOG_CONFIG_LOCATION, configFile.getPath() ) );
 
-
         // expect
         exception.expect( InvalidSettingException.class );
 
@@ -228,17 +228,26 @@ public class HTTPLoggingDocIT extends ExclusiveServerTestBase
     private File createUnwritableDirectory()
     {
         File file;
-        if ( osIsWindows() )
+        if ( SystemUtils.IS_OS_WINDOWS )
         {
-            file = new File( "\\\\" + UUID.randomUUID().toString() + "\\http.log" );
+            file = new File( "\\\\" + randomString() + "\\http.log" );
         }
         else
         {
-            file = testDirectory.file( "unwritable-" + System.currentTimeMillis() );
+            file = testDirectory.file( "unwritable-" + randomString() );
             assertThat( "create directory to be unwritable", file.mkdirs(), is( true ) );
-            assertThat( "mark directory as unwritable", file.setWritable( false, false ), is( true ) );
+
+            // Assume that we can change the file permissions, and that permissions are respected.
+            // If these checks fail, then we cannot use the current file system for this test, so we bail.
+            assumeThat( "mark directory as unwritable", file.setWritable( false, false ), is( true ) );
+            assumeThat( "directory permissions are respected", file.canWrite(), is( false ) );
         }
 
         return file;
+    }
+
+    private String randomString()
+    {
+        return UUID.randomUUID().toString();
     }
 }

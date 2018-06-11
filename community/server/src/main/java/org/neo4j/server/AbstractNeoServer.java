@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.server;
 
 import org.apache.commons.configuration.Configuration;
+import org.bouncycastle.operator.OperatorCreationException;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +29,7 @@ import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.regex.Pattern;
 import javax.servlet.Filter;
 
 import org.neo4j.function.Function;
@@ -94,6 +96,7 @@ import static org.neo4j.kernel.impl.util.JobScheduler.Groups.serverTransactionTi
 import static org.neo4j.server.configuration.ServerSettings.http_log_config_file;
 import static org.neo4j.server.configuration.ServerSettings.http_logging_enabled;
 import static org.neo4j.server.database.InjectableProvider.providerForSingleton;
+import static org.neo4j.server.exception.ServerStartupErrors.translateToServerStartupError;
 
 /**
  * @deprecated This class is for internal use only and will be moved to an internal package in a future release.
@@ -110,6 +113,14 @@ public abstract class AbstractNeoServer implements NeoServer
      */
     private static final long ROUNDING_SECOND = 1000L;
 
+    private static final Pattern[] DEFAULT_URI_WHITELIST = new Pattern[]{
+            Pattern.compile( "/browser.*" ),
+            Pattern.compile( "/webadmin.*" ),
+            Pattern.compile( "/" )
+    };
+
+    private final Database.Factory dbFactory;
+    private final GraphDatabaseFacadeFactory.Dependencies dependencies;
     protected final LogProvider logProvider;
     protected final Log log;
 
@@ -133,6 +144,8 @@ public abstract class AbstractNeoServer implements NeoServer
     private TransactionFacade transactionFacade;
     private TransactionHandleRegistry transactionRegistry;
 
+    private boolean initialized = false;
+
     protected abstract Iterable<ServerModule> createServerModules();
 
     protected abstract WebServer createWebServer();
@@ -141,8 +154,19 @@ public abstract class AbstractNeoServer implements NeoServer
             GraphDatabaseFacadeFactory.Dependencies dependencies, LogProvider logProvider )
     {
         this.config = config;
+        this.dbFactory = dbFactory;
+        this.dependencies = dependencies;
         this.logProvider = logProvider;
         this.log = logProvider.getLog( getClass() );
+    }
+
+    @Override
+    public void init()
+    {
+        if ( initialized )
+        {
+            return;
+        }
 
         this.database = life.add( dependencyResolver.satisfyDependency(dbFactory.newDatabase( config, dependencies)) );
 
@@ -151,27 +175,25 @@ public abstract class AbstractNeoServer implements NeoServer
         this.authManager = life.add(new AuthManager( users, Clock.SYSTEM_CLOCK, config.get( ServerSettings.auth_enabled ) ));
         this.webServer = createWebServer();
 
+
         this.keyStoreInfo = createKeyStore();
 
         for ( ServerModule moduleClass : createServerModules() )
         {
             registerModule( moduleClass );
         }
-    }
 
-    @Override
-    public void init()
-    {
-
+        this.initialized = true;
     }
 
     @Override
     public void start() throws ServerStartupException
     {
+        init();
         try
         {
             life.start();
-            
+
             DiagnosticsManager diagnosticsManager = resolveDependency(DiagnosticsManager.class);
 
             Log diagnosticsLog = diagnosticsManager.getTargetLog();
@@ -179,7 +201,8 @@ public abstract class AbstractNeoServer implements NeoServer
 
             databaseActions = createDatabaseActions();
 
-            if(getConfig().get( ServerInternalSettings.webadmin_enabled ))
+            if( getConfig().get( ServerInternalSettings.webadmin_enabled ) &&
+                getConfig().get( ServerInternalSettings.rrdb_enabled ) )
             {
                 // TODO: RrdDb is not needed once we remove the old webadmin
                 rrdDbScheduler = new RoundRobinJobScheduler( logProvider );
@@ -209,7 +232,7 @@ public abstract class AbstractNeoServer implements NeoServer
             // If the database has been started, attempt to cleanly shut it down to avoid unclean shutdowns.
             life.shutdown();
 
-            throw new ServerStartupException( format( "Starting Neo4j Server failed: %s", t.getMessage() ), t );
+            throw translateToServerStartupError( t );
         }
     }
 
@@ -344,7 +367,7 @@ public abstract class AbstractNeoServer implements NeoServer
         }
     }
 
-    private void startWebServer()
+    private void startWebServer() throws Exception
     {
         try
         {
@@ -356,7 +379,7 @@ public abstract class AbstractNeoServer implements NeoServer
 
             log.info( "Remote interface ready and available at %s", baseUri() );
         }
-        catch ( RuntimeException e )
+        catch ( Exception e )
         {
             //noinspection deprecation
             log.error( "Failed to start Neo Server on port %d: %s",
@@ -430,6 +453,11 @@ public abstract class AbstractNeoServer implements NeoServer
         return config.get( ServerSettings.webserver_address );
     }
 
+    protected Pattern[] getUriWhitelist()
+    {
+        return DEFAULT_URI_WHITELIST;
+    }
+
     protected KeyStoreInformation createKeyStore()
     {
         File privateKeyPath = config.get( ServerSettings.tls_key_file ).getAbsoluteFile();
@@ -464,7 +492,7 @@ public abstract class AbstractNeoServer implements NeoServer
         {
             throw new ServerStartupException( "TLS certificate error occurred, unable to start server: " + e.getMessage(), e );
         }
-        catch( IOException e )
+        catch( IOException | OperatorCreationException e )
         {
             throw new ServerStartupException( "IO problem while loading or creating TLS certificates: " + e.getMessage(), e );
         }
@@ -597,7 +625,8 @@ public abstract class AbstractNeoServer implements NeoServer
         singletons.add( providerForSingleton( new ConfigWrappingConfiguration( getConfig() ), Configuration.class ) );
         singletons.add( providerForSingleton( getConfig(), Config.class ) );
 
-        if(getConfig().get( ServerInternalSettings.webadmin_enabled ))
+        if (  getConfig().get( ServerInternalSettings.webadmin_enabled ) &&
+              getConfig().get( ServerInternalSettings.rrdb_enabled ) )
         {
             singletons.add( new RrdDbProvider( rrdDbWrapper ) );
         }

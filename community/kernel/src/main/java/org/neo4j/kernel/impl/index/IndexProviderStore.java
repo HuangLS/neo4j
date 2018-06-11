@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,7 @@ import org.neo4j.io.fs.StoreChannel;
 import org.neo4j.kernel.impl.store.NotCurrentStoreVersionException;
 import org.neo4j.kernel.impl.storemigration.UpgradeNotAllowedByConfigurationException;
 
-import static org.neo4j.kernel.impl.store.NeoStore.versionLongToString;
+import static org.neo4j.kernel.impl.store.MetaDataStore.versionLongToString;
 
 public class IndexProviderStore
 {

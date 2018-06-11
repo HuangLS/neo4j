@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -88,7 +88,7 @@ public class NetworkSenderReceiverTest
 
         // then
 
-        latch.await( 5, TimeUnit.SECONDS );
+        assertTrue( latch.await( 5, TimeUnit.SECONDS ) );
 
         assertTrue( "server1 should have processed the message", server1.processedMessage() );
         assertTrue( "server2 should have processed the message", server2.processedMessage() );
@@ -244,8 +244,6 @@ public class NetworkSenderReceiverTest
             sender.process( Message.to( TestMessage.helloWorld, URI.create( "cluster://127.0.0.1:1235" ),
                     "Hello World" ) );
 
-            sem.acquire(); // wait for the listeningAt trigger on receive (same as the previous but with real URI
-            // this time)
             sem.acquire(); // wait for process from the MessageProcessor
 
             receiver.stop();

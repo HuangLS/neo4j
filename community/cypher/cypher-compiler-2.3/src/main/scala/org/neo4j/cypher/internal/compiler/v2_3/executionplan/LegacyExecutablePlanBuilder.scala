@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,14 +22,16 @@ package org.neo4j.cypher.internal.compiler.v2_3.executionplan
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters.reattachAliasedExpressions
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.groupInequalityPredicatesForLegacy
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.{KeyToken, TokenType}
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders.prepare.KeyTokenResolver
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders.{DisconnectedShortestPathEndPointsBuilder, _}
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.Converge.iterateUntilConverged
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.NonEmptyList
 import org.neo4j.cypher.internal.compiler.v2_3.pipes._
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
 import org.neo4j.cypher.internal.compiler.v2_3.tracing.rewriters.RewriterStepSequencer
+import org.neo4j.cypher.internal.frontend.v2_3.SyntaxException
+import org.neo4j.cypher.internal.frontend.v2_3.helpers.NonEmptyList
 
 trait ExecutionPlanInProgressRewriter {
   def rewrite(in: ExecutionPlanInProgress)(implicit context: PipeMonitor): ExecutionPlanInProgress
@@ -61,7 +63,7 @@ class LegacyExecutablePlanBuilder(monitors: Monitors, rewriterSequencer: (String
       case q: Union =>
         buildUnionQuery(q, planContext)
     }
-    Right(res)
+    res
   }
 
   private val unionBuilder = new UnionBuilder(this)
@@ -107,6 +109,7 @@ class LegacyExecutablePlanBuilder(monitors: Monitors, rewriterSequencer: (String
 
   private def groupAndRewriteInequalities(psq: PartiallySolvedQuery): PartiallySolvedQuery = {
     import NonEmptyList._
+
     psq.where.map(p => p.token) match {
       case None => psq
       case Some(predicates) => {
@@ -173,6 +176,7 @@ The Neo4j Team""")
   private def updates = new Phase {
     def myBuilders: Seq[PlanBuilder] = Seq(
       new NamedPathBuilder,
+      new MergeIntoBuilder,
       new MergePatternBuilder(prepare andThen matching),
       new UpdateActionBuilder
     )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,13 +22,14 @@ package org.neo4j.cypher.internal.compiler.v2_3.pipes
 import org.mockito.Matchers._
 import org.mockito.Mockito._
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Collection, Expression, Identifier, Literal}
 import org.neo4j.cypher.internal.compiler.v2_3.commands.{ManyQueryExpression, QueryExpression, RangeQueryExpression, SingleQueryExpression}
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
 import org.neo4j.cypher.internal.compiler.v2_3.spi.QueryContext
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.{CypherTypeException, InternalException, LabelId, PropertyKeyId}
 import org.neo4j.graphdb.Node
-import org.neo4j.kernel.api.index.IndexDescriptor
 
 class NodeIndexSeekPipeTest extends CypherFunSuite with AstConstructionTestSupport {
 
@@ -36,12 +37,12 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with AstConstructionTestSuppo
 
   val label = LabelToken(LabelName("LabelName") _, LabelId(11))
   val propertyKey = PropertyKeyToken(PropertyKeyName("PropertyName") _, PropertyKeyId(10))
-  val descriptor = new IndexDescriptor(label.nameId.id, propertyKey.nameId.id)
+  val descriptor = IndexDescriptor(label.nameId.id, propertyKey.nameId.id)
   val node = mock[Node]
   val node2 = mock[Node]
 
   test("should produce the correct plan description for equality seeks") {
-    val uniquePipe = NodeIndexSeekPipe("a", label, propertyKey, SingleQueryExpression(Literal("hello")), UniqueIndexSeek)()
+    val uniquePipe = NodeIndexSeekPipe("a", label, propertyKey, SingleQueryExpression(Literal("hello")), LockingUniqueIndexSeek)()
     val nonUniquePipe = NodeIndexSeekPipe("a", label, propertyKey, SingleQueryExpression(Literal("hello")), IndexSeek)()
 
     val uniquePlan = uniquePipe.planDescriptionWithoutCardinality.toString
@@ -66,37 +67,42 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with AstConstructionTestSuppo
   }
 
   test("should produce the correct plan description for unique range seek based on query expression") {
-    val expression = commands.expressions.PrefixSeekRangeExpression(PrefixRange("prefix"))
+    val expression = commands.expressions.PrefixSeekRangeExpression(PrefixRange(Literal("prefix")))
     val queryExpression: QueryExpression[Expression] = RangeQueryExpression(expression)
     val pipe = NodeIndexSeekPipe("a", label, propertyKey, queryExpression, UniqueIndexSeekByRange)()
 
-    pipe.planDescriptionWithoutCardinality.toString should equal("""+-----------------------------+-------------+---------------------------------------+
-                                                                   || Operator                    | Identifiers | Other                                 |
-                                                                   |+-----------------------------+-------------+---------------------------------------+
-                                                                   || +NodeUniqueIndexSeekByRange | a           | :LabelName(PropertyName LIKE prefix%) |
-                                                                   |+-----------------------------+-------------+---------------------------------------+
-                                                                   |
-                                                                   |Total database accesses: ?
-                                                                   |""".stripMargin)
-    val illegalPipe = NodeIndexSeekPipe("a", label, propertyKey, SingleQueryExpression(Literal("hello")), UniqueIndexSeekByRange)()
-    a[InternalException] should be thrownBy illegalPipe.planDescriptionWithoutCardinality
+    pipe.planDescriptionWithoutCardinality.toString should equal(
+      """+-----------------------------+-------------+------------------------------------------------------+
+        || Operator                    | Identifiers | Other                                                |
+        |+-----------------------------+-------------+------------------------------------------------------+
+        || +NodeUniqueIndexSeekByRange | a           | :LabelName(PropertyName STARTS WITH Literal(prefix)) |
+        |+-----------------------------+-------------+------------------------------------------------------+
+        |
+        |Total database accesses: ?
+        |""".stripMargin)
+    val illegalPipe = NodeIndexSeekPipe("a", label, propertyKey, SingleQueryExpression(Literal("hello")),
+                                                                    UniqueIndexSeekByRange)()
+    a[InternalException] should be thrownBy illegalPipe. planDescriptionWithoutCardinality
   }
 
   test("should produce the correct plan description for nonunique range seek based on query expression") {
-    val expression = commands.expressions.PrefixSeekRangeExpression(PrefixRange("prefix"))
+    val expression = commands.expressions.PrefixSeekRangeExpression(PrefixRange(Literal("prefix")))
     val queryExpression: QueryExpression[Expression] = RangeQueryExpression(expression)
     val pipe = NodeIndexSeekPipe("a", label, propertyKey, queryExpression, IndexSeekByRange)()
 
-    pipe.planDescriptionWithoutCardinality.toString should equal("""+-----------------------+-------------+---------------------------------------+
-                                                                   || Operator              | Identifiers | Other                                 |
-                                                                   |+-----------------------+-------------+---------------------------------------+
-                                                                   || +NodeIndexSeekByRange | a           | :LabelName(PropertyName LIKE prefix%) |
-                                                                   |+-----------------------+-------------+---------------------------------------+
-                                                                   |
-                                                                   |Total database accesses: ?
-                                                                   |""".stripMargin)
-    val illegalPipe = NodeIndexSeekPipe("a", label, propertyKey, ManyQueryExpression(Literal("hello")), IndexSeekByRange)()
-    a[InternalException] should be thrownBy illegalPipe.planDescriptionWithoutCardinality
+    pipe.planDescriptionWithoutCardinality.toString should equal(
+      """+-----------------------+-------------+------------------------------------------------------+
+        || Operator              | Identifiers | Other                                                |
+        |+-----------------------+-------------+------------------------------------------------------+
+        || +NodeIndexSeekByRange | a           | :LabelName(PropertyName STARTS WITH Literal(prefix)) |
+        |+-----------------------+-------------+------------------------------------------------------+
+        |
+        |Total database accesses: ?
+        |""".stripMargin)
+    val illegalPipe = NodeIndexSeekPipe("a", label, propertyKey,
+                                                                    ManyQueryExpression(Literal("hello")), IndexSeekByRange)()
+    a[InternalException] should be thrownBy
+                                                                    illegalPipe.planDescriptionWithoutCardinality
   }
 
   test("should return nodes found by index lookup when both labelId and property key id are solved at compile time") {
@@ -133,9 +139,9 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with AstConstructionTestSuppo
   test("should handle unique index lookups for multiple values") {
     // given
     val queryState = QueryStateHelper.emptyWith(
-      query = uniqueIndexFor(
-        "hello" -> Some(node),
-        "world" -> Some(node2)
+      query = indexFor(
+        "hello" -> Iterator(node),
+        "world" -> Iterator(node2)
       )
     )
 
@@ -169,8 +175,8 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with AstConstructionTestSuppo
   test("should handle unique index lookups for multiple values when some are null") {
     // given
     val queryState = QueryStateHelper.emptyWith(
-      query = uniqueIndexFor(
-        "hello" -> Some(node)
+      query = indexFor(
+        "hello" -> Iterator(node)
       )
     )
 
@@ -253,7 +259,7 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with AstConstructionTestSuppo
 
   test("should return the node found by the unique index lookup when both labelId and property key id are solved at compile time") {
     // given
-    val queryState = QueryStateHelper.emptyWith(query = uniqueIndexFor("hello" -> Some(node)))
+    val queryState = QueryStateHelper.emptyWith(query = indexFor("hello" -> Iterator(node)))
 
     // when
     val pipe = NodeIndexSeekPipe("n", label, propertyKey, SingleQueryExpression(Literal("hello")), UniqueIndexSeek)()
@@ -276,18 +282,6 @@ class NodeIndexSeekPipeTest extends CypherFunSuite with AstConstructionTestSuppo
 
     // then
     result.map(_("n")).toList should equal(List(node))
-  }
-
-
-  private def uniqueIndexFor(values: (Any, Option[Node])*): QueryContext = {
-    val query = mock[QueryContext]
-    when(query.uniqueIndexSeek(any(), any())).thenReturn(None)
-
-    values.foreach {
-      case (searchTerm, result) => when(query.uniqueIndexSeek(descriptor, searchTerm)).thenReturn(result)
-    }
-
-    query
   }
 
   private def indexFor(values: (Any, Iterator[Node])*): QueryContext = {

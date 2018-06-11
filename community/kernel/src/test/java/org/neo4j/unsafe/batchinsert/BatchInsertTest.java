@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -77,7 +77,7 @@ import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
 import org.neo4j.kernel.impl.api.scan.InMemoryLabelScanStoreExtension;
 import org.neo4j.kernel.impl.api.scan.LabelScanStoreProvider;
 import org.neo4j.kernel.impl.logging.StoreLogService;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeLabels;
 import org.neo4j.kernel.impl.store.NodeLabelsField;
 import org.neo4j.kernel.impl.store.NodeStore;
@@ -85,14 +85,13 @@ import org.neo4j.kernel.impl.store.SchemaStorage;
 import org.neo4j.kernel.impl.store.SchemaStore;
 import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.store.UnderlyingStorageException;
-import org.neo4j.kernel.impl.store.record.UniquePropertyConstraintRule;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.IndexRule;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.store.record.SchemaRule;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
+import org.neo4j.kernel.impl.store.record.UniquePropertyConstraintRule;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
 import org.neo4j.kernel.lifecycle.Lifecycle;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.PageCacheRule;
 import org.neo4j.test.TargetDirectory;
@@ -313,13 +312,13 @@ public class BatchInsertTest
         return db;
     }
 
-    private NeoStore switchToNeoStore( BatchInserter inserter )
+    private NeoStores switchToNeoStores( BatchInserter inserter )
     {
         inserter.shutdown();
         File dir = new File( inserter.getStoreDir() );
         PageCache pageCache = pageCacheRule.getPageCache( fs );
-        StoreFactory storeFactory = new StoreFactory( fs, dir, pageCache, NullLogProvider.getInstance(), new Monitors() );
-        return storeFactory.newNeoStore( false );
+        StoreFactory storeFactory = new StoreFactory( fs, dir, pageCache, NullLogProvider.getInstance() );
+        return storeFactory.openAllNeoStores();
     }
 
     @Test
@@ -907,8 +906,8 @@ public class BatchInsertTest
         GraphDatabaseAPI graphdb = (GraphDatabaseAPI) switchToEmbeddedGraphDatabaseService( inserter );
         try
         {
-            NeoStore neoStore = graphdb.getDependencyResolver().resolveDependency( NeoStoreSupplier.class ).get();
-            SchemaStore store = neoStore.getSchemaStore();
+            NeoStores neoStores = graphdb.getDependencyResolver().resolveDependency( NeoStoresSupplier.class ).get();
+            SchemaStore store = neoStores.getSchemaStore();
             SchemaStorage storage = new SchemaStorage( store );
             List<Long> inUse = new ArrayList<>();
             for ( long i = 1, high = store.getHighestPossibleIdInUse(); i <= high; i++ )
@@ -1330,9 +1329,9 @@ public class BatchInsertTest
         try
         {
             DependencyResolver dependencyResolver = db.getDependencyResolver();
-            NeoStoreSupplier neoStoreSupplier = dependencyResolver.resolveDependency( NeoStoreSupplier.class );
-            NeoStore neoStore = neoStoreSupplier.get();
-            NodeStore nodeStore = neoStore.getNodeStore();
+            NeoStoresSupplier neoStoresSupplier = dependencyResolver.resolveDependency( NeoStoresSupplier.class );
+            NeoStores neoStores = neoStoresSupplier.get();
+            NodeStore nodeStore = neoStores.getNodeStore();
             NodeRecord record = nodeStore.getRecord( 1 );
             assertTrue( "Node " + record + " should have been dense", record.isDense() );
         }
@@ -1370,17 +1369,17 @@ public class BatchInsertTest
                 DynamicLabel.label( "Item" ) );
 
         // THEN
-        NeoStore neoStore = switchToNeoStore( inserter );
+        NeoStores neoStores = switchToNeoStores( inserter );
         try
         {
-            NodeRecord node = neoStore.getNodeStore().getRecord( nodeId );
+            NodeRecord node = neoStores.getNodeStore().getRecord( nodeId );
             NodeLabels labels = NodeLabelsField.parseLabelsField( node );
-            long[] labelIds = labels.get( neoStore.getNodeStore() );
+            long[] labelIds = labels.get( neoStores.getNodeStore() );
             assertEquals( 1, labelIds.length );
         }
         finally
         {
-            neoStore.close();
+            neoStores.close();
         }
     }
 
@@ -1397,12 +1396,12 @@ public class BatchInsertTest
                 DynamicLabel.label( "DD" ), DynamicLabel.label( "EE" ), DynamicLabel.label( "FF" ) );
 
         // THEN
-        try ( NeoStore neoStore = switchToNeoStore( inserter ) )
+        try ( NeoStores neoStores = switchToNeoStores( inserter ) )
         {
-            NodeRecord node = neoStore.getNodeStore().getRecord( nodeId );
+            NodeRecord node = neoStores.getNodeStore().getRecord( nodeId );
             NodeLabels labels = NodeLabelsField.parseLabelsField( node );
 
-            long[] labelIds = labels.get( neoStore.getNodeStore() );
+            long[] labelIds = labels.get( neoStores.getNodeStore() );
             long[] sortedLabelIds = labelIds.clone();
             Arrays.sort( sortedLabelIds );
             assertArrayEquals( sortedLabelIds, labelIds );
@@ -1452,179 +1451,6 @@ public class BatchInsertTest
                     "Node 0 already exists with label " + label.name() + " and property \"" + propertyKey + "\"=[" +
                     duplicatedValue + "]"
             );
-        }
-        finally
-        {
-            db.shutdown();
-        }
-    }
-
-    @Test
-    public void shouldCreateMandatoryNodePropertyConstraint() throws Exception
-    {
-        // Given
-        Label label = label( "Person" );
-        String propertyKey = "name";
-
-        BatchInserter inserter = newBatchInserter();
-
-        // When
-        inserter.createDeferredConstraint( label ).assertPropertyExists( propertyKey ).create();
-
-        // Then
-        GraphDatabaseService db = switchToEmbeddedGraphDatabaseService( inserter );
-        try
-        {
-            try ( Transaction tx = db.beginTx() )
-            {
-                List<ConstraintDefinition> constraints = asList( db.schema().getConstraints() );
-                assertEquals( 1, constraints.size() );
-                ConstraintDefinition constraint = constraints.get( 0 );
-                assertEquals( label.name(), constraint.getLabel().name() );
-                assertEquals( propertyKey, single( constraint.getPropertyKeys() ) );
-                tx.success();
-            }
-
-            try ( Transaction tx = db.beginTx() )
-            {
-                db.createNode( label );
-                tx.success();
-            }
-            fail( "Mandatory node property constraint was violated, exception expected" );
-        }
-        catch ( ConstraintViolationException e )
-        {
-            assertEquals(
-                    e.getMessage(),
-                    "Node 0 with label \"" + label.name() + "\" does not have a \"" + propertyKey + "\" property"
-            );
-        }
-        finally
-        {
-            db.shutdown();
-        }
-    }
-
-    @Test
-    public void shouldCreateMandatoryRelationshipPropertyConstraint() throws Exception
-    {
-        // Given
-        RelationshipType type = DynamicRelationshipType.withName( "KNOWS" );
-        String propertyKey = "since";
-
-        BatchInserter inserter = newBatchInserter();
-
-        // When
-        inserter.createDeferredConstraint( type ).assertPropertyExists( propertyKey ).create();
-
-        // Then
-        GraphDatabaseService db = switchToEmbeddedGraphDatabaseService( inserter );
-        try
-        {
-            try ( Transaction tx = db.beginTx() )
-            {
-                List<ConstraintDefinition> constraints = asList( db.schema().getConstraints() );
-                assertEquals( 1, constraints.size() );
-                ConstraintDefinition constraint = constraints.get( 0 );
-                assertEquals( type.name(), constraint.getRelationshipType().name() );
-                assertEquals( propertyKey, single( constraint.getPropertyKeys() ) );
-                tx.success();
-            }
-
-            try ( Transaction tx = db.beginTx() )
-            {
-                db.createNode().createRelationshipTo( db.createNode(), type );
-                tx.success();
-            }
-            fail( "Mandatory relationship property constraint was violated, exception expected" );
-        }
-        catch ( ConstraintViolationException e )
-        {
-            assertEquals(
-                    e.getMessage(),
-                    "Relationship 0 with type \"" + type.name() + "\" does not have a \"" + propertyKey + "\" property"
-            );
-        }
-        finally
-        {
-            db.shutdown();
-        }
-    }
-
-    @Test
-    public void shouldAllowCreationOfIndexAndMandatoryPropertyConstraintOnSameLabelAndProperty() throws Exception
-    {
-        // Given
-        Label label = label( "Person" );
-        String property = "name";
-
-        BatchInserter inserter = newBatchInserter();
-
-        // When
-        inserter.createDeferredSchemaIndex( label ).on( property ).create();
-        inserter.createDeferredConstraint( label ).assertPropertyExists( property ).create();
-
-        // Then
-        GraphDatabaseService db = switchToEmbeddedGraphDatabaseService( inserter );
-        try
-        {
-            try ( Transaction tx = db.beginTx() )
-            {
-                List<IndexDefinition> indexes = asList( db.schema().getIndexes() );
-                assertEquals( 1, indexes.size() );
-                IndexDefinition index = indexes.get( 0 );
-                assertEquals( label.name(), index.getLabel().name() );
-                assertEquals( property, single( index.getPropertyKeys() ) );
-                List<ConstraintDefinition> constraints = asList( db.schema().getConstraints() );
-                assertEquals( 1, constraints.size() );
-                ConstraintDefinition constraint = constraints.get( 0 );
-                assertEquals( label.name(), constraint.getLabel().name() );
-                assertEquals( property, single( constraint.getPropertyKeys() ) );
-                tx.success();
-            }
-        }
-        finally
-        {
-            db.shutdown();
-        }
-    }
-
-    @Test
-    public void shouldAllowCreationOfUniquenessAndMandatoryPropertyConstraintOnSameLabelAndProperty() throws Exception
-    {
-        // Given
-        Label label = label( "Person" );
-        String property = "name";
-
-        BatchInserter inserter = newBatchInserter();
-
-        // When
-        inserter.createDeferredConstraint( label ).assertPropertyIsUnique( property ).create();
-        inserter.createDeferredConstraint( label ).assertPropertyExists( property ).create();
-
-        // Then
-        GraphDatabaseService db = switchToEmbeddedGraphDatabaseService( inserter );
-        try
-        {
-            try ( Transaction tx = db.beginTx() )
-            {
-                List<ConstraintDefinition> constraints = asList( db.schema().getConstraints() );
-                assertEquals( 2, constraints.size() );
-                for ( ConstraintDefinition constraint : constraints )
-                {
-                    if ( constraint.getConstraintType() == ConstraintType.UNIQUENESS ||
-                         constraint.getConstraintType() == ConstraintType.MANDATORY_NODE_PROPERTY )
-                    {
-                        assertEquals( label.name(), constraint.getLabel().name() );
-                        assertEquals( property, single( constraint.getPropertyKeys() ) );
-                    }
-                    else
-                    {
-                        fail( "Unexpected constraint type found: " + constraint.getConstraintType() );
-                    }
-                }
-                tx.success();
-            }
         }
         finally
         {
@@ -1704,56 +1530,6 @@ public class BatchInsertTest
     }
 
     @Test
-    public void shouldNotAllowDuplicatedMandatoryNodePropertyConstraints() throws Exception
-    {
-        // Given
-        Label label = label( "Person" );
-        String property = "name";
-
-        BatchInserter inserter = newBatchInserter();
-
-        // When
-        inserter.createDeferredConstraint( label ).assertPropertyExists( property ).create();
-        try
-        {
-            inserter.createDeferredConstraint( label ).assertPropertyExists( property ).create();
-            fail( "Exception expected" );
-        }
-        catch ( ConstraintViolationException e )
-        {
-            // Then
-            assertEquals(
-                    "Mandatory node property constraint for given {label;property} already exists",
-                    e.getMessage() );
-        }
-    }
-
-    @Test
-    public void shouldNotAllowDuplicatedMandatoryRelationshipPropertyConstraints() throws Exception
-    {
-        // Given
-        RelationshipType type = DynamicRelationshipType.withName( "KNOWS" );
-        String property = "since";
-
-        BatchInserter inserter = newBatchInserter();
-
-        // When
-        inserter.createDeferredConstraint( type ).assertPropertyExists( property ).create();
-        try
-        {
-            inserter.createDeferredConstraint( type ).assertPropertyExists( property ).create();
-            fail( "Exception expected" );
-        }
-        catch ( ConstraintViolationException e )
-        {
-            // Then
-            assertEquals(
-                    "Mandatory relationship property constraint for given {type;property} already exists",
-                    e.getMessage() );
-        }
-    }
-
-    @Test
     public void uniquenessConstraintShouldBeCheckedOnBatchInserterShutdownAndFailIfViolated() throws Exception
     {
         // Given
@@ -1780,6 +1556,22 @@ public class BatchInsertTest
             // good
             assertEquals( new PreexistingIndexEntryConflictException( value, 0, 1 ), ex.getCause() );
         }
+    }
+
+    @Test
+    public void shouldChangePropertiesInCurrentBatch() throws Exception
+    {
+        // GIVEN
+        BatchInserter inserter = newBatchInserter();
+        Map<String,Object> properties = map( "key1", "value1" );
+        long node = inserter.createNode( properties );
+
+        // WHEN
+        properties.put( "additionalKey", "Additional value" );
+        inserter.setNodeProperties( node, properties );
+
+        // THEN
+        assertEquals( properties, inserter.getNodeProperties( node ) );
     }
 
     private void createRelationships( BatchInserter inserter, long node, RelationshipType relType,

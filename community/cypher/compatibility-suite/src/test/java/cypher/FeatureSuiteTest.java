@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -46,17 +46,6 @@ public class FeatureSuiteTest
             "cypher.cucumber.db.DatabaseConfigProvider:/cypher/db/config/cost-interpreted.json",
     } )
     public static class CostInterpreted
-    {
-    }
-
-    @RunWith( Cucumber.class )
-    @CucumberOptions( plugin = {
-            "pretty", "html:target/cost-compiled",
-            "cypher.cucumber.reporter.CypherResultReporter:target/cost-compiled",
-            "cypher.cucumber.db.DatabaseProvider:target/dbs",
-            "cypher.cucumber.db.DatabaseConfigProvider:/cypher/db/config/cost-compiled.json",
-    } )
-    public static class CostCompiled
     {
     }
 }

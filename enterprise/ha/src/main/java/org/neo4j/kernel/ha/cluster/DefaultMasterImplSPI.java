@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -48,13 +48,15 @@ import org.neo4j.kernel.impl.store.id.IdGenerator;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.log.LogicalTransactionStore;
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore;
-import org.neo4j.kernel.impl.transaction.log.rotation.StoreFlusher;
+import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointer;
 import org.neo4j.kernel.impl.transaction.tracing.CommitEvent;
 import org.neo4j.kernel.monitoring.Monitors;
 
 public class DefaultMasterImplSPI implements MasterImpl.SPI
 {
     private static final int ID_GRAB_SIZE = 1000;
+    static final String STORE_COPY_CHECKPOINT_TRIGGER = "store copy";
+
     private final GraphDatabaseAPI graphDb;
     private final TransactionChecksumLookup txChecksumLookup;
     private final FileSystemAbstraction fileSystem;
@@ -68,9 +70,7 @@ public class DefaultMasterImplSPI implements MasterImpl.SPI
     private final Monitors monitors;
 
     private final TransactionCommitProcess transactionCommitProcess;
-    private final StoreFlusher storeFlusher;
-    private final LogicalTransactionStore txStore;
-    private final TransactionIdStore transactionIdStore;
+    private final CheckPointer checkPointer;
 
     public DefaultMasterImplSPI( final GraphDatabaseAPI graphDb,
                                  FileSystemAbstraction fileSystemAbstraction,
@@ -79,7 +79,7 @@ public class DefaultMasterImplSPI implements MasterImpl.SPI
                                  RelationshipTypeTokenHolder relationshipTypeTokenHolder,
                                  IdGeneratorFactory idGeneratorFactory,
                                  TransactionCommitProcess transactionCommitProcess,
-                                 StoreFlusher storeFlusher,
+                                 CheckPointer checkPointer,
                                  TransactionIdStore transactionIdStore,
                                  LogicalTransactionStore logicalTransactionStore,
                                  NeoStoreDataSource neoStoreDataSource)
@@ -88,19 +88,17 @@ public class DefaultMasterImplSPI implements MasterImpl.SPI
 
         // Hmm, fetching the dependencies here instead of handing them in the constructor directly feels bad,
         // but it seems like there's some intricate usage and need for the db's dependency resolver.
-        this.transactionIdStore = transactionIdStore;
         this.fileSystem = fileSystemAbstraction;
         this.labels = labels;
         this.propertyKeyTokenHolder = propertyKeyTokenHolder;
         this.relationshipTypeTokenHolder = relationshipTypeTokenHolder;
         this.idGeneratorFactory = idGeneratorFactory;
         this.transactionCommitProcess = transactionCommitProcess;
-        this.storeFlusher = storeFlusher;
+        this.checkPointer = checkPointer;
         this.neoStoreDataSource = neoStoreDataSource;
         this.storeDir = new File( graphDb.getStoreDir() );
-        this.txStore = logicalTransactionStore;
-        this.txChecksumLookup = new TransactionChecksumLookup( transactionIdStore, txStore );
-        this.responsePacker = new ResponsePacker( txStore, transactionIdStore, new Supplier<StoreId>()
+        this.txChecksumLookup = new TransactionChecksumLookup( transactionIdStore, logicalTransactionStore );
+        this.responsePacker = new ResponsePacker( logicalTransactionStore, transactionIdStore, new Supplier<StoreId>()
         {
             @Override
             public StoreId get()
@@ -170,9 +168,9 @@ public class DefaultMasterImplSPI implements MasterImpl.SPI
     @Override
     public RequestContext flushStoresAndStreamStoreFiles( StoreWriter writer )
     {
-        StoreCopyServer streamer = new StoreCopyServer( transactionIdStore, neoStoreDataSource,
-                storeFlusher, fileSystem, storeDir, monitors.newMonitor( StoreCopyServer.Monitor.class ) );
-        return streamer.flushStoresAndStreamStoreFiles( writer, false );
+        StoreCopyServer streamer = new StoreCopyServer( neoStoreDataSource,
+                checkPointer, fileSystem, storeDir, monitors.newMonitor( StoreCopyServer.Monitor.class ) );
+        return streamer.flushStoresAndStreamStoreFiles( STORE_COPY_CHECKPOINT_TRIGGER, writer, false );
     }
 
     @Override

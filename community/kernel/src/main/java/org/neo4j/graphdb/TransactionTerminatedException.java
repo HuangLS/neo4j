@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,30 @@
  */
 package org.neo4j.graphdb;
 
+import org.neo4j.kernel.api.exceptions.Status;
+
 /**
  * Signals that the transaction within which the failed operations ran
  * has been terminated with {@link Transaction#terminate()}.
  */
-public class TransactionTerminatedException extends TransactionFailureException
+public class TransactionTerminatedException extends TransactionFailureException implements Status.HasStatus
 {
-    public TransactionTerminatedException()
+    private final Status status;
+
+    public TransactionTerminatedException( Status status )
     {
-        super( "The transaction has been terminated." );
+        this( status, "" );
+    }
+
+    protected TransactionTerminatedException( Status status, String additionalInfo )
+    {
+        super( "The transaction has been terminated. " + status.code().description() + " " + additionalInfo );
+        this.status = status;
+    }
+
+    @Override
+    public Status status()
+    {
+        return status;
     }
 }

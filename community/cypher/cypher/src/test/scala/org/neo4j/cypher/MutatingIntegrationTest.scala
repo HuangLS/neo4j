@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -176,12 +176,9 @@ class MutatingIntegrationTest extends ExecutionEngineFunSuite with Assertions wi
   }
 
   test("create_node_from_map_values") {
-    execute("create (n {a}) return n", "a" -> Map("name" -> "Andres", "age" -> 66))
-    val n = graph.createdNodes.dequeue()
-    graph.inTx {
-      n.getProperty("name") should equal("Andres")
-      n.getProperty("age") should equal(66)
-    }
+    val result = execute("create (n {a}) return n.age, n.name", "a" -> Map("name" -> "Andres", "age" -> 66))
+
+    result.toList should equal(List(Map("n.age" -> 66, "n.name" -> "Andres")))
   }
 
 
@@ -477,5 +474,15 @@ return distinct center""")
     val result = execute("foreach(x in [null]| create ())")
 
     assertStats(result, nodesCreated = 1)
+  }
+
+  test("should be possible to remove nodes created in the same query") {
+    val result = execute(
+      """CREATE (a)-[:FOO]->(b)
+         WITH *
+         MATCH (x)-[r]-(y)
+         DELETE x, r, y""".stripMargin)
+
+    assertStats(result, nodesCreated = 2, relationshipsCreated = 1, nodesDeleted = 2, relationshipsDeleted = 1)
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,7 +31,6 @@ import org.neo4j.walk.Walker;
 /**
  * An object that writes a graph to a specified destination in graphviz dot
  * format.
- * @author Tobias Ivarsson <tobias.ivarsson@neotechnology.com>
  */
 public final class GraphvizWriter
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,10 +20,11 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes.matching
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import commands._
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.Predicate
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.DynamicIterable
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{LazyTypes, QueryState}
-import org.neo4j.graphdb.{Node, Relationship, Direction}
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.graphdb.{Node, Relationship}
 
 /*
 Variable length paths are expanded by decreasing min and max, if it's a bounded path. Once
@@ -39,13 +40,13 @@ as the next step.
  */
 case class VarLengthStep(id: Int,
                          typ: Seq[String],
-                         direction: Direction,
+                         direction: SemanticDirection,
                          min: Int,
                          max: Option[Int],
                          next: Option[ExpanderStep],
                          relPredicate: Predicate,
                          nodePredicate: Predicate) extends ExpanderStep {
-  def createCopy(next: Option[ExpanderStep], direction: Direction, nodePredicate: Predicate): ExpanderStep =
+  def createCopy(next: Option[ExpanderStep], direction: SemanticDirection, nodePredicate: Predicate): ExpanderStep =
     copy(next = next, direction = direction, nodePredicate = nodePredicate)
 
   private val types = LazyTypes(typ)
@@ -111,13 +112,13 @@ case class VarLengthStep(id: Int,
     val predicateString = "r: %s, n: %s".format(relPredicate, nodePredicate)
 
     val left =
-      if (direction == Direction.OUTGOING)
+      if (direction == SemanticDirection.OUTGOING)
         ""
       else
         "<"
 
     val right =
-      if (direction == Direction.INCOMING)
+      if (direction == SemanticDirection.INCOMING)
         ""
       else
         ">"

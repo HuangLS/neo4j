@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,8 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.symbols
 
-import org.neo4j.cypher.internal.compiler.v2_3.{CypherException, CypherTypeException, SyntaxException}
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.{CypherException, CypherTypeException, SyntaxException}
 
 import scala.collection.Map
 
@@ -65,4 +66,28 @@ case class SymbolTable(identifiers: Map[String, CypherType] = Map.empty) {
   }
 }
 
+/*
+TypeSafe is everything that needs to check it's types
+ */
+trait TypeSafe {
+  def symbolDependenciesMet(symbols: SymbolTable): Boolean =
+    symbolTableDependencies.forall(symbols.identifiers.contains)
 
+  def symbolTableDependencies: Set[String]
+}
+
+/*
+Typed is the trait all classes that have a return type, or have dependencies on an expressions' type.
+ */
+trait Typed {
+  /*
+  Checks if internal type dependencies are met, checks if the expected type is valid,
+  and returns the actual type of the expression. Will throw an exception if the check fails
+   */
+  def evaluateType(expectedType: CypherType, symbols: SymbolTable): CypherType
+
+  /*
+  Checks if internal type dependencies are met and returns the actual type of the expression
+  */
+  def getType(symbols: SymbolTable): CypherType = evaluateType(CTAny, symbols)
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.kernel.impl.factory;
 
 import java.io.File;
+import java.net.URL;
 import java.util.Collections;
 import java.util.Map;
 
@@ -81,11 +82,12 @@ import org.neo4j.kernel.impl.traversal.BidirectionalTraversalDescriptionImpl;
 import org.neo4j.kernel.impl.traversal.MonoDirectionalTraversalDescription;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.LifecycleException;
+import org.neo4j.kernel.security.URLAccessValidationError;
 import org.neo4j.logging.Log;
+import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.tooling.GlobalGraphOperations;
 
 import static java.lang.String.format;
-
 import static org.neo4j.collection.primitive.PrimitiveLongCollections.map;
 import static org.neo4j.helpers.collection.IteratorUtil.emptyIterator;
 import static org.neo4j.kernel.impl.api.operations.KeyReadOperations.NO_SUCH_LABEL;
@@ -538,6 +540,18 @@ public class GraphDatabaseFacade
         return new BidirectionalTraversalDescriptionImpl( threadToTransactionBridge );
     }
 
+    @Override
+    public TemporalIndexManager temporalIndex() {
+        return TemporalIndexManager.getInstance(threadToTransactionBridge);
+    }
+
+//    @Override
+//    public ResourceIterator<Relationship> findRelationshipsByTemporalProperty(String key, int time, Object value) {
+//        //FIXME TGraph: Not Implement.
+//        throw new TGraphNoImplementationException();
+//        //return null;
+//    }
+
     // GraphDatabaseAPI
     @Override
     public DependencyResolver getDependencyResolver()
@@ -549,6 +563,12 @@ public class GraphDatabaseFacade
     public StoreId storeId()
     {
         return storeId.get();
+    }
+
+    @Override
+    public URL validateURLAccess( URL url ) throws URLAccessValidationError
+    {
+        return platformModule.urlAccessRule.validate( this, url );
     }
 
     @Override
@@ -603,5 +623,9 @@ public class GraphDatabaseFacade
             }
             return false;
         }
+    }
+
+    public int proKeyId(String key){
+        return threadToTransactionBridge.get().readOperations().propertyKeyGetForName( key );
     }
 }

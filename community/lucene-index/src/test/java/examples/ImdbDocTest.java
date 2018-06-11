@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -610,15 +610,6 @@ public class ImdbDocTest
         // END SNIPPET: fulltext
         assertEquals( theMatrixReloaded, found );
     }
-
-//    @Test
-//    public void cacheSettings()
-//    {
-//        // START SNIPPET: cache
-//        Index<Node> index = graphDb.index().forNodes( "actors" );
-//        ((LuceneIndex<Node>) index).setCacheCapacity( "name", 300000 );
-//        // END SNIPPET: cache
-//    }
 
     @Test
     public void batchInsert() throws Exception

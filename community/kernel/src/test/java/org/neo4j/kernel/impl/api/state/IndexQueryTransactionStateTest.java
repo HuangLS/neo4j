@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,10 @@
  */
 package org.neo4j.kernel.impl.api.state;
 
+import java.util.Collections;
+
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.Collections;
 
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
@@ -41,7 +41,9 @@ import org.neo4j.kernel.impl.api.StatementOperationsTestHelper;
 import org.neo4j.kernel.impl.api.operations.EntityOperations;
 import org.neo4j.kernel.impl.api.store.StoreReadLayer;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
+import org.neo4j.kernel.impl.constraints.StandardConstraintSemantics;
 import org.neo4j.kernel.impl.index.LegacyIndexStore;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.util.Cursors;
 import org.neo4j.kernel.impl.util.PrimitiveLongResourceIterator;
 
@@ -98,9 +100,10 @@ public class IndexQueryTransactionStateTest
                 store,
                 mock( LegacyPropertyTrackers.class ),
                 mock( ConstraintIndexCreator.class ),
-                mock( LegacyIndexStore.class ) );
+                mock( LegacyIndexStore.class ),
+                mock( TemporalPropertyStoreAdapter.class ));
         txContext = new ConstraintEnforcingEntityOperations(
-                stateHandlingOperations, stateHandlingOperations, stateHandlingOperations, stateHandlingOperations );
+                new StandardConstraintSemantics(), stateHandlingOperations, stateHandlingOperations, stateHandlingOperations, stateHandlingOperations );
     }
 
     @Test

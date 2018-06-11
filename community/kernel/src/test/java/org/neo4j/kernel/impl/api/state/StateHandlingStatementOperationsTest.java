@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,10 +29,13 @@ import java.util.Set;
 
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
+import org.neo4j.cursor.Cursor;
 import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.kernel.api.constraints.NodePropertyConstraint;
 import org.neo4j.kernel.api.constraints.PropertyConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
+import org.neo4j.kernel.api.cursor.LabelItem;
+import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.txstate.TransactionState;
 import org.neo4j.kernel.impl.api.KernelStatement;
@@ -41,9 +44,10 @@ import org.neo4j.kernel.impl.api.StateHandlingStatementOperations;
 import org.neo4j.kernel.impl.api.store.StoreReadLayer;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
 import org.neo4j.kernel.impl.index.LegacyIndexStore;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
+import org.neo4j.kernel.impl.util.Cursors;
 import org.neo4j.kernel.impl.util.diffsets.DiffSets;
 
-import static java.util.Arrays.asList;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
@@ -53,10 +57,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+
+import static java.util.Arrays.asList;
+
 import static org.neo4j.helpers.collection.IteratorUtil.asIterable;
 import static org.neo4j.helpers.collection.IteratorUtil.asSet;
+import static org.neo4j.kernel.api.properties.Property.intProperty;
 import static org.neo4j.kernel.impl.api.StatementOperationsTestHelper.mockedState;
 import static org.neo4j.kernel.impl.api.state.StubCursors.asNodeCursor;
+import static org.neo4j.kernel.impl.api.state.StubCursors.asPropertyCursor;
 
 public class StateHandlingStatementOperationsTest
 {
@@ -98,6 +107,7 @@ public class StateHandlingStatementOperationsTest
         PropertyConstraint constraint = new UniquenessConstraint( 10, 66 );
         TransactionState txState = mock( TransactionState.class );
         when( txState.nodesWithLabelChanged( anyInt() ) ).thenReturn( new DiffSets() );
+        when( txState.hasChanges() ).thenReturn( true );
         KernelStatement state = mockedState( txState );
         when( inner.constraintsGetForLabelAndPropertyKey( 10, 66 ) )
                 .thenAnswer( asAnswer( asList( constraint ) ) );
@@ -272,31 +282,61 @@ public class StateHandlingStatementOperationsTest
         assertEquals( asSet( 42L, 43L ), asSet( results ) );
     }
 
+    @SuppressWarnings( "unchecked" )
     @Test
     public void shouldConsiderTransactionStateDuringIndexBetweenRangeSeekByNumber() throws Exception
     {
         // Given
+        final int propertyKey = 2;
+        final int inRange = 15;
+        int lower = 10;
+        int upper = 20;
+
         TransactionState txState = mock( TransactionState.class );
         KernelStatement statement = mock( KernelStatement.class );
         when( statement.hasTxStateWithChanges() ).thenReturn( true );
         when( statement.txState() ).thenReturn( txState );
-        IndexDescriptor index = new IndexDescriptor( 1, 2 );
-        when( txState.indexUpdatesForRangeSeekByNumber( index, 10, true, 20, false ) ).thenReturn(
+        IndexDescriptor index = new IndexDescriptor( 1, propertyKey );
+        when( txState.indexUpdatesForRangeSeekByNumber( index, lower, true, upper, false ) ).thenReturn(
                 new DiffSets<>( Collections.singleton( 42L ), Collections.singleton( 44L ) )
         );
         when( txState.addedAndRemovedNodes() ).thenReturn(
                 new DiffSets<>( Collections.singleton( 45L ), Collections.singleton( 46L ) )
         );
+        when( txState.augmentSingleNodeCursor( any( Cursor.class ), anyLong() ) ).thenAnswer(
+                new Answer<Cursor<NodeItem>>()
+                {
+                    @Override
+                    public Cursor<NodeItem> answer( InvocationOnMock invocationOnMock ) throws Throwable
+                    {
+                        long nodeId = (long) invocationOnMock.getArguments()[1];
+                        return asNodeCursor( nodeId, asPropertyCursor( intProperty( propertyKey, inRange ) ),
+                                Cursors.<LabelItem>empty() );
+                    }
+                } );
 
         StoreReadLayer storeReadLayer = mock( StoreReadLayer.class );
-        when( storeReadLayer.nodesGetFromIndexRangeSeekByNumber( statement, index, 10, true, 20, false ) ).thenReturn(
+        when( storeReadLayer.nodesGetFromInclusiveNumericIndexRangeSeek( statement, index, lower, upper ) ).thenReturn(
                 IteratorUtil.resourceIterator( PrimitiveLongCollections.iterator( 43L, 44L, 46L ), null )
         );
+        StoreStatement storeStatement = mock( StoreStatement.class );
+        when( statement.getStoreStatement() ).thenReturn( storeStatement );
+        when( storeStatement.acquireSingleNodeCursor( anyLong() ) ).thenAnswer(
+                new Answer<Cursor<NodeItem>>()
+                {
+                    @Override
+                    public Cursor<NodeItem> answer( InvocationOnMock invocationOnMock ) throws Throwable
+                    {
+                        long nodeId = (long) invocationOnMock.getArguments()[0];
+                        return asNodeCursor( nodeId, asPropertyCursor( intProperty( propertyKey, inRange ) ),
+                                Cursors.<LabelItem>empty() );
+                    }
+                } );
 
         StateHandlingStatementOperations context = newTxStateOps( storeReadLayer );
 
         // When
-        PrimitiveLongIterator results = context.nodesGetFromIndexRangeSeekByNumber( statement, index, 10, true, 20, false );
+        PrimitiveLongIterator results = context.nodesGetFromIndexRangeSeekByNumber( statement, index, lower, true, upper, false );
 
         // Then
         assertEquals( asSet( 42L, 43L ), asSet( results ) );
@@ -319,8 +359,9 @@ public class StateHandlingStatementOperationsTest
         );
 
         StoreReadLayer storeReadLayer = mock( StoreReadLayer.class );
-        when( storeReadLayer.nodesGetFromIndexRangeSeekByString( statement, index, "Anne", true, "Bill", false ) ).thenReturn(
-                IteratorUtil.resourceIterator( PrimitiveLongCollections.iterator( 43L, 44L, 46L ), null )
+        when( storeReadLayer.nodesGetFromIndexRangeSeekByString( statement, index, "Anne", true, "Bill", false ) )
+                .thenReturn(
+                        IteratorUtil.resourceIterator( PrimitiveLongCollections.iterator( 43L, 44L, 46L ), null )
         );
 
         StateHandlingStatementOperations context = newTxStateOps( storeReadLayer );
@@ -348,6 +389,6 @@ public class StateHandlingStatementOperationsTest
     {
         return new StateHandlingStatementOperations( delegate,
                 mock( LegacyPropertyTrackers.class ), mock( ConstraintIndexCreator.class ),
-                mock( LegacyIndexStore.class ) );
+                mock( LegacyIndexStore.class ), mock(TemporalPropertyStoreAdapter.class ) );
     }
 }

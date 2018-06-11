@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.kernel.impl.api.integrationtest;
 import org.junit.After;
 import org.junit.Before;
 
+import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.mockfs.EphemeralFileSystemAbstraction;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.api.DataWriteOperations;
@@ -35,8 +36,6 @@ import org.neo4j.kernel.api.exceptions.KernelException;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge;
-import org.neo4j.kernel.impl.store.NeoStore;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
 import org.neo4j.test.TestGraphDatabaseBuilder;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
@@ -114,7 +113,7 @@ public abstract class KernelIntegrationTest
     public void setup()
     {
         fs = new EphemeralFileSystemAbstraction();
-        startDb("soft");
+        startDb();
     }
 
     @After
@@ -124,21 +123,26 @@ public abstract class KernelIntegrationTest
         fs.shutdown();
     }
 
-    protected void startDb(String cacheType)
+    protected void startDb()
     {
-        TestGraphDatabaseBuilder graphDatabaseFactory = (TestGraphDatabaseBuilder) new TestGraphDatabaseFactory().setFileSystem(fs).newImpermanentDatabaseBuilder();
-
-        //noinspection deprecation
-        db = (GraphDatabaseAPI) graphDatabaseFactory.newGraphDatabase();
+        db = (GraphDatabaseAPI) createGraphDatabase( fs );
         kernel = db.getDependencyResolver().resolveDependency( KernelAPI.class );
         indexingService = db.getDependencyResolver().resolveDependency( IndexingService.class );
         statementContextSupplier = db.getDependencyResolver().resolveDependency( ThreadToStatementContextBridge.class );
     }
 
+    protected GraphDatabaseService createGraphDatabase( EphemeralFileSystemAbstraction fs )
+    {
+        TestGraphDatabaseBuilder graphDatabaseFactory = (TestGraphDatabaseBuilder) new TestGraphDatabaseFactory()
+                .setFileSystem( fs )
+                .newImpermanentDatabaseBuilder();
+        return graphDatabaseFactory.newGraphDatabase();
+    }
+
     protected void dbWithNoCache() throws TransactionFailureException
     {
         stopDb();
-        startDb("none");
+        startDb();
     }
 
     protected void stopDb() throws TransactionFailureException
@@ -153,11 +157,6 @@ public abstract class KernelIntegrationTest
     protected void restartDb() throws TransactionFailureException
     {
         stopDb();
-        startDb("soft");
-    }
-
-    protected NeoStore neoStore()
-    {
-        return db.getDependencyResolver().resolveDependency( NeoStoreSupplier.class ).get();
+        startDb();
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -50,6 +50,12 @@ abstract class AbstractLockService<HANDLE> implements LockService
     public Lock acquireNodeLock( long nodeId, LockType type )
     {
         return lock( new LockedNode( nodeId ) );
+    }
+
+    @Override
+    public Lock acquireRelationshipLock( long relationshipId, LockType type )
+    {
+        return lock( new LockedRelationship( relationshipId ) );
     }
 
     private Lock lock( LockedEntity key )
@@ -130,36 +136,52 @@ abstract class AbstractLockService<HANDLE> implements LockService
         }
     }
 
-    static final class LockedNode extends LockedEntity
+    static class LockedPropertyContainer extends LockedEntity
     {
-        private final long nodeId;
+        private final long id;
 
-        LockedNode( long nodeId )
+        LockedPropertyContainer( long id )
         {
-            this.nodeId = nodeId;
+            this.id = id;
         }
 
         @Override
         void toString( StringBuilder repr )
         {
-            repr.append( "id=" ).append( nodeId );
+            repr.append( "id=" ).append( id );
         }
 
         @Override
         public int hashCode()
         {
-            return (int) (nodeId ^ (nodeId >>> 32));
+            return (int) (id ^ (id >>> 32));
         }
 
         @Override
         public boolean equals( Object obj )
         {
-            if ( obj instanceof LockedNode )
+            if ( obj.getClass().equals( getClass() ) )
             {
-                LockedNode that = (LockedNode) obj;
-                return this.nodeId == that.nodeId;
+                LockedPropertyContainer that = (LockedPropertyContainer) obj;
+                return this.id == that.id;
             }
             return false;
+        }
+    }
+
+    static final class LockedNode extends LockedPropertyContainer
+    {
+        LockedNode( long nodeId )
+        {
+            super( nodeId );
+        }
+    }
+
+    static final class LockedRelationship extends LockedPropertyContainer
+    {
+        LockedRelationship( long relationshipId )
+        {
+            super( relationshipId );
         }
     }
 }

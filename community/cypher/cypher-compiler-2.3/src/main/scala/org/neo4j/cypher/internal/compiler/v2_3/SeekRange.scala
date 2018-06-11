@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,30 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3
 
+import org.neo4j.cypher.internal.frontend.v2_3.{Bounds, Bound}
+
+/*
+  Seek ranges describe intervals. In practice they are used to summarize all inequalities over the
+  same node and property (n.prop) during planning, esp. for generating index seek by range plans.
+
+  Seek ranges are used both during planning (in the ast), and at runtime (as a value). To achieve this
+  they are generic in the type of the actual limits used by their bounds (type parameter V).
+ */
 sealed trait SeekRange[+V]
 
+/*
+  An inequality seek range can either only have lower bounds (RangeGreaterThan),
+  or upper bounds (RangeLessThan),or both (RangeBetween). Bounds can either be inclusive or exclusive
+  to differentiate between< and <= or > and >= respectively.  Multiple bounds are needed since
+  it is not known at compile time which ast expression is the maximum lower or the minimum upper bound.
+ */
 object InequalitySeekRange {
+
+  /*
+   Construct an inequality seek range given either some lower bounds and optionally some upper bounds - or -
+   optionally some lower bounds and some upper bounds.  Such an input may be obtained by partitioning
+   inequality expressions.  See usages of this method for examples.
+   */
   def fromPartitionedBounds[V](bounds: Either[(Bounds[V], Option[Bounds[V]]), (Option[Bounds[V]], Bounds[V])]): InequalitySeekRange[V] =
     bounds match {
       case Left((lefts, None)) => RangeGreaterThan(lefts)
@@ -36,9 +57,13 @@ sealed trait InequalitySeekRange[+V] extends SeekRange[V] {
 
   def groupBy[K](f: Bound[V] => K): Map[K, InequalitySeekRange[V]]
 
+  // Test if value falls into this range using the implicitly given ordering
+  // (returns None if the value is a 'null' value)
   def includes[X >: V](value: X)(implicit ordering: MinMaxOrdering[X]): Boolean =
     inclusionTest[X](ordering).exists(_(value))
 
+  // Function for testing if a value falls into this range using the implicitly given ordering
+  // (returns None if the value is a 'null' value)
   def inclusionTest[X >: V](implicit ordering: MinMaxOrdering[X]): Option[X => Boolean]
 }
 
@@ -47,6 +72,10 @@ sealed trait HalfOpenSeekRange[+V] extends InequalitySeekRange[V] {
 
   override def mapBounds[P](f: V => P): HalfOpenSeekRange[P]
 
+  // returns the limit of this half open seek range, i.e.
+  // the greatest bound if this is a RangeGreaterThan and
+  // the smallest bound if this is a RangeLessThan
+  //
   def limit[X >: V](implicit ordering: MinMaxOrdering[X]): Option[Bound[X]] =
     boundLimit(boundOrdering(ordering))
 
@@ -142,4 +171,16 @@ final case class RangeLessThan[+V](bounds: Bounds[V]) extends HalfOpenSeekRange[
     MinBoundOrdering(ordering.forMin)
 }
 
-final case class PrefixRange(prefix: String) extends SeekRange[String]
+/*
+  PrefixRange is used to describe intervals on string values for prefix search.
+
+  This is practical for two reasons:
+  - It directly maps on prefix queries of index implementations
+  - It removes the need to construct a proper upper bound value for an interval that
+  would describe the prefix search (which can be difficult due to unicode issues)
+*/
+final case class PrefixRange[T](prefix: T) extends SeekRange[T] {
+  def map[X](f: T => X): PrefixRange[X] = copy(f(prefix))
+
+  override def toString: String = prefix.toString
+}

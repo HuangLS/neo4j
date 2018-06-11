@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,13 +21,15 @@ package org.neo4j.cypher
 
 import org.mockito.Matchers._
 import org.mockito.Mockito.{verify, _}
-import org.neo4j.cypher.internal.compatibility.{StringInfoLogger2_3, WrappedMonitors2_3}
+import org.neo4j.cypher.internal.compatibility.{EntityAccessorWrapper2_3, StringInfoLogger2_3, WrappedMonitors2_3}
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.notification.CartesianProductNotification
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.cypher.internal.compiler.v2_3.tracing.rewriters.RewriterStepSequencer
-import org.neo4j.cypher.internal.spi.v2_3.GeneratedQueryStructure
+import org.neo4j.cypher.internal.frontend.v2_3.InputPosition
+import org.neo4j.cypher.internal.frontend.v2_3.notification.CartesianProductNotification
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.helpers.Clock
+import org.neo4j.kernel.GraphDatabaseAPI
+import org.neo4j.kernel.impl.core.NodeManager
 import org.neo4j.logging.NullLog
 
 class CartesianProductNotificationAcceptanceTest extends CypherFunSuite with GraphDatabaseTestSupport {
@@ -76,7 +78,6 @@ class CartesianProductNotificationAcceptanceTest extends CypherFunSuite with Gra
     //given
     val logger = mock[InternalNotificationLogger]
     val compiler = createCompiler()
-    val executionMode = NormalMode
 
     //when
     graph.inTx(compiler.planQuery("MATCH (a)-->(b) MATCH (c)-->(d) RETURN *", planContext, logger))
@@ -85,15 +86,41 @@ class CartesianProductNotificationAcceptanceTest extends CypherFunSuite with Gra
     verify(logger, never) += any()
   }
 
-  private def createCompiler() =
+  test("this query does not contain a cartesian product") {
+    //given
+    val logger = mock[InternalNotificationLogger]
+    val compiler = createCompiler()
+
+    //when
+    graph.inTx(compiler.planQuery("""MATCH (p)-[r1]-(m),
+                                    |(m)-[r2]-(d), (d)-[r3]-(m2)
+                                    |RETURN DISTINCT d""".stripMargin, planContext, logger))
+
+    //then
+    verify(logger, never) += any()
+  }
+
+  private def createCompiler() = {
+    val nodeManager = graph.asInstanceOf[GraphDatabaseAPI].getDependencyResolver.resolveDependency(classOf[NodeManager])
+
     CypherCompilerFactory.costBasedCompiler(
-      graph, 128, 0.5, 1000L, Clock.SYSTEM_CLOCK,
-      GeneratedQueryStructure,
+      graph,
+      new EntityAccessorWrapper2_3(nodeManager),
+      CypherCompilerConfiguration(
+        queryCacheSize = 128,
+        statsDivergenceThreshold = 0.5,
+        queryPlanTTL = 1000L,
+        useErrorsOverWarnings = false,
+        idpMaxTableSize = 128,
+        idpIterationDuration = 1000,
+        nonIndexedLabelWarningThreshold = 10000L
+      ),
+      Clock.SYSTEM_CLOCK,
       new WrappedMonitors2_3(kernelMonitors),
       new StringInfoLogger2_3(NullLog.getInstance),
       plannerName = Some(GreedyPlannerName),
-      runtimeName = Some(CompiledRuntimeName),
-      rewriterSequencer = RewriterStepSequencer.newValidating,
-      useErrorsOverWarnings = false
+      runtimeName = Some(InterpretedRuntimeName),
+      rewriterSequencer = RewriterStepSequencer.newValidating
     )
+  }
 }

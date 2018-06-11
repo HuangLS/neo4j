@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,13 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality.assumeIndependence
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{LabelName, RelTypeName}
+import org.neo4j.cypher.internal.compiler.v2_3.planner.Selections
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, Selectivity}
-import org.neo4j.cypher.internal.compiler.v2_3.planner.{Selections, SemanticTable}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.GraphStatistics
-import org.neo4j.cypher.internal.compiler.v2_3.{InternalException, LabelId, RelTypeId}
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{LabelName, RelTypeName}
+import org.neo4j.cypher.internal.frontend.v2_3._
 
 trait Pattern2Selectivity {
   def apply(pattern: PatternRelationship, labels: Map[IdName, Set[LabelName]])(implicit semanticTable: SemanticTable, selections: Selections): Selectivity
@@ -43,8 +42,7 @@ case class PatternSelectivityCalculator(stats: GraphStatistics, combiner: Select
   def apply(pattern: PatternRelationship, labels: Map[IdName, Set[LabelName]])
            (implicit semanticTable: SemanticTable, selections: Selections): Selectivity = {
     val nbrOfNodesInGraph = stats.nodesWithLabelCardinality(None)
-    val lhs = pattern.nodes._1
-    val rhs = pattern.nodes._2
+    val (lhs, rhs) = pattern.nodes
     val labelsOnLhs: Seq[TokenSpec[LabelId]] = mapToLabelTokenSpecs(selections.labelsOnNode(lhs) ++ labels.getOrElse(lhs, Set.empty))
     val labelsOnRhs: Seq[TokenSpec[LabelId]] = mapToLabelTokenSpecs(selections.labelsOnNode(rhs) ++ labels.getOrElse(rhs, Set.empty))
 
@@ -90,7 +88,7 @@ case class PatternSelectivityCalculator(stats: GraphStatistics, combiner: Select
               }
           val selectivityPerLength = selectivityPerLengthAndStep.flatMap(combiner.andTogetherSelectivities)
           combiner.orTogetherSelectivities(selectivityPerLength).
-            getOrElse(throw new InternalException("Unexpectedly tried to calculate cardinality of a [*0..0] relationship"))
+            getOrElse(Selectivity.ZERO)
       }
     }
   }
@@ -98,7 +96,7 @@ case class PatternSelectivityCalculator(stats: GraphStatistics, combiner: Select
   private def calculateSelectivityForSingleRelHop(types: Seq[TokenSpec[RelTypeId]],
                                                   labelsOnLhs: Seq[TokenSpec[LabelId]],
                                                   labelsOnRhs: Seq[TokenSpec[LabelId]],
-                                                  dir: Direction,
+                                                  dir: SemanticDirection,
                                                   estimatedMaxCardForPatternBasedOnLabels: Cardinality): Selectivity = {
 
     def selectivityEstimateForPattern(fromLabel: Option[LabelId], relType: Option[RelTypeId], toLabel: Option[LabelId]): Selectivity = {
@@ -116,13 +114,13 @@ case class PatternSelectivityCalculator(stats: GraphStatistics, combiner: Select
           case (SpecifiedButUnknown(), _, _) | (_, SpecifiedButUnknown(), _) | (_, _, SpecifiedButUnknown()) =>
             Selectivity.ZERO
 
-          case _ if dir == Direction.OUTGOING =>
+          case _ if dir == SemanticDirection.OUTGOING =>
             selectivityEstimateForPattern(lhsLabel.id, typ.id, rhsLabel.id)
 
-          case _ if dir == Direction.INCOMING =>
+          case _ if dir == SemanticDirection.INCOMING =>
             selectivityEstimateForPattern(rhsLabel.id, typ.id, lhsLabel.id)
 
-          case _ if dir == Direction.BOTH =>
+          case _ if dir == SemanticDirection.BOTH =>
             val selectivities = Seq(
               selectivityEstimateForPattern(lhsLabel.id, typ.id, rhsLabel.id),
               selectivityEstimateForPattern(rhsLabel.id, typ.id, lhsLabel.id)

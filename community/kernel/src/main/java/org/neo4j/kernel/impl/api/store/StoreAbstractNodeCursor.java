@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,14 +32,20 @@ import org.neo4j.kernel.api.cursor.LabelItem;
 import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.cursor.PropertyItem;
 import org.neo4j.kernel.api.cursor.RelationshipItem;
+import org.neo4j.kernel.impl.locking.Lock;
+import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.store.InvalidRecordException;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.NodeStore;
+import org.neo4j.kernel.impl.store.RelationshipGroupStore;
+import org.neo4j.kernel.impl.store.RelationshipStore;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.store.record.Record;
 import org.neo4j.kernel.impl.store.record.RelationshipGroupRecord;
 import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 import org.neo4j.kernel.impl.util.InstanceCache;
 
+import static org.neo4j.kernel.impl.locking.LockService.NO_LOCK_SERVICE;
 import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsField;
 
 /**
@@ -48,7 +54,10 @@ import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsField;
 public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper implements Cursor<NodeItem>, NodeItem
 {
     protected final NodeRecord nodeRecord;
-    protected final NeoStore neoStore;
+    protected NodeStore nodeStore;
+    protected RelationshipGroupStore relationshipGroupStore;
+    protected RelationshipStore relationshipStore;
+    protected final LockService lockService;
     protected StoreStatement storeStatement;
 
     private InstanceCache<StoreLabelCursor> labelCursor;
@@ -58,12 +67,16 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
     private InstanceCache<StorePropertyCursor> allPropertyCursor;
 
     public StoreAbstractNodeCursor( NodeRecord nodeRecord,
-            final NeoStore neoStore,
-            final StoreStatement storeStatement )
+            final NeoStores neoStores,
+            final StoreStatement storeStatement,
+            final LockService lockService )
     {
         this.nodeRecord = nodeRecord;
-        this.neoStore = neoStore;
+        this.nodeStore = neoStores.getNodeStore();
+        this.relationshipStore = neoStores.getRelationshipStore();
+        this.relationshipGroupStore = neoStores.getRelationshipGroupStore();
         this.storeStatement = storeStatement;
+        this.lockService = lockService;
 
         labelCursor = new InstanceCache<StoreLabelCursor>()
         {
@@ -87,8 +100,8 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
             protected StoreNodeRelationshipCursor create()
             {
                 return new StoreNodeRelationshipCursor( new RelationshipRecord( -1 ),
-                        neoStore,
-                        new RelationshipGroupRecord( -1, -1 ), storeStatement, this );
+                        neoStores,
+                        new RelationshipGroupRecord( -1, -1 ), storeStatement, this, lockService );
             }
         };
         singlePropertyCursor = new InstanceCache<StoreSinglePropertyCursor>()
@@ -96,7 +109,7 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
             @Override
             protected StoreSinglePropertyCursor create()
             {
-                return new StoreSinglePropertyCursor( neoStore.getPropertyStore(), this );
+                return new StoreSinglePropertyCursor( neoStores.getPropertyStore(), this );
             }
         };
         allPropertyCursor = new InstanceCache<StorePropertyCursor>()
@@ -104,10 +117,9 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
             @Override
             protected StorePropertyCursor create()
             {
-                return new StorePropertyCursor( neoStore.getPropertyStore(), this );
+                return new StorePropertyCursor( neoStores.getPropertyStore(), this );
             }
         };
-
     }
 
     @Override
@@ -125,25 +137,57 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
     @Override
     public Cursor<LabelItem> labels()
     {
-        return labelCursor.get().init( parseLabelsField( nodeRecord ).get( neoStore.getNodeStore() ) );
+        return labelCursor.get().init( parseLabelsField( nodeRecord ).get( nodeStore ) );
     }
 
     @Override
     public Cursor<LabelItem> label( int labelId )
     {
-        return singleLabelCursor.get().init( parseLabelsField( nodeRecord ).get( neoStore.getNodeStore() ), labelId );
+        return singleLabelCursor.get().init( parseLabelsField( nodeRecord ).get( nodeStore ), labelId );
+    }
+
+    private Lock shortLivedReadLock()
+    {
+        Lock lock = lockService.acquireNodeLock( nodeRecord.getId(), LockService.LockType.READ_LOCK );
+        if ( lockService != NO_LOCK_SERVICE )
+        {
+            boolean success = false;
+            try
+            {
+                // It's safer to re-read the node record here, specifically nextProp, after acquiring the lock
+                nodeStore.loadRecord( nodeRecord.getId(), nodeRecord );
+                if ( !nodeRecord.inUse() )
+                {
+                    // So it looks like the node has been deleted. The current behavior of NodeStore#loadRecord
+                    // is to only set the inUse field on loading an unused record. This should (and will)
+                    // change to be more of a centralized behavior by the stores. Anyway, setting this pointer
+                    // to the primitive equivalent of null the property cursor will just look empty from the
+                    // outside and the releasing of the lock will be done as usual.
+                    nodeRecord.setNextProp( Record.NO_NEXT_PROPERTY.intValue() );
+                }
+                success = true;
+            }
+            finally
+            {
+                if ( !success )
+                {
+                    lock.release();
+                }
+            }
+        }
+        return lock;
     }
 
     @Override
     public Cursor<PropertyItem> properties()
     {
-        return allPropertyCursor.get().init( nodeRecord.getNextProp() );
+        return allPropertyCursor.get().init( nodeRecord.getNextProp(), shortLivedReadLock() );
     }
 
     @Override
     public Cursor<PropertyItem> property( int propertyKeyId )
     {
-        return singlePropertyCursor.get().init( nodeRecord.getNextProp(), propertyKeyId );
+        return singlePropertyCursor.get().init( nodeRecord.getNextProp(), propertyKeyId, shortLivedReadLock() );
     }
 
     @Override
@@ -178,7 +222,7 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
                         return false;
                     }
 
-                    RelationshipGroupRecord group = neoStore.getRelationshipGroupStore().getRecord( groupId );
+                    RelationshipGroupRecord group = relationshipGroupStore.getRecord( groupId );
                     try
                     {
                         value.setValue( group.getType() );
@@ -193,7 +237,6 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
                 @Override
                 public void close()
                 {
-
                 }
 
                 @Override
@@ -230,7 +273,6 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
                 @Override
                 public void close()
                 {
-
                 }
 
                 @Override
@@ -251,7 +293,7 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
             long count = 0;
             while ( groupId != Record.NO_NEXT_RELATIONSHIP.intValue() )
             {
-                RelationshipGroupRecord group = neoStore.getRelationshipGroupStore().getRecord( groupId );
+                RelationshipGroupRecord group = relationshipGroupStore.getRecord( groupId );
                 count += nodeDegreeByDirection( group, direction );
                 groupId = group.getNext();
             }
@@ -279,7 +321,7 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
             long groupId = nodeRecord.getNextRel();
             while ( groupId != Record.NO_NEXT_RELATIONSHIP.intValue() )
             {
-                RelationshipGroupRecord group = neoStore.getRelationshipGroupStore().getRecord( groupId );
+                RelationshipGroupRecord group = relationshipGroupStore.getRecord( groupId );
                 if ( group.getType() == relType )
                 {
                     return (int) nodeDegreeByDirection( group, direction );
@@ -335,6 +377,12 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
         }
     }
 
+    @Override
+    public boolean isDense()
+    {
+        return nodeRecord.isDense();
+    }
+
     private long nodeDegreeByDirection( RelationshipGroupRecord group, Direction direction )
     {
         long loopCount = countByFirstPrevPointer( group.getFirstLoop() );
@@ -358,7 +406,7 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
         {
             return 0;
         }
-        RelationshipRecord record = neoStore.getRelationshipStore().getRecord( relationshipId );
+        RelationshipRecord record = relationshipStore.getRecord( relationshipId );
         if ( record.getFirstNode() == nodeRecord.getId() )
         {
             return record.getFirstPrevRel();
@@ -446,11 +494,8 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
 
                 return true;
             }
-            else
-            {
-                keys = null;
-                return false;
-            }
+            keys = null;
+            return false;
         }
     }
 
@@ -472,7 +517,7 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
         {
             if ( groupId != Record.NO_NEXT_RELATIONSHIP.intValue() )
             {
-                RelationshipGroupRecord group = neoStore.getRelationshipGroupStore().getRecord( groupId );
+                RelationshipGroupRecord group = relationshipGroupStore.getRecord( groupId );
                 this.type = group.getType();
                 long loop = countByFirstPrevPointer( group.getFirstLoop() );
                 outgoing = countByFirstPrevPointer( group.getFirstOut() ) + loop;
@@ -481,16 +526,12 @@ public abstract class StoreAbstractNodeCursor extends NodeItem.NodeItemHelper im
 
                 return true;
             }
-            else
-            {
-                return false;
-            }
+            return false;
         }
 
         @Override
         public void close()
         {
-
         }
 
         @Override

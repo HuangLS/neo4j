@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 
 import org.neo4j.helpers.UTF8;
-import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.impl.store.CommonAbstractStore;
 import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore;
 
@@ -39,12 +38,10 @@ public class Legacy22Store implements LegacyStore
 {
     public static final String LEGACY_VERSION = "v0.A.5";
 
-    private final FileSystemAbstraction fs;
     private final File storageFileName;
 
-    public Legacy22Store( FileSystemAbstraction fs, File storageFileName ) throws IOException
+    public Legacy22Store( File storageFileName ) throws IOException
     {
-        this.fs = fs;
         this.storageFileName = storageFileName;
         assertLegacyAndCurrentVersionHaveSameLength( LEGACY_VERSION, CommonAbstractStore.ALL_STORES_VERSION );
     }

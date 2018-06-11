@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,12 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.greedy
 
-import org.neo4j.cypher.internal.compiler.v2_3.{HintException, IndexHintException}
+import org.neo4j.cypher.internal.compiler.v2_3.helpers.Converge.iterateUntilConverged
 import org.neo4j.cypher.internal.compiler.v2_3.planner.QueryGraph
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, LogicalPlan}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.steps.solveOptionalMatches
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.Converge.iterateUntilConverged
+import org.neo4j.cypher.internal.frontend.v2_3.HintException
 
 class GreedyQueryGraphSolver(planCombiner: CandidateGenerator[GreedyPlanTable],
                              val config: QueryPlannerConfiguration = QueryPlannerConfiguration.default)
@@ -41,7 +41,8 @@ class GreedyQueryGraphSolver(planCombiner: CandidateGenerator[GreedyPlanTable],
       val leafPlanCandidateLists = config.leafPlanners.candidates(queryGraph, kit.projectAllEndpoints)
       val leafPlanCandidateListsWithSelections = kit.select(leafPlanCandidateLists, queryGraph).iterator
       val bestLeafPlans: Iterator[LogicalPlan] = leafPlanCandidateListsWithSelections.flatMap(kit.pickBest(_))
-      val startTable: GreedyPlanTable = leafPlan.foldLeft(GreedyPlanTable.empty)(_ + _)
+      val leafPlanWithSelections = leafPlan.map(kit.select.apply(_, queryGraph))
+      val startTable: GreedyPlanTable = leafPlanWithSelections.foldLeft(GreedyPlanTable.empty)(_ + _)
       bestLeafPlans.foldLeft(startTable)(_ + _)
     }
 
@@ -64,7 +65,7 @@ class GreedyQueryGraphSolver(planCombiner: CandidateGenerator[GreedyPlanTable],
                 acc + (ids -> candidates)
             }
 
-          val best: Iterable[LogicalPlan] = candidatesPerIds.values.map(kit.pickBest(_)).flatten
+          val best: Iterable[LogicalPlan] = candidatesPerIds.values.flatMap(kit.pickBest(_))
 
           //          println(s"best: ${best.map(_.availableSymbols)}")
           val result = best.foldLeft(planTable)(_ + _)

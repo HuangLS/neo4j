@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,20 +21,19 @@ package org.neo4j.kernel.impl.store;
 
 import java.io.File;
 
-import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.io.pagecache.PageCursor;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.store.record.PropertyKeyTokenRecord;
 import org.neo4j.logging.LogProvider;
-import org.neo4j.kernel.monitoring.Monitors;
 
 /**
  * Implementation of the property store.
  */
-public class PropertyKeyTokenStore extends TokenStore<PropertyKeyTokenRecord>
+public class PropertyKeyTokenStore extends TokenStore<PropertyKeyTokenRecord, Token>
 {
     // Historical type descriptor, should be called PropertyKeyTokenStore
     public static final String TYPE_DESCRIPTOR = "PropertyIndexStore";
@@ -46,14 +45,11 @@ public class PropertyKeyTokenStore extends TokenStore<PropertyKeyTokenRecord>
             Config config,
             IdGeneratorFactory idGeneratorFactory,
             PageCache pageCache,
-            FileSystemAbstraction fileSystemAbstraction,
             LogProvider logProvider,
-            DynamicStringStore nameStore,
-            StoreVersionMismatchHandler versionMismatchHandler,
-            Monitors monitors )
+            DynamicStringStore nameStore )
     {
-        super(fileName, config, IdType.PROPERTY_KEY_TOKEN, idGeneratorFactory, pageCache,
-                fileSystemAbstraction, logProvider, nameStore, versionMismatchHandler, monitors );
+        super( fileName, config, IdType.PROPERTY_KEY_TOKEN, idGeneratorFactory, pageCache,
+                logProvider, nameStore, new Token.Factory() );
     }
 
     @Override

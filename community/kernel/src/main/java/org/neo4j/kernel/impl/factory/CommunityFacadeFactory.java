@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.Map;
 
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 import static org.neo4j.helpers.collection.Iterables.append;
 import static org.neo4j.helpers.collection.Iterables.toList;
@@ -39,10 +40,9 @@ public class CommunityFacadeFactory
             graphDatabaseFacade )
     {
         params.put( Configuration.editionName.name(), "Community" );
-
         return super.newFacade( storeDir, params, newDependencies( dependencies ).settingsClasses(
                 toList( append( GraphDatabaseSettings.class, dependencies.settingsClasses() ) ) ),
-                graphDatabaseFacade );
+                graphDatabaseFacade, OperationalMode.single );
     }
 
     protected EditionModule createEdition( PlatformModule platformModule )

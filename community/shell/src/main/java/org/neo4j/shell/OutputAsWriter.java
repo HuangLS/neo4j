@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,6 @@ import java.io.Writer;
 
 public class OutputAsWriter extends Writer
 {
-    private final static String LINE_SEPARATOR = System.getProperty( "line.separator" );
     private final Output out;
 
     public OutputAsWriter( Output out )
@@ -36,14 +35,14 @@ public class OutputAsWriter extends Writer
     public void write( char[] cbuf, int off, int len ) throws IOException
     {
         String string = String.valueOf( cbuf, off, len );
-        int lastNewline = string.lastIndexOf( LINE_SEPARATOR );
+        int lastNewline = string.lastIndexOf( System.lineSeparator() );
         if ( lastNewline == -1 )
         {
             out.print( string );
         } else
         {
             out.println( string.substring( 0, lastNewline ) );
-            out.print( string.substring( lastNewline + LINE_SEPARATOR.length() ) );
+            out.print( string.substring( lastNewline + System.lineSeparator().length() ) );
         }
     }
 

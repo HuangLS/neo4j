@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,8 @@
 package org.neo4j.cypher.internal.compiler.v2_3.planner
 
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, PatternRelationship, SimplePatternLength}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class QueryGraphTest extends CypherFunSuite {
   test("returns no pattern relationships when the query graph doesn't contain any") {
@@ -32,7 +32,7 @@ class QueryGraphTest extends CypherFunSuite {
   }
 
   test("finds single pattern relationship") {
-    val r = PatternRelationship(IdName("r"), (IdName("a"), IdName("b")), Direction.BOTH, Seq.empty, SimplePatternLength)
+    val r = PatternRelationship(IdName("r"), (IdName("a"), IdName("b")), SemanticDirection.BOTH, Seq.empty, SimplePatternLength)
     val qg = QueryGraph(patternRelationships = Set(r))
 
     qg.findRelationshipsEndingOn(IdName("x")) shouldBe empty
@@ -41,8 +41,8 @@ class QueryGraphTest extends CypherFunSuite {
   }
 
   test("finds multiple pattern relationship") {
-    val r = PatternRelationship(IdName("r"), (IdName("a"), IdName("b")), Direction.BOTH, Seq.empty, SimplePatternLength)
-    val r2 = PatternRelationship(IdName("r2"), (IdName("b"), IdName("c")), Direction.BOTH, Seq.empty, SimplePatternLength)
+    val r = PatternRelationship(IdName("r"), (IdName("a"), IdName("b")), SemanticDirection.BOTH, Seq.empty, SimplePatternLength)
+    val r2 = PatternRelationship(IdName("r2"), (IdName("b"), IdName("c")), SemanticDirection.BOTH, Seq.empty, SimplePatternLength)
     val qg = QueryGraph(patternRelationships = Set(r, r2))
 
     qg.findRelationshipsEndingOn(IdName("x")) shouldBe empty

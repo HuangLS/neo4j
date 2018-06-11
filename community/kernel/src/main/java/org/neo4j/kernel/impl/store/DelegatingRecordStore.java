@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,6 +32,7 @@ public class DelegatingRecordStore<R extends AbstractBaseRecord> implements Reco
     {
         this.delegate = delegate;
     }
+
     @Override
     public String toString()
     {
@@ -66,12 +67,6 @@ public class DelegatingRecordStore<R extends AbstractBaseRecord> implements Reco
     public R getRecord( long id )
     {
         return delegate.getRecord( id );
-    }
-
-    @Override
-    public long getNextRecordReference( R record )
-    {
-        return delegate.getNextRecordReference( record );
     }
 
     @Override
@@ -111,6 +106,12 @@ public class DelegatingRecordStore<R extends AbstractBaseRecord> implements Reco
     }
 
     @Override
+    public int getRecordsPerPage()
+    {
+        return delegate.getRecordsPerPage();
+    }
+
+    @Override
     public int getRecordHeaderSize()
     {
         return delegate.getRecordHeaderSize();
@@ -120,6 +121,12 @@ public class DelegatingRecordStore<R extends AbstractBaseRecord> implements Reco
     public void close()
     {
         delegate.close();
+    }
+
+    @Override
+    public void flush()
+    {
+        delegate.flush();
     }
 
     @Override

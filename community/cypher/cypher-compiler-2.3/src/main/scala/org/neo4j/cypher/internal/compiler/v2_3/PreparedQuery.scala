@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,26 +19,27 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.Statement
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.StatementConverters._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.AbstractQuery
-import org.neo4j.cypher.internal.compiler.v2_3.planner.SemanticTable
 import org.neo4j.cypher.internal.compiler.v2_3.tracing.rewriters.RewriterCondition
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{Query, Statement}
+import org.neo4j.cypher.internal.frontend.v2_3.{Rewriter, Scope, SemanticTable}
 
 case class PreparedQuery(statement: Statement,
                          queryText: String,
                          extractedParams: Map[String, Any])(val semanticTable: SemanticTable,
                                                             val conditions: Set[RewriterCondition],
                                                             val scopeTree: Scope,
-                                                            val notificationLogger: InternalNotificationLogger) {
+                                                            val notificationLogger: InternalNotificationLogger,
+                                                            val plannerName: String = "") {
 
-  def abstractQuery: AbstractQuery = statement.asQuery(notificationLogger).setQueryText(queryText)
+  def abstractQuery: AbstractQuery = statement.asQuery(notificationLogger, plannerName).setQueryText(queryText)
 
   def isPeriodicCommit = statement match {
-    case ast.Query(Some(_), _) => true
-    case _                     => false
+    case Query(Some(_), _) => true
+    case _ => false
   }
 
   def rewrite(rewriter: Rewriter): PreparedQuery =
-    copy(statement = statement.endoRewrite(rewriter))(semanticTable, conditions, scopeTree, notificationLogger)
+    copy(statement = statement.endoRewrite(rewriter))(semanticTable, conditions, scopeTree, notificationLogger, plannerName)
 }

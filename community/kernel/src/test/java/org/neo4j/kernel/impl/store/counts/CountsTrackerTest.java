@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,12 @@
  */
 package org.neo4j.kernel.impl.store.counts;
 
+import org.junit.Rule;
+import org.junit.Test;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Future;
-
-import org.junit.Rule;
-import org.junit.Test;
 
 import org.neo4j.function.Function;
 import org.neo4j.function.IOFunction;
@@ -43,7 +43,6 @@ import org.neo4j.test.Barrier;
 import org.neo4j.test.ThreadingRule;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertSame;
@@ -51,24 +50,25 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-
 import static org.neo4j.kernel.impl.store.kvstore.Resources.InitialLifecycle.STARTED;
 import static org.neo4j.kernel.impl.store.kvstore.Resources.TestPath.FILE_IN_EXISTING_DIRECTORY;
 
 public class CountsTrackerTest
 {
-    public final @Rule Resources the = new Resources( FILE_IN_EXISTING_DIRECTORY );
-    public final @Rule ThreadingRule threading = new ThreadingRule();
+    @Rule
+    public final Resources resourceManager = new Resources( FILE_IN_EXISTING_DIRECTORY );
+    @Rule
+    public final ThreadingRule threading = new ThreadingRule();
 
     @Test
     public void shouldBeAbleToStartAndStopTheStore() throws Exception
     {
         // given
-        the.managed( newTracker() );
+        resourceManager.managed( newTracker() );
 
         // when
-        the.lifeStarts();
-        the.lifeShutsDown();
+        resourceManager.lifeStarts();
+        resourceManager.lifeShutsDown();
     }
 
     @Test
@@ -76,7 +76,7 @@ public class CountsTrackerTest
     public void shouldBeAbleToWriteDataToCountsTracker() throws Exception
     {
         // given
-        CountsTracker tracker = the.managed( newTracker() );
+        CountsTracker tracker = resourceManager.managed( newTracker() );
         CountsOracle oracle = new CountsOracle();
         {
             CountsOracle.Node a = oracle.node( 1 );
@@ -202,7 +202,8 @@ public class CountsTrackerTest
         {
             final Barrier.Control barrier = new Barrier.Control();
             CountsTracker tracker = life.add( new CountsTracker(
-                    the.logProvider(), the.fileSystem(), the.pageCache(), new Config(), the.testPath() )
+                    resourceManager.logProvider(), resourceManager.fileSystem(), resourceManager.pageCache(),
+                    new Config(), resourceManager.testPath() )
             {
                 @Override
                 protected boolean include( CountsKey countsKey, ReadableBuffer value )
@@ -257,7 +258,7 @@ public class CountsTrackerTest
     public void shouldNotRotateIfNoDataChanges() throws Exception
     {
         // given
-        CountsTracker tracker = the.managed( newTracker() );
+        CountsTracker tracker = resourceManager.managed( newTracker() );
         File before = tracker.currentFile();
 
         // when
@@ -272,7 +273,7 @@ public class CountsTrackerTest
     public void shouldRotateOnDataChangesEvenIfTransactionIsUnchanged() throws Exception
     {
         // given
-        CountsTracker tracker = the.managed( newTracker() );
+        CountsTracker tracker = resourceManager.managed( newTracker() );
         File before = tracker.currentFile();
         try ( CountsAccessor.IndexStatsUpdater updater = tracker.updateIndexCounts() )
         {
@@ -291,7 +292,7 @@ public class CountsTrackerTest
     public void shouldSupportTransactionsAppliedOutOfOrderOnRotation() throws Exception
     {
         // given
-        final CountsTracker tracker = the.managed( newTracker() );
+        final CountsTracker tracker = resourceManager.managed( newTracker() );
         try ( CountsAccessor.Updater tx = tracker.apply( 2 ).get() )
         {
             tx.incrementNodeCount( 1, 1 );
@@ -346,7 +347,8 @@ public class CountsTrackerTest
 
     private CountsTracker newTracker()
     {
-        return new CountsTracker( the.logProvider(), the.fileSystem(), the.pageCache(), new Config(), the.testPath() )
+        return new CountsTracker( resourceManager.logProvider(), resourceManager.fileSystem(),
+                resourceManager.pageCache(), new Config(), resourceManager.testPath() )
                 .setInitializer( new DataInitializer<CountsAccessor.Updater>()
                 {
                     @Override

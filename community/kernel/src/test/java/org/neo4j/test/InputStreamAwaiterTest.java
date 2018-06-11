@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,12 @@
  */
 package org.neo4j.test;
 
+import org.junit.Test;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import org.junit.Test;
 
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.spy;
@@ -93,7 +93,7 @@ public class InputStreamAwaiterTest
         StringBuilder result = new StringBuilder();
         for ( String line : lines )
         {
-            result.append( line ).append( System.getProperty( "line.separator" ) );
+            result.append( line ).append( System.lineSeparator() );
         }
         return result.toString();
     }

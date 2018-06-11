@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -555,6 +555,17 @@ public class EphemeralFileSystemAbstraction implements FileSystemAbstraction
         return clazz.cast( fileSystem );
     }
 
+    @Override
+    public void truncate( File file, long size ) throws IOException
+    {
+        EphemeralFileData data = files.get( file );
+        if ( data == null )
+        {
+            throw new FileNotFoundException( "File " + file + " not found" );
+        }
+        data.truncate( size );
+    }
+
     @SuppressWarnings( "serial" )
     private static class FileStillOpenException extends Exception
     {
@@ -818,8 +829,9 @@ public class EphemeralFileSystemAbstraction implements FileSystemAbstraction
         int read( Positionable fc, ByteBuffer dst )
         {
             int wanted = dst.limit() - dst.position();
-            int available = min( wanted, (int) (size() - fc.pos()) );
-            if ( available == 0 )
+            long size = size();
+            int available = min( wanted, (int) (size - fc.pos()) );
+            if ( available <= 0 )
             {
                 return -1; // EOF
             }

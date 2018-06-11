@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,13 +21,12 @@ package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.steps
 
 import org.mockito.Matchers.any
 import org.mockito.Mockito._
-import org.neo4j.cypher.internal.compiler.v2_3.ast
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.Metrics.QueryGraphSolverInput
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, LogicalPlanningContext, QueryPlannerConfiguration}
-import org.neo4j.cypher.internal.compiler.v2_3.planner.{CardinalityEstimation, LogicalPlanningTestSupport, PlannerQuery, QueryGraph, SemanticTable}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.compiler.v2_3.planner.{CardinalityEstimation, LogicalPlanningTestSupport, PlannerQuery, QueryGraph}
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticDirection, SemanticTable, ast}
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class SolveOptionalMatchesTest extends CypherFunSuite with LogicalPlanningTestSupport {
 
@@ -78,7 +77,7 @@ class SolveOptionalMatchesTest extends CypherFunSuite with LogicalPlanningTestSu
     val resultingPlanTable = solveOptionalMatches(defaultSolvers, pickBest(context))(planTable, qg)
 
     // Then
-    val expectedRhs = Expand(Argument(Set("a"))(solved)(), "a", Direction.OUTGOING, Seq.empty, "b", "r1")(solved)
+    val expectedRhs = Expand(Argument(Set("a"))(solved)(), "a", SemanticDirection.OUTGOING, Seq.empty, "b", "r1")(solved)
     val expectedResult = Apply(lhs, Optional(expectedRhs)(solved))(solved)
 
     resultingPlanTable.plans should have size 1
@@ -141,7 +140,7 @@ class SolveOptionalMatchesTest extends CypherFunSuite with LogicalPlanningTestSu
     val resultingPlanTable = (new solveOptionalMatches(Seq(applyOptional), pickBest(context)))(planTable, qg)
 
     // Then
-    val innerPlan = Expand(Argument(Set("a"))(solved)(), "a", Direction.OUTGOING, Seq.empty, "c", "r2")(solved)
+    val innerPlan = Expand(Argument(Set("a"))(solved)(), "a", SemanticDirection.OUTGOING, Seq.empty, "c", "r2")(solved)
     val applyPlan = Apply(inputPlan, Optional(innerPlan)(solved))(solved)
 
     resultingPlanTable.plans should have size 1
@@ -225,7 +224,7 @@ class SolveOptionalMatchesTest extends CypherFunSuite with LogicalPlanningTestSu
     // when
     // Using a simpler strategy to avoid costs
     val resultingPlanTable = solveOptionalMatches(Seq(applyOptional), pickBest(context))(planTable, qg)
-    val expectedRhs = Expand(Argument(Set("a"))(solved)(), "a", Direction.OUTGOING, Seq.empty, "b", "r1")(solved)
+    val expectedRhs = Expand(Argument(Set("a"))(solved)(), "a", SemanticDirection.OUTGOING, Seq.empty, "b", "r1")(solved)
     val expectedResult = Apply(planForA, Optional(expectedRhs)(solved))(solved)
 
     resultingPlanTable.plans should have size 2
@@ -250,10 +249,10 @@ class SolveOptionalMatchesTest extends CypherFunSuite with LogicalPlanningTestSu
     val step1 = solveOptionalMatches(Seq(applyOptional), pickBest(context))(planTable, qg)
     val resultingPlanTable = solveOptionalMatches(Seq(applyOptional), pickBest(context))(step1, qg)
 
-    val expectedPlanForAtoB = Expand(Argument(Set("a"))(solved)(), "a", Direction.OUTGOING, Seq.empty, "b", "r1")(solved)
+    val expectedPlanForAtoB = Expand(Argument(Set("a"))(solved)(), "a", SemanticDirection.OUTGOING, Seq.empty, "b", "r1")(solved)
     val expectedResult1 = Apply(planForA, Optional(expectedPlanForAtoB)(solved))(solved)
 
-    val expectedPlanForCtoX = Expand(Argument(Set("c"))(solved)(), "c", Direction.OUTGOING, Seq.empty, "x", "r3")(solved)
+    val expectedPlanForCtoX = Expand(Argument(Set("c"))(solved)(), "c", SemanticDirection.OUTGOING, Seq.empty, "x", "r3")(solved)
     val expectedResult2 = Apply(planForC, Optional(expectedPlanForCtoX)(solved))(solved)
 
     resultingPlanTable.plans should have size 2
@@ -293,7 +292,7 @@ class SolveOptionalMatchesTest extends CypherFunSuite with LogicalPlanningTestSu
     val arguments = Argument(Set("a"))(solved)()
     val expand = Expand(
       arguments,
-      "a", Direction.OUTGOING, Seq.empty, "b", "r1")(solved)
+      "a", SemanticDirection.OUTGOING, Seq.empty, "b", "r1")(solved)
     val expectedRhs = Selection(Seq(labelPredicate), expand)(solved)
 
     val expectedResult = Apply(lhs, Optional(expectedRhs)(solved))(solved)

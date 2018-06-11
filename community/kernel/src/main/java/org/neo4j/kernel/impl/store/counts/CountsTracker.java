@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,6 @@ import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.api.CountsAccessor;
 import org.neo4j.kernel.impl.api.CountsVisitor;
-import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.store.UnderlyingStorageException;
 import org.neo4j.kernel.impl.store.counts.keys.CountsKey;
 import org.neo4j.kernel.impl.store.kvstore.AbstractKeyValueStore;
@@ -50,7 +49,6 @@ import org.neo4j.logging.LogProvider;
 import org.neo4j.register.Register;
 
 import static java.lang.String.format;
-
 import static org.neo4j.kernel.impl.store.counts.keys.CountsKeyFactory.indexSampleKey;
 import static org.neo4j.kernel.impl.store.counts.keys.CountsKeyFactory.indexStatisticsKey;
 import static org.neo4j.kernel.impl.store.counts.keys.CountsKeyFactory.nodeKey;
@@ -78,7 +76,7 @@ public class CountsTracker extends AbstractKeyValueStore<CountsKey>
 {
     /** The format specifier for the current version of the store file format. */
     private static final byte[] FORMAT = {'N', 'e', 'o', 'C', 'o', 'u', 'n', 't',
-                                          'S', 't', 'o', 'r', 'e', /**/0, 0, 'V'};
+                                          'S', 't', 'o', 'r', 'e', /**/0, 1, 'V'};
     @SuppressWarnings("unchecked")
     private static final HeaderField<?>[] HEADER_FIELDS = new HeaderField[]{FileVersion.FILE_VERSION};
     public static final String LEFT = ".a", RIGHT = ".b";
@@ -117,8 +115,8 @@ public class CountsTracker extends AbstractKeyValueStore<CountsKey>
                 log.error( format( "Failed to rotate counts store at transaction %d to [%s], from [%s].",
                         headers.get( FileVersion.FILE_VERSION ).txId, target, source ), e );
             }
-        }, new RotationTimerFactory( Clock.SYSTEM_CLOCK, config.get( GraphDatabaseSettings
-                .store_interval_log_rotation_wait_time ) ), 16, 16, HEADER_FIELDS );
+        }, new RotationTimerFactory( Clock.SYSTEM_CLOCK,
+                config.get( GraphDatabaseSettings.store_interval_log_rotation_wait_time ) ), 16, 16, HEADER_FIELDS );
     }
 
     public CountsTracker setInitializer( final DataInitializer<Updater> initializer )
@@ -262,12 +260,6 @@ public class CountsTracker extends AbstractKeyValueStore<CountsKey>
     protected CountsKey readKey( ReadableBuffer key ) throws UnknownKey
     {
         return KeyFormat.readKey( key );
-    }
-
-    @Override
-    protected String fileTrailer()
-    {
-        return StoreFactory.buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR );
     }
 
     @Override

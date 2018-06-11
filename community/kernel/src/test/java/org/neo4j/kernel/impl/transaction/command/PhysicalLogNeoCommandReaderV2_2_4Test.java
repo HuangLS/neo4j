@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -52,7 +52,7 @@ public class PhysicalLogNeoCommandReaderV2_2_4Test
         writer.visitIndexRemoveCommand( removeCommand );
 
         // WHEN
-        PhysicalLogNeoCommandReaderV2_2_4 reader = new PhysicalLogNeoCommandReaderV2_2_4();
+        PhysicalLogCommandReaderV2_2_4 reader = new PhysicalLogCommandReaderV2_2_4();
         assertTrue( reader.read( channel ) instanceof IndexDefineCommand );
         RemoveCommand readRemoveCommand = (RemoveCommand) reader.read( channel );
 

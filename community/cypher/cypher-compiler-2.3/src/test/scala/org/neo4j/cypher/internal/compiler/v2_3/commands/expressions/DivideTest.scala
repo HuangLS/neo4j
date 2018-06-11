@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,16 +21,17 @@ package org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryStateHelper
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class DivideTest extends CypherFunSuite {
   test("should_throw_arithmetic_exception_for_divide_by_zero") {
     val ctx = ExecutionContext.empty
     val state = QueryStateHelper.empty
 
-    intercept[ArithmeticException](Divide(Literal(1), Literal(0))(ctx)(state))
-    intercept[ArithmeticException](Divide(Literal(1.4), Literal(0))(ctx)(state))
-    intercept[ArithmeticException](Divide(Literal(1), Literal(0.0))(ctx)(state))
-    intercept[ArithmeticException](Divide(Literal(3.4), Literal(0.0))(ctx)(state))
+    intercept[v2_3.ArithmeticException](Divide(Literal(1), Literal(0))(ctx)(state))
+    intercept[v2_3.ArithmeticException](Divide(Literal(1.4), Literal(0))(ctx)(state))
+    intercept[v2_3.ArithmeticException](Divide(Literal(1), Literal(0.0))(ctx)(state))
+    intercept[v2_3.ArithmeticException](Divide(Literal(3.4), Literal(0.0))(ctx)(state))
   }
 }

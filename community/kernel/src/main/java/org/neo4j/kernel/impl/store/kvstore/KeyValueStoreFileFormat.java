@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -82,9 +82,6 @@ public abstract class KeyValueStoreFileFormat
 
     protected abstract void writeFormatSpecifier( WritableBuffer formatSpecifier );
 
-    /** A trailer for writing at the end of a new file. */
-    protected abstract String fileTrailer();
-
     protected HeaderField<?>[] headerFieldsForFormat( ReadableBuffer formatSpecifier )
     {
         return headerFields.clone();
@@ -146,14 +143,23 @@ public abstract class KeyValueStoreFileFormat
                     "Invalid sizes: keySize=%d, valueSize=%d, format maxSize=%d",
                     keySize, valueSize, maxSize ) );
         }
+
+        if ( fs.fileExists( path ) )
+        {
+            fs.truncate( path, 0 );
+        }
+
         BigEndianByteArrayBuffer key = new BigEndianByteArrayBuffer( new byte[keySize] );
         BigEndianByteArrayBuffer value = new BigEndianByteArrayBuffer( new byte[valueSize] );
+
+        // format specifier
         writeFormatSpecifier( value );
         if ( !validFormatSpecifier( value.buffer, keySize ) )
         {
             throw new IllegalArgumentException( "Invalid Format specifier: " +
                                                 BigEndianByteArrayBuffer.toString( value.buffer ) );
         }
+
         int pageSize = pageSize( pages, keySize, valueSize );
         try ( KeyValueWriter writer = newWriter( fs, path, value, pages, pageSize, keySize, valueSize );
               DataProvider data = dataProvider )
@@ -190,12 +196,12 @@ public abstract class KeyValueStoreFileFormat
             value.clear();
 
             // trailer
-            value.putIntegerAtEnd( dataEntries );
+            value.putIntegerAtEnd( dataEntries == 0 ? -1 : dataEntries );
             if ( !writer.writeHeader( key, value ) )
             {
                 throw new IllegalStateException( "The trailing size header should be valid" );
             }
-            writer.writeTrailer( fileTrailer() );
+
             return writer.openStoreFile();
         }
     }
@@ -262,6 +268,9 @@ public abstract class KeyValueStoreFileFormat
         int pageSize = pageSize( pages, keySize, valueSize );
         // read the store metadata
         {
+            BigEndianByteArrayBuffer formatSpecifier = new BigEndianByteArrayBuffer( new byte[valueSize] );
+            writeFormatSpecifier( formatSpecifier );
+
             PagedFile file = pages.map( path, pageSize );
             try
             {
@@ -271,7 +280,9 @@ public abstract class KeyValueStoreFileFormat
                 buffer.position( keySize );
                 buffer.limit( keySize + valueSize );
                 value.dataFrom( buffer );
-                MetadataCollector metadata = metadata( value, pageSize, keySize, valueSize );
+
+
+                MetadataCollector metadata = metadata( formatSpecifier, pageSize, keySize, valueSize );
                 // scan and catalogue all entries in the file
                 KeyValueStoreFile.scanAll( file, 0, metadata, key, value );
                 KeyValueStoreFile storeFile = new KeyValueStoreFile( file, keySize, valueSize, metadata );

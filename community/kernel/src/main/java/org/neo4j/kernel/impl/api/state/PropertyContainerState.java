@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,15 @@
  */
 package org.neo4j.kernel.impl.api.state;
 
+import org.act.temporalProperty.impl.InternalKey;
+import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.impl.ValueType;
+import org.act.temporalProperty.table.TableComparator;
+import org.act.temporalProperty.util.Slice;
+
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.TreeMap;
 
 import org.neo4j.cursor.Cursor;
 import org.neo4j.function.Predicate;
@@ -32,9 +40,11 @@ import org.neo4j.kernel.api.EntityType;
 import org.neo4j.kernel.api.cursor.PropertyItem;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.TemporalProperty;
 import org.neo4j.kernel.impl.api.cursor.TxAllPropertyCursor;
 import org.neo4j.kernel.impl.api.cursor.TxSinglePropertyCursor;
 import org.neo4j.kernel.impl.util.VersionedHashMap;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 import static org.neo4j.helpers.collection.IteratorUtil.emptyIterator;
 
@@ -78,6 +88,25 @@ public interface PropertyContainerState
         private final long id;
         private final EntityType entityType;
         private static final ResourceIterator<DefinedProperty> NO_PROPERTIES = emptyIterator();
+
+        private final TreeMap<InternalKey,Slice> temporalProperty = new TreeMap<>( new Comparator<InternalKey>()
+        {
+            @Override
+            public int compare( InternalKey o1, InternalKey o2 )
+            {
+                int r = o1.getPropertyId() - o2.getPropertyId();
+                if(r==0){
+                    r = (int) (o1.getEntityId() - o2.getEntityId());
+                    if(r==0){
+                        return o1.getStartTime() - o2.getStartTime();
+                    }else{
+                        return r;
+                    }
+                }else{
+                    return r;
+                }
+            }
+        });
 
         private VersionedHashMap<Integer, DefinedProperty> addedProperties;
         private VersionedHashMap<Integer, DefinedProperty> changedProperties;
@@ -283,6 +312,48 @@ public interface PropertyContainerState
             {
                 visitor.visitPropertyChanges( id, addedProperties(), changedProperties(), removedProperties() );
             }
+        }
+
+    }
+
+    class TemporalPropertyRecordKey
+    {
+        private int propertyId;
+        private int time;
+
+        TemporalPropertyRecordKey(int proId, int t )
+        {
+            this.propertyId = proId;
+            this.time = t;
+        }
+
+        public int getPropertyId()
+        {
+            return propertyId;
+        }
+
+        public int getTime()
+        {
+            return time;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            int result = propertyId;
+            result = 31 * result + time;
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            TemporalPropertyRecordKey that = (TemporalPropertyRecordKey) o;
+
+            return propertyId == that.propertyId && time == that.time;
         }
     }
 }

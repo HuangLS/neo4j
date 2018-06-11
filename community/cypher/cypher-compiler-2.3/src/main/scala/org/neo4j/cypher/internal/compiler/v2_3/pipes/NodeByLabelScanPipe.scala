@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,10 +20,11 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, ReadsLabel}
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, ReadsNodesWithLabels}
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments.LabelName
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.{NoChildren, PlanDescriptionImpl}
-import org.neo4j.cypher.internal.compiler.v2_3.symbols.{SymbolTable, _}
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
 case class NodeByLabelScanPipe(ident: String, label: LazyLabel)
                               (val estimatedCardinality: Option[Double] = None)(implicit pipeMonitor: PipeMonitor)
@@ -46,7 +47,7 @@ case class NodeByLabelScanPipe(ident: String, label: LazyLabel)
 
   def planDescriptionWithoutCardinality = new PlanDescriptionImpl(this.id, "NodeByLabelScan", NoChildren, Seq(LabelName(label.name)), identifiers)
 
-  def symbols: SymbolTable = new SymbolTable(Map(ident -> CTNode))
+  def symbols = new SymbolTable(Map(ident -> CTNode))
 
   override def monitor = pipeMonitor
 
@@ -57,7 +58,7 @@ case class NodeByLabelScanPipe(ident: String, label: LazyLabel)
 
   def sources: Seq[Pipe] = Seq.empty
 
-  override def localEffects = Effects(ReadsLabel(label.name))
+  override def localEffects = Effects(ReadsNodesWithLabels(label.name))
 
   def withEstimatedCardinality(estimated: Double) = copy()(Some(estimated))
 }

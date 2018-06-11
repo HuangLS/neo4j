@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,28 @@
  */
 package org.neo4j.kernel;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.junit.Test;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.neo4j.helpers.Clock;
 import org.neo4j.helpers.TickingClock;
+import org.neo4j.kernel.AvailabilityGuard.UnavailableException;
+import org.neo4j.logging.Log;
+import org.neo4j.logging.NullLog;
 
 import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.atMost;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 import static org.neo4j.kernel.AvailabilityGuard.availabilityRequirement;
 
@@ -36,11 +50,56 @@ public class AvailabilityGuardTest
     private static final AvailabilityGuard.AvailabilityRequirement REQUIREMENT_2 = availabilityRequirement( "Requirement 2" );
 
     @Test
+    public void logOnAvailabilityChange() throws Exception
+    {
+        // Given
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
+
+        // When starting out
+        verifyZeroInteractions( log );
+
+        // When requirement is added
+        availabilityGuard.require( REQUIREMENT_1 );
+
+        // Then log should have been called
+        verify( log, atLeastOnce() ).info( anyString() );
+
+        // When requirement fulfilled
+        availabilityGuard.fulfill( REQUIREMENT_1 );
+
+        // Then log should have been called
+        verify( log, atLeast( 2 ) ).info( anyString() );
+
+        // When requirement is added
+        availabilityGuard.require( REQUIREMENT_1 );
+        availabilityGuard.require( REQUIREMENT_2 );
+
+        // Then log should have been called
+        verify( log, atLeast( 3 ) ).info( anyString() );
+
+        // When requirement fulfilled
+        availabilityGuard.fulfill( REQUIREMENT_1 );
+
+        // Then log should not have been called
+        verify( log, atMost( 3 ) ).info( anyString() );
+
+        // When requirement fulfilled
+        availabilityGuard.fulfill( REQUIREMENT_2 );
+
+        // Then log should have been called
+        verify( log, atLeast( 4 ) ).info( anyString() );
+        verify( log, atMost( 4 ) ).info( anyString() );
+    }
+
+    @Test
     public void givenAccessGuardWith2ConditionsWhenAwaitThenTimeoutAndReturnFalse() throws Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
         availabilityGuard.require( REQUIREMENT_1 );
         availabilityGuard.require( REQUIREMENT_2 );
 
@@ -55,8 +114,9 @@ public class AvailabilityGuardTest
     public void givenAccessGuardWith2ConditionsWhenAwaitThenActuallyWaitGivenTimeout() throws Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
         availabilityGuard.require( REQUIREMENT_1 );
         availabilityGuard.require( REQUIREMENT_2 );
 
@@ -75,8 +135,9 @@ public class AvailabilityGuardTest
     public void givenAccessGuardWith2ConditionsWhenGrantOnceAndAwaitThenTimeoutAndReturnFalse() throws Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
         availabilityGuard.require( REQUIREMENT_1 );
         availabilityGuard.require( REQUIREMENT_2 );
 
@@ -97,8 +158,9 @@ public class AvailabilityGuardTest
     public void givenAccessGuardWith2ConditionsWhenGrantEachAndAwaitThenTrue() throws Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
         availabilityGuard.require( REQUIREMENT_1 );
         availabilityGuard.require( REQUIREMENT_2 );
 
@@ -122,8 +184,9 @@ public class AvailabilityGuardTest
             Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
         availabilityGuard.require( REQUIREMENT_1 );
         availabilityGuard.require( REQUIREMENT_2 );
 
@@ -147,13 +210,14 @@ public class AvailabilityGuardTest
             Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        final AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        final AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
         availabilityGuard.require( REQUIREMENT_1 );
         availabilityGuard.require( REQUIREMENT_2 );
 
         // When
-        clock.at( 500, new Runnable()
+        clock.at( 500, TimeUnit.MILLISECONDS, new Runnable()
         {
             @Override
             public void run()
@@ -177,8 +241,9 @@ public class AvailabilityGuardTest
     public void givenAccessGuardWithConditionWhenGrantThenNotifyListeners() throws Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        final AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        final AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
         availabilityGuard.require( REQUIREMENT_1 );
 
         final AtomicBoolean notified = new AtomicBoolean();
@@ -209,8 +274,9 @@ public class AvailabilityGuardTest
     public void givenAccessGuardWithConditionWhenGrantAndDenyThenNotifyListeners() throws Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        final AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        final AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
         availabilityGuard.require( REQUIREMENT_1 );
 
         final AtomicBoolean notified = new AtomicBoolean();
@@ -242,8 +308,9 @@ public class AvailabilityGuardTest
     public void givenAccessGuardWithConditionWhenShutdownThenInstantlyDenyAccess() throws Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        final AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        final AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
         availabilityGuard.require( REQUIREMENT_1 );
 
         // When
@@ -261,8 +328,9 @@ public class AvailabilityGuardTest
             Exception
     {
         // Given
-        TickingClock clock = new TickingClock( 0, 100 );
-        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock );
+        TickingClock clock = new TickingClock( 0, 100, TimeUnit.MILLISECONDS );
+        Log log = mock( Log.class );
+        AvailabilityGuard availabilityGuard = new AvailabilityGuard( clock, log );
 
         // When
         availabilityGuard.require( REQUIREMENT_1 );
@@ -270,5 +338,28 @@ public class AvailabilityGuardTest
 
         // Then
         assertThat( availabilityGuard.describeWhoIsBlocking(), equalTo( "2 reasons for blocking: Requirement 1, Requirement 2." ) );
+    }
+
+    @Test
+    public void shouldExplainBlockersOnCheckAvailable() throws Exception
+    {
+        // GIVEN
+        AvailabilityGuard availabilityGuard = new AvailabilityGuard( Clock.SYSTEM_CLOCK, NullLog.getInstance() );
+        // At this point it should be available
+        availabilityGuard.checkAvailable();
+
+        // WHEN
+        availabilityGuard.require( REQUIREMENT_1 );
+
+        // THEN
+        try
+        {
+            availabilityGuard.checkAvailable();
+            fail( "Should not be available" );
+        }
+        catch ( UnavailableException e )
+        {
+            assertThat( e.getMessage(), containsString( REQUIREMENT_1.description() ) );
+        }
     }
 }

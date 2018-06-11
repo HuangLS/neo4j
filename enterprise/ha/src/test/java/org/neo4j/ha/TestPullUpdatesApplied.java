@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -43,11 +43,12 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.TestHighlyAvailableGraphDatabaseFactory;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.HighlyAvailableGraphDatabase;
-import org.neo4j.kernel.ha.UpdatePullerClient;
+import org.neo4j.kernel.ha.UpdatePuller;
 import org.neo4j.test.StreamConsumer;
 import org.neo4j.test.TargetDirectory;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This test case ensures that updates in HA are first written out to the log
@@ -120,10 +121,7 @@ public class TestPullUpdatesApplied
 
         dbToKill.shutdown();
 
-        if ( !latch1.await( 60, TimeUnit.SECONDS ) )
-        {
-            throw new IllegalStateException( "Timeout waiting for instance to leave cluster" );
-        }
+        assertTrue( "Timeout waiting for instance to leave cluster", latch1.await( 60, TimeUnit.SECONDS ) );
 
         addNode( master ); // this will be pulled by tne next start up, applied
         // but not written to log.
@@ -147,10 +145,7 @@ public class TestPullUpdatesApplied
 
         runInOtherJvmToGetExitCode( targetDirectory.getAbsolutePath(), "" + toKill );
 
-        if ( !latch2.await( 60, TimeUnit.SECONDS ) )
-        {
-            throw new IllegalStateException( "Timeout waiting for instance to fail" );
-        }
+        assertTrue( "Timeout waiting for instance to fail", latch2.await( 60, TimeUnit.SECONDS ) );
 
         // This is to allow other instances to mark the dead instance as failed, otherwise on startup it will be denied.
         // TODO This is to demonstrate shortcomings in our design. Fix this, you ugly, ugly hacker
@@ -167,7 +162,7 @@ public class TestPullUpdatesApplied
         String storePath = args[0];
         int serverId = Integer.parseInt( args[1] );
 
-        database( serverId, storePath ).getDependencyResolver().resolveDependency( UpdatePullerClient.class ).pullUpdates();
+        database( serverId, storePath ).getDependencyResolver().resolveDependency( UpdatePuller.class ).pullUpdates();
         // this is the bug trigger
         // no shutdown, emulates a crash.
     }

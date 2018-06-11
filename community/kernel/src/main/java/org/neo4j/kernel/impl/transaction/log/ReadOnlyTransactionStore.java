@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,6 @@ import java.io.IOException;
 
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
-import org.neo4j.kernel.impl.transaction.CommittedTransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.log.TransactionMetadataCache.TransactionMetadata;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
@@ -39,6 +38,7 @@ public class ReadOnlyTransactionStore extends LifecycleAdapter implements Logica
     private final LogicalTransactionStore physicalStore;
 
     public ReadOnlyTransactionStore( PageCache pageCache, FileSystemAbstraction fs, File fromPath, Monitors monitors )
+            throws IOException
     {
         PhysicalLogFiles logFiles = new PhysicalLogFiles( fromPath, fs );
         TransactionMetadataCache transactionMetadataCache = new TransactionMetadataCache( 10, 100 );
@@ -50,10 +50,16 @@ public class ReadOnlyTransactionStore extends LifecycleAdapter implements Logica
     }
 
     @Override
-    public IOCursor<CommittedTransactionRepresentation> getTransactions( long transactionIdToStartFrom )
+    public TransactionCursor getTransactions( long transactionIdToStartFrom )
             throws NoSuchTransactionException, IOException
     {
         return physicalStore.getTransactions( transactionIdToStartFrom );
+    }
+
+    @Override
+    public TransactionCursor getTransactions( LogPosition position ) throws NoSuchTransactionException, IOException
+    {
+        return physicalStore.getTransactions( position );
     }
 
     @Override

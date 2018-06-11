@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,9 @@
  */
 package org.neo4j.server;
 
-import static org.hamcrest.CoreMatchers.startsWith;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
-import static org.neo4j.server.helpers.CommunityServerBuilder.server;
-import static org.neo4j.test.server.HTTP.GET;
-import static org.neo4j.test.server.HTTP.POST;
-import static org.neo4j.test.server.HTTP.RawPayload.quotedJson;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.security.KeyManagementException;
@@ -33,17 +29,21 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 import org.neo4j.test.server.ExclusiveServerTestBase;
 import org.neo4j.test.server.HTTP;
+
+import static org.hamcrest.CoreMatchers.startsWith;
+import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertThat;
+import static org.neo4j.server.helpers.CommunityServerBuilder.server;
+import static org.neo4j.test.server.HTTP.GET;
+import static org.neo4j.test.server.HTTP.POST;
+import static org.neo4j.test.server.HTTP.RawPayload.quotedJson;
 
 public class HttpsAccessIT extends ExclusiveServerTestBase
 {

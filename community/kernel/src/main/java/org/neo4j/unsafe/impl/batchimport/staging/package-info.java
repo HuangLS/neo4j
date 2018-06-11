@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,7 @@
 /**
  * Generic staging framework and generic implementations of such used to execute batches in parallel.
  *
- * @see Stage
- * @see Step
+ * @see org.neo4j.unsafe.impl.batchimport.staging.Stage
+ * @see org.neo4j.unsafe.impl.batchimport.staging.Step
  */
 package org.neo4j.unsafe.impl.batchimport.staging;

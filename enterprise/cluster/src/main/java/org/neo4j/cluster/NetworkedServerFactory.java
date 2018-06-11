@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -128,7 +128,8 @@ public class NetworkedServerFactory
         } );
 
         final ProtocolServer protocolServer = protocolServerFactory.newProtocolServer(
-                config.get( ClusterSettings.server_id ), timeoutStrategy, receiver, sender,
+                config.get( ClusterSettings.server_id ), config.get( ClusterSettings.max_acceptors ),
+                timeoutStrategy, receiver, sender,
                 acceptorInstanceStore, electionCredentialsProvider, stateMachineExecutor, objectInputStreamFactory,
                 objectOutputStreamFactory );
         receiver.addNetworkChannelsListener( new NetworkReceiver.NetworkChannelsListener()

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,15 +22,16 @@ package org.neo4j.cypher.internal.compiler.v2_3.commands
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders.GetGraphElements
 import org.neo4j.cypher.internal.compiler.v2_3.mutation.GraphElementPropertyFunctions
-import org.neo4j.cypher.internal.compiler.v2_3.pipes.{IndexSeekModeFactory, EntityProducer, QueryState}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.{NodeByLabelEntityProducer, EntityProducer, IndexSeekModeFactory, QueryState}
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.Argument
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
+import org.neo4j.cypher.internal.frontend.v2_3.{EntityNotFoundException, IndexHintException, InternalException}
 import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
 
 class EntityProducerFactory extends GraphElementPropertyFunctions {
 
-    private def asProducer[T <: PropertyContainer](startItem: StartItem)
-                                                  (f: (ExecutionContext, QueryState) => Iterator[T]) =
+  private def asProducer[T <: PropertyContainer](startItem: StartItem)
+                                                (f: (ExecutionContext, QueryState) => Iterator[T]) =
     new EntityProducer[T] {
       def apply(m: ExecutionContext, q: QueryState) = f(m, q)
 
@@ -39,11 +40,19 @@ class EntityProducerFactory extends GraphElementPropertyFunctions {
       def arguments: Seq[Argument] = startItem.arguments
     }
 
-  def nodeStartItems: PartialFunction[(PlanContext, StartItem), EntityProducer[Node]] =
+  def readNodeStartItems: PartialFunction[(PlanContext, StartItem), EntityProducer[Node]] =
     nodeById orElse
       nodeByIndex orElse
       nodeByIndexQuery orElse
-      nodeByIndexHint orElse
+      nodeByIndexHint(readOnly = true) orElse
+      nodeByLabel orElse
+      nodesAll
+
+  def updateNodeStartItems: PartialFunction[(PlanContext, StartItem), EntityProducer[Node]] =
+    nodeById orElse
+      nodeByIndex orElse
+      nodeByIndexQuery orElse
+      nodeByIndexHint(readOnly = false) orElse
       nodeByLabel orElse
       nodesAll
 
@@ -52,10 +61,10 @@ class EntityProducerFactory extends GraphElementPropertyFunctions {
       planContext.checkNodeIndex(idxName)
 
       asProducer[Node](startItem) { (m: ExecutionContext, state: QueryState) =>
-          val keyVal = key(m)(state).toString
-          val valueVal = value(m)(state)
-          val neoValue = makeValueNeoSafe(valueVal)
-          state.query.nodeOps.indexGet(idxName, keyVal, neoValue)
+        val keyVal = key(m)(state).toString
+        val valueVal = value(m)(state)
+        val neoValue = makeValueNeoSafe(valueVal)
+        state.query.nodeOps.indexGet(idxName, keyVal, neoValue)
       }
   }
 
@@ -91,9 +100,8 @@ class EntityProducerFactory extends GraphElementPropertyFunctions {
     // The label exists at compile time - no need to look up the label id for every run
     case (planContext, startItem@NodeByLabel(identifier, label)) if planContext.getOptLabelId(label).nonEmpty =>
       val labelId: Int = planContext.getOptLabelId(label).get
-      asProducer[Node](startItem) {
-        (m: ExecutionContext, state: QueryState) => state.query.getNodesByLabel(labelId)
-      }
+
+      NodeByLabelEntityProducer(startItem, labelId)
 
     // The label is missing at compile time - we look it up every time this plan is run
     case (planContext, startItem@NodeByLabel(identifier, label)) => asProducer(startItem) {
@@ -116,7 +124,7 @@ class EntityProducerFactory extends GraphElementPropertyFunctions {
         state.query.relationshipOps.all }
   }
 
-  val nodeByIndexHint: PartialFunction[(PlanContext, StartItem), EntityProducer[Node]] = {
+  def nodeByIndexHint(readOnly: Boolean): PartialFunction[(PlanContext, StartItem), EntityProducer[Node]] = {
     case (planContext, startItem @ SchemaIndex(identifier, labelName, propertyName, AnyIndex, Some(ScanQueryExpression(_)))) =>
 
       val indexGetter = planContext.getIndexRule(labelName, propertyName)
@@ -125,7 +133,6 @@ class EntityProducerFactory extends GraphElementPropertyFunctions {
         (throw new IndexHintException(identifier, labelName, propertyName, "No such index found."))
 
       asProducer[Node](startItem) { (m: ExecutionContext, state: QueryState) =>
-        val baseContext = state.initialContext.getOrElse(ExecutionContext.empty)
         val resultNodes: Iterator[Node] = state.query.indexScan(index)
         resultNodes
       }
@@ -139,7 +146,9 @@ class EntityProducerFactory extends GraphElementPropertyFunctions {
 
       val expression = valueExp getOrElse
         (throw new InternalException("Something went wrong trying to build your query."))
-      val indexFactory = IndexSeekModeFactory(unique = false).fromQueryExpression(expression).indexFactory(index)
+      val indexFactory = IndexSeekModeFactory(unique = false, readOnly = readOnly).
+        fromQueryExpression(expression).
+        indexFactory(index)
 
       asProducer[Node](startItem) { (m: ExecutionContext, state: QueryState) =>
         indexQuery(expression, m, state, indexFactory(state), labelName, propertyName)
@@ -154,7 +163,9 @@ class EntityProducerFactory extends GraphElementPropertyFunctions {
 
       val expression = valueExp getOrElse
         (throw new InternalException("Something went wrong trying to build your query."))
-      val indexFactory = IndexSeekModeFactory(unique = true).fromQueryExpression(expression).indexFactory(index)
+      val indexFactory = IndexSeekModeFactory(unique = true, readOnly = readOnly).
+        fromQueryExpression(expression).
+        indexFactory(index)
 
       asProducer[Node](startItem) { (m: ExecutionContext, state: QueryState) =>
         indexQuery(expression, m, state, indexFactory(state), labelName, propertyName)

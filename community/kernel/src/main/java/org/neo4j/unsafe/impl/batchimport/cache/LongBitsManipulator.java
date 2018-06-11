@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.unsafe.impl.batchimport.cache;
+
+import java.util.Arrays;
+
+import org.neo4j.kernel.impl.util.Bits;
 
 /**
  * Turns a long into 64 bits of memory where variables can be allocated in, for example:
@@ -68,6 +72,12 @@ public class LongBitsManipulator
                     // all bits in this slot as 0
                     otherBits;
         }
+
+        @Override
+        public String toString()
+        {
+            return getClass().getSimpleName() + "[" + Bits.numbersToBitString( new long[] {maxValue << bitOffset} ) + "]";
+        }
     }
 
     private final Slot[] slots;
@@ -90,6 +100,11 @@ public class LongBitsManipulator
             bitCursor += bits;
         }
         return slots;
+    }
+
+    public int slots()
+    {
+        return slots.length;
     }
 
     public long set( long field, int slotIndex, long value )
@@ -126,8 +141,14 @@ public class LongBitsManipulator
     {
         if ( slotIndex < 0 || slotIndex >= slots.length )
         {
-            throw new IllegalArgumentException( "Invalid slot " + slotIndex );
+            throw new IllegalArgumentException( "Invalid slot " + slotIndex + ", I've got " + this );
         }
         return slots[slotIndex];
+    }
+
+    @Override
+    public String toString()
+    {
+        return Arrays.toString( slots );
     }
 }

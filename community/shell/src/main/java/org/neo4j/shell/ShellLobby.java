@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,6 +28,7 @@ import org.neo4j.shell.impl.SimpleAppServer;
 import org.neo4j.shell.impl.RemoteClient;
 import org.neo4j.shell.impl.RmiLocation;
 import org.neo4j.shell.impl.SameJvmClient;
+import org.neo4j.shell.impl.SystemOutput;
 
 /**
  * A convenience class for creating servers clients as well as finding remote
@@ -58,11 +59,13 @@ public abstract class ShellLobby
 	}
 
 	/**
-	 * Creates a client and "starts" it, i.e. grabs the console prompt.
-	 * @param server the server (in the same JVM) which the client will
-	 * communicate with.
-	 * @return the new shell client.
-	 */
+     * Creates a client and "starts" it, i.e. grabs the console prompt.
+     * @param server the server (in the same JVM) which the client will
+     * communicate with.
+     * @param signalHandler the ctrl-c handler to use
+     * @throws ShellException if the execution fails
+     * @return the new shell client.
+     */
 	public static ShellClient newClient( ShellServer server, CtrlCHandler signalHandler ) throws ShellException
     {
 	    return newClient( server, new HashMap<String, Serializable>(), signalHandler );
@@ -72,6 +75,7 @@ public abstract class ShellLobby
      * Creates a client and "starts" it, i.e. grabs the console prompt.
      * @param server the server (in the same JVM) which the client will
      * communicate with.
+     * @throws ShellException if the execution fails
      * @return the new shell client.
      */
     public static ShellClient newClient( ShellServer server ) throws ShellException
@@ -85,13 +89,31 @@ public abstract class ShellLobby
      * communicate with.
      * @param initialSession the initial session variables the shell will have,
      * in addition to those provided by the server initially.
-     * @param signalHandler
+     * @param signalHandler the ctrl-c handler to use
+     * @throws ShellException if the execution fails
      * @return the new shell client.
      */
     public static ShellClient newClient( ShellServer server, Map<String, Serializable> initialSession,
                                          CtrlCHandler signalHandler ) throws ShellException
     {
-        return new SameJvmClient( initialSession, server, signalHandler );
+        return newClient( server, initialSession, new SystemOutput(), signalHandler );
+    }
+
+    /**
+     * Creates a client and "starts" it, i.e. grabs the console prompt.
+     * @param server the server (in the same JVM) which the client will
+     * communicate with.
+     * @param initialSession the initial session variables the shell will have,
+     * in addition to those provided by the server initially.
+     * @param output the output to write to.
+     * @param signalHandler the ctrl-c handler to use
+     * @throws ShellException if the execution fails
+     * @return the new shell client.
+     */
+    public static ShellClient newClient( ShellServer server, Map<String, Serializable> initialSession,
+                                         Output output, CtrlCHandler signalHandler ) throws ShellException
+    {
+        return new SameJvmClient( initialSession, server, output, signalHandler );
     }
 	
     /**
@@ -99,6 +121,7 @@ public abstract class ShellLobby
      * It will try to find a remote server on "localhost".
      * @param port the RMI port.
      * @param name the RMI name.
+     * @param ctrlcHandler the ctrl-c handler to use
      * @throws ShellException if no server was found at the RMI location.
      * @return the new shell client.
      */
@@ -122,14 +145,15 @@ public abstract class ShellLobby
     }
     
 	/**
-	 * Creates a client and "starts" it, i.e. grabs the console prompt.
-	 * It will try to find a remote server to connect to.
+     * Creates a client and "starts" it, i.e. grabs the console prompt.
+     * It will try to find a remote server to connect to.
      * @param host the host (IP or domain name).
-	 * @param port the RMI port.
-	 * @param name the RMI name.
-	 * @throws ShellException if no server was found at the RMI location.
-	 * @return the new shell client.
-	 */
+     * @param port the RMI port.
+     * @param name the RMI name.
+     * @param ctrlcHandler the ctrl-c handler to use
+     * @throws ShellException if no server was found at the RMI location.
+     * @return the new shell client.
+     */
 	public static ShellClient newClient( String host, int port, String name, CtrlCHandler ctrlcHandler )
 		throws ShellException
 	{
@@ -151,12 +175,13 @@ public abstract class ShellLobby
     }
     
 	/**
-	 * Creates a client and "starts" it, i.e. grabs the console prompt.
-	 * It will try to find a remote server specified by {@code serverLocation}.
-	 * @param serverLocation the RMI location of the server to connect to.
-	 * @throws ShellException if no server was found at the RMI location.
-	 * @return the new shell client.
-	 */
+     * Creates a client and "starts" it, i.e. grabs the console prompt.
+     * It will try to find a remote server specified by {@code serverLocation}.
+     * @param serverLocation the RMI location of the server to connect to.
+     * @param ctrlcHandler the ctrl-c handler to use
+     * @throws ShellException if no server was found at the RMI location.
+     * @return the new shell client.
+     */
 	public static ShellClient newClient( RmiLocation serverLocation, CtrlCHandler ctrlcHandler )
 		throws ShellException
 	{
@@ -169,6 +194,7 @@ public abstract class ShellLobby
      * @param serverLocation the RMI location of the server to connect to.
      * @param initialSession the initial session variables the shell will have,
      * in addition to those provided by the server initially.
+     * @param ctrlcHandler the ctrl-c handler to use
      * @throws ShellException if no server was found at the RMI location.
      * @return the new shell client.
      */
@@ -183,6 +209,7 @@ public abstract class ShellLobby
      * It will try to find a remote server on {@code host} with default
      * port and name.
      * @param host host to connect to.
+     * @param ctrlcHandler the ctrl-c handler to use
      * @throws ShellException if no server was found at the RMI location.
      * @return the new shell client.
      */

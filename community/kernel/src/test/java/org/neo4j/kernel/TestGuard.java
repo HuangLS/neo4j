@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,18 +25,19 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Path;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
-import org.neo4j.helpers.Settings;
+import org.neo4j.kernel.configuration.Settings;
 import org.neo4j.kernel.guard.Guard;
 import org.neo4j.kernel.guard.GuardOperationsCountException;
 import org.neo4j.kernel.guard.GuardTimeoutException;
+import org.neo4j.kernel.impl.util.UnsatisfiedDependencyException;
 import org.neo4j.test.TestGraphDatabaseFactory;
-
-import static java.lang.Integer.MAX_VALUE;
-import static java.lang.Thread.sleep;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
+
+import static java.lang.Integer.MAX_VALUE;
+import static java.lang.Thread.sleep;
 
 import static org.neo4j.graphdb.DynamicRelationshipType.withName;
 import static org.neo4j.helpers.SillyUtils.ignore;
@@ -44,7 +45,7 @@ import static org.neo4j.helpers.SillyUtils.ignore;
 @SuppressWarnings("deprecation"/*getGuard() is deprecated (GraphDatabaseAPI), and used all throughout this test*/)
 public class TestGuard
 {
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = UnsatisfiedDependencyException.class)
     public void testGuardNotInsertedByDefault()
     {
         GraphDatabaseAPI db = (GraphDatabaseAPI) new TestGraphDatabaseFactory().newImpermanentDatabase();

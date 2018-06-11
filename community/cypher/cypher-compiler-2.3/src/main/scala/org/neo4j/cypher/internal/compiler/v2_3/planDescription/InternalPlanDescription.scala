@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planDescription
 
+import org.neo4j.cypher.internal.compiler.v2_3.commands
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{SeekArgs => PipeEntityByIdRhs}
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments._
-import org.neo4j.cypher.internal.compiler.v2_3.{ast, commands}
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticDirection, ast}
 
 /**
  * Abstract description of an execution plan
@@ -81,9 +81,10 @@ object InternalPlanDescription {
     case class Expression(value: ast.Expression) extends Argument
     case class LegacyExpression(value: commands.expressions.Expression) extends Argument
     case class UpdateActionName(value: String) extends Argument
+    case class MergePattern(startPoint: String) extends Argument
     case class LegacyIndex(value: String) extends Argument
     case class Index(label: String, propertyKey: String) extends Argument
-    case class PrefixIndex(label: String, propertyKey: String, prefix: String) extends Argument
+    case class PrefixIndex(label: String, propertyKey: String, prefix: commands.expressions.Expression) extends Argument
     case class InequalityIndex(label: String, propertyKey: String, bounds: Seq[String]) extends Argument
     case class LabelName(label: String) extends Argument
     case class KeyNames(keys: Seq[String]) extends Argument
@@ -105,7 +106,8 @@ object InternalPlanDescription {
     case class RuntimeImpl(value: String) extends Argument{
       override def name = "runtime-impl"
     }
-    case class ExpandExpression(from: String, relName: String, relTypes:Seq[String], to: String, direction: Direction, varLength: Boolean = false) extends Argument
+    case class ExpandExpression(from: String, relName: String, relTypes:Seq[String], to: String,
+                                direction: SemanticDirection, varLength: Boolean = false) extends Argument
     case class SourceCode(className: String, sourceCode: String) extends Argument {
       override def name = className
     }

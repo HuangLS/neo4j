@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,7 +28,7 @@ class WithAcceptanceTest extends ExecutionEngineFunSuite with NewPlannerTestSupp
     val b = createNode()
     relate(a, b)
 
-    val result = executeWithAllPlannersAndRuntimes(
+    val result = executeWithAllPlanners(
       "MATCH a WITH a MATCH a-->b RETURN *"
     )
     result.toList should equal(List(Map("a" -> a, "b" -> b)))
@@ -51,7 +51,7 @@ class WithAcceptanceTest extends ExecutionEngineFunSuite with NewPlannerTestSupp
     val a = createNode()
     val b = createNode()
 
-    val result = executeWithAllPlannersAndRuntimes(
+    val result = executeWithAllPlanners(
       "MATCH a WITH a MATCH b RETURN *"
     )
     result.toSet should equal(Set(
@@ -188,6 +188,17 @@ class WithAcceptanceTest extends ExecutionEngineFunSuite with NewPlannerTestSupp
       "WITH {foo: {bar: 'baz'}} AS nestedMap RETURN nestedMap.foo.bar"
     )
     result.toSet should equal(Set(Map("nestedMap.foo.bar" -> "baz")))
+  }
+
+  test("connected components after WITH") {
+    val n = createLabeledNode("A")
+    val m = createLabeledNode("B")
+    val x = createNode()
+    relate(n, x)
+
+    val result = executeWithAllPlanners("MATCH (n:A) WITH n LIMIT 1 MATCH (m:B), (n)-->(x) RETURN *")
+
+    result.toList should equal(List(Map("m" -> m, "n" -> n, "x" -> x)))
   }
 
 }

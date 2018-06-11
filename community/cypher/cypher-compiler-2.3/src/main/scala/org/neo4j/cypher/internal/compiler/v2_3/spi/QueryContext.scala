@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,14 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.spi
 
+import java.net.URL
+
 import org.neo4j.cypher.internal.compiler.v2_3.InternalQueryStatistics
-import org.neo4j.graphdb._
-import org.neo4j.kernel.api.constraints.{MandatoryNodePropertyConstraint, MandatoryRelationshipPropertyConstraint, UniquenessConstraint}
-import org.neo4j.kernel.api.index.IndexDescriptor
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expander, KernelPredicate}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.PatternNode
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.{IndexDescriptor, NodePropertyExistenceConstraint, RelationshipPropertyExistenceConstraint, UniquenessConstraint}
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.graphdb.{Node, Path, PropertyContainer, Relationship}
 
 /*
  * Developer note: This is an attempt at an internal graph database API, which defines a clean cut between
@@ -45,15 +49,17 @@ trait QueryContext extends TokenContext {
 
   def createRelationship(start: Node, end: Node, relType: String): Relationship
 
+  def createRelationship(start: Long, end: Long, relType: Int): Relationship
+
   def getOrCreateRelTypeId(relTypeName: String): Int
 
-  def getRelationshipsForIds(node: Node, dir: Direction, types: Option[Seq[Int]]): Iterator[Relationship]
+  def getRelationshipsForIds(node: Node, dir: SemanticDirection, types: Option[Seq[Int]]): Iterator[Relationship]
 
   def getOrCreateLabelId(labelName: String): Int
 
   def getLabelsForNode(node: Long): Iterator[Int]
 
-  def isLabelSetOnNode(label: Int, node: Long): Boolean = getLabelsForNode(node).toIterator.contains(label)
+  def isLabelSetOnNode(label: Int, node: Long): Boolean
 
   def setLabelsOnNode(node: Long, labelIds: Iterator[Int]): Int
 
@@ -62,6 +68,8 @@ trait QueryContext extends TokenContext {
   def getPropertiesForNode(node: Long): Iterator[Int]
 
   def getPropertiesForRelationship(relId: Long): Iterator[Int]
+
+  def detachDeleteNode(node: Node): Int
 
   def getOrCreatePropertyKeyId(propertyKey: String): Int
 
@@ -81,7 +89,7 @@ trait QueryContext extends TokenContext {
 
   def indexScan(index: IndexDescriptor): Iterator[Node]
 
-  def uniqueIndexSeek(index: IndexDescriptor, value: Any): Option[Node]
+  def lockingExactUniqueIndexSearch(index: IndexDescriptor, value: Any): Option[Node]
 
   def getNodesByLabel(id: Int): Iterator[Node]
 
@@ -95,17 +103,17 @@ trait QueryContext extends TokenContext {
 
   def dropUniqueConstraint(labelId: Int, propertyKeyId: Int)
 
-  def createNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int): IdempotentResult[MandatoryNodePropertyConstraint]
+  def createNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int): IdempotentResult[NodePropertyExistenceConstraint]
 
-  def dropNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int)
+  def dropNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int)
 
-  def createRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int): IdempotentResult[MandatoryRelationshipPropertyConstraint]
+  def createRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int): IdempotentResult[RelationshipPropertyExistenceConstraint]
 
-  def dropRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int)
+  def dropRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int)
 
   def getOptStatistics: Option[InternalQueryStatistics] = None
 
-  def hasLocalFileAccess: Boolean = false
+  def getImportURL(url: URL): Either[String,URL]
 
   /**
    * This should not be used. We'll remove sooner (or later). Don't do it.
@@ -118,9 +126,25 @@ trait QueryContext extends TokenContext {
 
   def relationshipEndNode(rel: Relationship): Node
 
-  def nodeGetDegree(node: Long, dir: Direction): Int
+  def nodeGetDegree(node: Long, dir: SemanticDirection): Int
 
-  def nodeGetDegree(node: Long, dir: Direction, relTypeId: Int): Int
+  def nodeGetDegree(node: Long, dir: SemanticDirection, relTypeId: Int): Int
+
+  def nodeIsDense(node: Long): Boolean
+
+  // Legacy dependency between kernel and compiler
+  def variableLengthPathExpand(node: PatternNode,
+                               realNode: Node,
+                               minHops: Option[Int],
+                               maxHops: Option[Int],
+                               direction: SemanticDirection,
+                               relTypes: Seq[String]): Iterator[Path]
+
+  def singleShortestPath(left: Node, right: Node, depth: Int, expander: Expander, pathPredicate: KernelPredicate[Path],
+                         filters: Seq[KernelPredicate[PropertyContainer]]): Option[Path]
+
+  def allShortestPath(left: Node, right: Node, depth: Int, expander: Expander, pathPredicate: KernelPredicate[Path],
+                      filters: Seq[KernelPredicate[PropertyContainer]]): Iterator[Path]
 }
 
 trait LockingQueryContext extends QueryContext {

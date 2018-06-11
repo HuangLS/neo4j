@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,12 +20,14 @@
 package org.neo4j.kernel.api.impl.index;
 
 import org.neo4j.helpers.Service;
+import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.extension.KernelExtensionFactory;
-import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory;
+import org.neo4j.kernel.impl.logging.LogService;
 import org.neo4j.kernel.impl.spi.KernelContext;
+import org.neo4j.logging.LogProvider;
 
 import static org.neo4j.kernel.api.impl.index.LuceneKernelExtensions.directoryFactory;
 
@@ -41,6 +43,8 @@ public class LuceneSchemaIndexProviderFactory extends
     public interface Dependencies
     {
         Config getConfig();
+
+        LogService getLogging();
     }
 
     public LuceneSchemaIndexProviderFactory()
@@ -51,11 +55,14 @@ public class LuceneSchemaIndexProviderFactory extends
     @Override
     public LuceneSchemaIndexProvider newInstance( KernelContext context, Dependencies dependencies ) throws Throwable
     {
-        boolean ephemeral = dependencies.getConfig().get( GraphDatabaseFacadeFactory.Configuration.ephemeral );
+        Config config = dependencies.getConfig();
+        LogProvider logging = dependencies.getLogging().getInternalLogProvider();
+        boolean ephemeral = config.get( GraphDatabaseFacadeFactory.Configuration.ephemeral );
 
         FileSystemAbstraction fileSystem = context.fileSystem();
         DirectoryFactory directoryFactory = directoryFactory( ephemeral, fileSystem );
 
-        return new LuceneSchemaIndexProvider( directoryFactory, context.storeDir() );
+        return new LuceneSchemaIndexProvider( fileSystem, directoryFactory, context.storeDir(), logging, config,
+                context.operationalMode() );
     }
 }

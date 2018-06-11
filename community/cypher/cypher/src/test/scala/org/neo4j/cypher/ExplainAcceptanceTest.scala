@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.cypher
+
+import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments.MergePattern
 
 class ExplainAcceptanceTest extends ExecutionEngineFunSuite {
   test("normal query is marked as such") {
@@ -42,5 +44,15 @@ class ExplainAcceptanceTest extends ExecutionEngineFunSuite {
     assert(result.planDescriptionRequested, "result not marked with planDescriptionRequested")
     result.executionPlanDescription().toString should include("Estimated Rows")
     result.executionPlanDescription().asJava.toString should include("Estimated Rows")
+  }
+
+  test("should report which node the merge starts from") {
+    val query = "EXPLAIN MERGE (first)-[:PIZZA]->(second)"
+
+    val result = execute(query)
+    val plan = result.executionPlanDescription()
+    result.close()
+
+    plan.toString should include(MergePattern("second").toString)
   }
 }

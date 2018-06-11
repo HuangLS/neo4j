@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,12 +20,13 @@
 package org.neo4j.cypher.internal.compiler.v2_3
 
 import org.neo4j.cypher.GraphDatabaseFunSuite
-import org.neo4j.cypher.internal.compiler.v2_3.commands.True
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.True
 import org.neo4j.cypher.internal.compiler.v2_3.pipes._
-import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.{BidirectionalTraversalMatcher, MonoDirectionalTraversalMatcher, SingleStep}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.SingleStep
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.Argument
-import org.neo4j.graphdb.Direction.OUTGOING
-import org.neo4j.graphdb.{Direction, Node, Path}
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection.{BOTH, OUTGOING}
+import org.neo4j.cypher.internal.spi.v2_3.{BidirectionalTraversalMatcher, MonoDirectionalTraversalMatcher}
+import org.neo4j.graphdb.{Node, Path}
 
 class TraversalMatcherTest extends GraphDatabaseFunSuite with QueryStateTestSupport {
 
@@ -105,7 +106,7 @@ class TraversalMatcherTest extends GraphDatabaseFunSuite with QueryStateTestSupp
     val start = createStartPointIterator(nodeA, nodeB)
     val end = createStartPointIterator(nodeA, nodeB)
 
-    val pr = SingleStep(0, Seq("LINK"), Direction.BOTH, None, True(), True())
+    val pr = SingleStep(0, Seq("LINK"), BOTH, None, True(), True())
     val matcher = new BidirectionalTraversalMatcher(pr, start, end)
 
     val result = withQueryState { queryState =>
@@ -132,7 +133,7 @@ class TraversalMatcherTest extends GraphDatabaseFunSuite with QueryStateTestSupp
     val start = createStartPointIterator(nodeA, nodeB, nodeC)
     val end = createStartPointIterator(nodeA, nodeB, nodeC)
 
-    val pr = SingleStep(0, Seq("LINK"), Direction.BOTH, None, True(), True())
+    val pr = SingleStep(0, Seq("LINK"), BOTH, None, True(), True())
     val matcher = new BidirectionalTraversalMatcher(pr, start, end)
 
     val result = withQueryState { queryState =>

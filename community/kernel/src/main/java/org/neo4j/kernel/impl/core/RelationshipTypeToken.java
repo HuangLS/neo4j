@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,10 +21,24 @@ package org.neo4j.kernel.impl.core;
 
 import org.neo4j.graphdb.RelationshipType;
 
+/**
+ * Special sub-class of {@link Token} that implements the public-facing
+ * interface {@link RelationshipType}, so that we can pass tokens directly to users
+ * without first wrapping them in another object.
+ */
 public class RelationshipTypeToken extends Token implements RelationshipType
 {
     public RelationshipTypeToken( String name, int id )
     {
         super( name, id );
+    }
+
+    public static class Factory implements TokenFactory<RelationshipTypeToken>
+    {
+        @Override
+        public RelationshipTypeToken newToken( String name, int id )
+        {
+            return new RelationshipTypeToken( name, id );
+        }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -85,7 +85,6 @@ public interface JobScheduler extends Lifecycle
             }
             return "neo4j." + name() + "-" + threadCounter.incrementAndGet();
         }
-
     }
 
     /**
@@ -133,14 +132,24 @@ public interface JobScheduler extends Lifecycle
         public static final Group internalLogRotation = new Group( "InternalLogRotation", POOLED );
 
         /**
+         * Rotates query logs
+         */
+        public static final Group queryLogRotation = new Group( "queryLogRotation", POOLED );
+
+        /**
          * Checkpoint and store flush
          */
         public static final Group checkPoint = new Group( "CheckPoint", POOLED );
 
         /**
-         * Network IO threads for the GAP protocol.
+         * Network IO threads for the Bolt protocol.
          */
-        public static final Group gapNetworkIO = new Group( "GAPNetworkIO", NEW_THREAD );
+        public static final Group boltNetworkIO = new Group( "BoltNetworkIO", NEW_THREAD );
+
+        /**
+         * Storage maintenance.
+         */
+        public static Group storageMaintenance = new Group( "StorageMaintenance", POOLED );
     }
 
     interface JobHandle

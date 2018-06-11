@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,15 +30,17 @@ import org.neo4j.kernel.impl.core.CacheAccessBackDoor;
 import org.neo4j.kernel.impl.index.IndexConfigStore;
 import org.neo4j.kernel.impl.locking.LockGroup;
 import org.neo4j.kernel.impl.locking.LockService;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.TemporalPropertyStoreAdapter;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.command.CacheInvalidationTransactionApplier;
+import org.neo4j.kernel.impl.transaction.command.CommandHandler;
 import org.neo4j.kernel.impl.transaction.command.HighIdTransactionApplier;
 import org.neo4j.kernel.impl.transaction.command.IndexTransactionApplier;
-import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
 import org.neo4j.kernel.impl.transaction.command.NeoStoreTransactionApplier;
 import org.neo4j.kernel.impl.util.IdOrderingQueue;
 import org.neo4j.kernel.impl.util.function.Optional;
+import org.neo4j.temporal.TemporalPropertyStoreHandler;
 import org.neo4j.unsafe.batchinsert.LabelScanWriter;
 
 /**
@@ -48,8 +50,8 @@ import org.neo4j.unsafe.batchinsert.LabelScanWriter;
  */
 public class TransactionRepresentationStoreApplier
 {
-    private final NeoStore neoStore;
-    private final IndexingService indexingService;
+    private final NeoStores neoStores;
+    protected final IndexingService indexingService;
     private final CacheAccessBackDoor cacheAccess;
     private final LockService lockService;
     private final Provider<LabelScanWriter> labelScanWriters;
@@ -58,17 +60,20 @@ public class TransactionRepresentationStoreApplier
     private final KernelHealth health;
     private final IdOrderingQueue legacyIndexTransactionOrdering;
 
+    private final TemporalPropertyStoreAdapter temporalPropStore;
+
     private final WorkSync<Provider<LabelScanWriter>,IndexTransactionApplier.LabelUpdateWork> labelScanStoreSync;
 
     public TransactionRepresentationStoreApplier(
-            IndexingService indexingService, Provider<LabelScanWriter> labelScanWriters, NeoStore neoStore,
+            IndexingService indexingService, Provider<LabelScanWriter> labelScanWriters, NeoStores neoStores,
             CacheAccessBackDoor cacheAccess, LockService lockService, LegacyIndexApplierLookup
             legacyIndexProviderLookup,
-            IndexConfigStore indexConfigStore, KernelHealth health, IdOrderingQueue legacyIndexTransactionOrdering )
+            IndexConfigStore indexConfigStore, KernelHealth health, IdOrderingQueue legacyIndexTransactionOrdering,
+            TemporalPropertyStoreAdapter temporalPropertyStore)
     {
         this.indexingService = indexingService;
         this.labelScanWriters = labelScanWriters;
-        this.neoStore = neoStore;
+        this.neoStores = neoStores;
         this.cacheAccess = cacheAccess;
         this.lockService = lockService;
         this.legacyIndexProviderLookup = legacyIndexProviderLookup;
@@ -76,21 +81,22 @@ public class TransactionRepresentationStoreApplier
         this.health = health;
         this.legacyIndexTransactionOrdering = legacyIndexTransactionOrdering;
         labelScanStoreSync = new WorkSync<>( labelScanWriters );
+        this.temporalPropStore = temporalPropertyStore;
     }
 
     public void apply( TransactionRepresentation representation, ValidatedIndexUpdates indexUpdates, LockGroup locks,
             long transactionId, TransactionApplicationMode mode ) throws IOException
     {
         // Graph store application. The order of the decorated store appliers is irrelevant
-        NeoCommandHandler storeApplier = new NeoStoreTransactionApplier(
-                neoStore, cacheAccess, lockService, locks, transactionId );
+        CommandHandler storeApplier = new NeoStoreTransactionApplier(
+                neoStores, cacheAccess, lockService, locks, transactionId );
         if ( mode.needsIdTracking() )
         {
-            storeApplier = new HighIdTransactionApplier( storeApplier, neoStore );
+            storeApplier = new HighIdTransactionApplier( storeApplier, neoStores );
         }
         if ( mode.needsCacheInvalidationOnUpdates() )
         {
-            storeApplier = new CacheInvalidationTransactionApplier( storeApplier, neoStore, cacheAccess );
+            storeApplier = new CacheInvalidationTransactionApplier( storeApplier, neoStores, cacheAccess );
         }
 
         // Schema index application
@@ -102,11 +108,15 @@ public class TransactionRepresentationStoreApplier
                 legacyIndexProviderLookup, legacyIndexTransactionOrdering, transactionId, mode );
 
         // Counts store application
-        NeoCommandHandler countsStoreApplier = getCountsStoreApplier( transactionId, mode );
+        CommandHandler countsStoreApplier = getCountsStoreApplier( transactionId, mode );
+
+        // Dynamic Property store application
+        TemporalPropertyStoreHandler temporalProHandler = new TemporalPropertyStoreHandler( this.temporalPropStore );
+
 
         // Perform the application
         try ( CommandApplierFacade applier = new CommandApplierFacade(
-                storeApplier, indexApplier, legacyIndexApplier, countsStoreApplier ) )
+                storeApplier, indexApplier, legacyIndexApplier, countsStoreApplier, temporalProHandler ) )
         {
             representation.accept( applier );
         }
@@ -117,13 +127,13 @@ public class TransactionRepresentationStoreApplier
         }
     }
 
-    private NeoCommandHandler getCountsStoreApplier( long transactionId, TransactionApplicationMode mode )
+    private CommandHandler getCountsStoreApplier( long transactionId, TransactionApplicationMode mode )
     {
-        Optional<NeoCommandHandler> handlerOption =
-                neoStore.getCounts().apply( transactionId ).map( CountsStoreApplier.FACTORY );
+        Optional<CommandHandler> handlerOption =
+                neoStores.getCounts().apply( transactionId ).map( CountsStoreApplier.FACTORY );
         if ( mode == TransactionApplicationMode.RECOVERY )
         {
-            handlerOption = handlerOption.or( NeoCommandHandler.EMPTY );
+            handlerOption = handlerOption.or( CommandHandler.EMPTY );
         }
         return handlerOption.get();
     }
@@ -131,7 +141,7 @@ public class TransactionRepresentationStoreApplier
     public TransactionRepresentationStoreApplier withLegacyIndexTransactionOrdering(
             IdOrderingQueue legacyIndexTransactionOrdering )
     {
-        return new TransactionRepresentationStoreApplier( indexingService, labelScanWriters, neoStore, cacheAccess,
-                lockService, legacyIndexProviderLookup, indexConfigStore, health, legacyIndexTransactionOrdering );
+        return new TransactionRepresentationStoreApplier( indexingService, labelScanWriters, neoStores, cacheAccess,
+                lockService, legacyIndexProviderLookup, indexConfigStore, health, legacyIndexTransactionOrdering, temporalPropStore );
     }
 }

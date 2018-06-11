@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,7 +40,10 @@ import org.neo4j.io.pagecache.tracing.FlushEventOpportunity;
 import org.neo4j.io.pagecache.tracing.MajorFlushEvent;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
 import org.neo4j.io.pagecache.tracing.PageFaultEvent;
+import org.neo4j.unsafe.impl.internal.dragons.MemoryManager;
 import org.neo4j.unsafe.impl.internal.dragons.UnsafeUtil;
+
+import static org.neo4j.unsafe.impl.internal.dragons.FeatureToggles.flag;
 
 /**
  * The Muninn {@link org.neo4j.io.pagecache.PageCache page cache} implementation.
@@ -94,7 +97,7 @@ import org.neo4j.unsafe.impl.internal.dragons.UnsafeUtil;
 public class MuninnPageCache implements PageCache
 {
     public static final byte ZERO_BYTE =
-            (byte) (Boolean.getBoolean( "org.neo4j.io.pagecache.impl.muninn.MuninnPage.brandedZeroByte" )? 0x0F : 0);
+            (byte) (flag( MuninnPageCache.class, "brandedZeroByte", false ) ? 0x0f : 0);
 
     // Keep this many pages free and ready for use in faulting.
     // This will be truncated to be no more than half of the number of pages
@@ -382,7 +385,7 @@ public class MuninnPageCache implements PageCache
         try
         {
             backgroundThreadExecutor.execute( new EvictionTask( this ) );
-            backgroundThreadExecutor.execute( new FlushTask( this ) );
+            backgroundThreadExecutor.execute( new FlushTask( this ) ); // TODO disable background flushing
         }
         catch ( Exception e )
         {
@@ -611,7 +614,10 @@ public class MuninnPageCache implements PageCache
             if ( current == null )
             {
                 unparkEvictor();
-                return cooperativelyEvict( faultEvent );
+                MuninnPage page = cooperativelyEvict( faultEvent );
+                if ( page != null ) {
+                    return page;
+                }
             }
             else if ( current instanceof MuninnPage )
             {
@@ -645,6 +651,10 @@ public class MuninnPageCache implements PageCache
         do
         {
             assertHealthy();
+            if ( getFreelistHead() != null )
+            {
+                return null;
+            }
 
             if ( clockArm == pages.length )
             {
@@ -815,18 +825,14 @@ public class MuninnPageCache implements PageCache
                     if ( pageEvicted )
                     {
                         Object current;
-                        Object nextListHead;
-                        FreePage freePage = null;
+                        FreePage freePage = new FreePage( page );
                         do
                         {
                             current = getFreelistHead();
-                            freePage = freePage == null?
-                                       new FreePage( page ) : freePage;
                             freePage.setNext( (FreePage) current );
-                            nextListHead = freePage;
                         }
                         while ( !compareAndSetFreelistHead(
-                                current, nextListHead ) );
+                                current, freePage ) );
                     }
                 }
             }

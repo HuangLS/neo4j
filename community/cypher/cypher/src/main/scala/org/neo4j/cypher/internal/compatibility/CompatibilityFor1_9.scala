@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -72,7 +72,7 @@ case class CompatibilityFor1_9(graph: GraphDatabaseService, queryCacheSize: Int,
 
     def isPeriodicCommit = false
 
-    def isStale(lastTxId: () => Long, statement: Statement): Boolean = false
+    def isStale(lastCommittedTxId: LastCommittedTxIdProvider, statement: Statement): Boolean = false
 
     def notifications = Iterable.empty
   }

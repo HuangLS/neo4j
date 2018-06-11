@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ import org.neo4j.kernel.impl.api.scan.LabelScanStoreProvider;
 import org.neo4j.kernel.impl.factory.GraphDatabaseFacadeFactory;
 import org.neo4j.kernel.impl.logging.LogService;
 import org.neo4j.kernel.impl.spi.KernelContext;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
 
 import static org.neo4j.kernel.api.impl.index.IndexWriterFactories.tracking;
 import static org.neo4j.kernel.api.impl.index.LuceneKernelExtensions.directoryFactory;
@@ -46,7 +46,7 @@ public class LuceneLabelScanStoreExtension extends KernelExtensionFactory<Lucene
     {
         Config getConfig();
 
-        NeoStoreSupplier getNeoStoreSupplier();
+        NeoStoresSupplier getNeoStoreSupplier();
 
         LogService getLogService();
     }
@@ -66,7 +66,8 @@ public class LuceneLabelScanStoreExtension extends KernelExtensionFactory<Lucene
     @Override
     public LabelScanStoreProvider newInstance( KernelContext context, Dependencies dependencies ) throws Throwable
     {
-        boolean ephemeral = dependencies.getConfig().get( GraphDatabaseFacadeFactory.Configuration.ephemeral );
+        Config config = dependencies.getConfig();
+        boolean ephemeral = config.get( GraphDatabaseFacadeFactory.Configuration.ephemeral );
         DirectoryFactory directoryFactory = directoryFactory( ephemeral, context.fileSystem() );
 
         LuceneLabelScanStore scanStore = new LuceneLabelScanStore(
@@ -77,6 +78,7 @@ public class LuceneLabelScanStoreExtension extends KernelExtensionFactory<Lucene
 
                 context.fileSystem(), tracking(),
                 fullStoreLabelUpdateStream( dependencies.getNeoStoreSupplier() ),
+                config, context.operationalMode(),
                 monitor != null ? monitor : loggerMonitor( dependencies.getLogService().getInternalLogProvider() ) );
 
         return new LabelScanStoreProvider( scanStore, priority );

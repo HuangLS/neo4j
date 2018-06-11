@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -52,7 +52,6 @@ import org.neo4j.index.lucene.QueryContext;
 import org.neo4j.index.lucene.ValueContext;
 import org.neo4j.kernel.api.LegacyIndex;
 import org.neo4j.kernel.api.LegacyIndexHits;
-import org.neo4j.kernel.impl.cache.LruCache;
 import org.neo4j.kernel.impl.util.IoPrimitiveUtils;
 
 import static org.neo4j.collection.primitive.Primitive.longSet;
@@ -102,6 +101,7 @@ public abstract class LuceneIndex implements LegacyIndex
     public void addNode( long entityId, String key, Object value )
     {
         assertValidKey( key );
+        assertValidValue( value );
         EntityId entity = new IdData( entityId );
         for ( Object oneValue : IoPrimitiveUtils.asArray( value ) )
         {
@@ -113,11 +113,12 @@ public abstract class LuceneIndex implements LegacyIndex
 
     protected Object getCorrectValue( Object value )
     {
-        if ( value instanceof ValueContext )
-        {
-            return ((ValueContext) value).getCorrectValue();
-        }
-        return value.toString();
+        assertValidValue( value );
+        Object result = value instanceof ValueContext
+                ? ((ValueContext) value).getCorrectValue()
+                : value.toString();
+        assertValidValue( value );
+        return result;
     }
 
     private static void assertValidKey( String key )
@@ -127,6 +128,19 @@ public abstract class LuceneIndex implements LegacyIndex
             throw new IllegalArgumentException( "Key " + key + " forbidden" );
         }
     }
+
+    private static void assertValidValue( Object singleValue )
+    {
+        if ( singleValue == null )
+        {
+            throw new IllegalArgumentException( "Null value" );
+        }
+        if ( !(singleValue instanceof Number) && singleValue.toString() == null )
+        {
+            throw new IllegalArgumentException( "Value of type " + singleValue.getClass() + " has null toString" );
+        }
+    }
+
 
     /**
      * See {@link Index#remove(PropertyContainer, String, Object)} for more
@@ -138,7 +152,7 @@ public abstract class LuceneIndex implements LegacyIndex
      * that transaction. When the transaction has been committed all such
      * queries are guaranteed to return correct results.
      *
-     * @param entity the entity (i.e {@link Node} or {@link Relationship})
+     * @param entityId the entity (i.e {@link Node} or {@link Relationship})
      * to dissociate the key/value pair from.
      * @param key the key in the key/value pair to dissociate from the entity.
      * @param value the value in the key/value pair to dissociate from the
@@ -253,37 +267,24 @@ public abstract class LuceneIndex implements LegacyIndex
 
         if ( searcher != null )
         {
-            boolean foundInCache = false;
-            LruCache<String, Collection<EntityId>> cachedIdsMap = null;
-            if ( keyForDirectLookup != null )
+            try
             {
-                cachedIdsMap = dataSource.getFromCache(
-                        identifier, keyForDirectLookup );
-                foundInCache = fillFromCache( cachedIdsMap, simpleTransactionStateIds,
-                        valueForDirectLookup.toString(), removedIdsFromTransactionState );
+                // Gather all added ids from fulltextTransactionStateSearcher and simpleTransactionStateIds.
+                PrimitiveLongSet idsModifiedInTransactionState = gatherIdsModifiedInTransactionState(
+                        simpleTransactionStateIds, fulltextTransactionStateSearcher, query );
+
+                // Do the combined search from store and fulltext tx state
+                DocToIdIterator hits = new DocToIdIterator( search( searcher, fulltextTransactionStateSearcher,
+                        query, additionalParametersOrNull, removedIdsFromTransactionState ),
+                        removedIdsFromTransactionState, searcher, idsModifiedInTransactionState );
+
+                idIterator = simpleTransactionStateIds.isEmpty() ? hits : new CombinedIndexHits(
+                        Arrays.<LegacyIndexHits>asList( hits,
+                                new ConstantScoreIterator( simpleTransactionStateIds, Float.NaN ) ) );
             }
-
-            if ( !foundInCache )
+            catch ( IOException e )
             {
-                try
-                {
-                    // Gather all added ids from fulltextTransactionStateSearcher and simpleTransactionStateIds.
-                    PrimitiveLongSet idsModifiedInTransactionState = gatherIdsModifiedInTransactionState(
-                            simpleTransactionStateIds, fulltextTransactionStateSearcher, query );
-
-                    // Do the combined search from store and fulltext tx state
-                    DocToIdIterator hits = new DocToIdIterator( search( searcher, fulltextTransactionStateSearcher,
-                            query, additionalParametersOrNull, removedIdsFromTransactionState ),
-                            removedIdsFromTransactionState, searcher, idsModifiedInTransactionState );
-
-                    idIterator = simpleTransactionStateIds.isEmpty() ? hits : new CombinedIndexHits(
-                            Arrays.<LegacyIndexHits>asList( hits,
-                                    new ConstantScoreIterator( simpleTransactionStateIds, Float.NaN ) ) );
-                }
-                catch ( IOException e )
-                {
-                    throw new RuntimeException( "Unable to query " + this + " with " + query, e );
-                }
+                throw new RuntimeException( "Unable to query " + this + " with " + query, e );
             }
         }
 
@@ -328,30 +329,6 @@ public abstract class LuceneIndex implements LegacyIndex
             set.add( idFromDoc( hits.doc( i ) ) );
         }
         return set;
-    }
-
-    private boolean fillFromCache(
-            LruCache<String, Collection<EntityId>> cachedNodesMap,
-            List<EntityId> ids, String valueAsString,
-            Collection<EntityId> deletedNodes )
-    {
-        boolean found = false;
-        if ( cachedNodesMap != null )
-        {
-            Collection<EntityId> cachedNodes = cachedNodesMap.get( valueAsString );
-            if ( cachedNodes != null )
-            {
-                found = true;
-                for ( EntityId cachedNodeId : cachedNodes )
-                {
-                    if ( !deletedNodes.contains( cachedNodeId ) )
-                    {
-                        ids.add( cachedNodeId );
-                    }
-                }
-            }
-        }
-        return found;
     }
 
     private IndexHits<Document> search( IndexReference searcherRef, IndexSearcher fulltextTransactionStateSearcher,
@@ -471,6 +448,7 @@ public abstract class LuceneIndex implements LegacyIndex
         public void addRelationship( long entityId, String key, Object value, long startNode, long endNode )
         {
             assertValidKey( key );
+            assertValidValue( value );
             RelationshipData entity = new RelationshipData( entityId, startNode, endNode );
             for ( Object oneValue : IoPrimitiveUtils.asArray( value ) )
             {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -103,4 +103,122 @@ class FunctionsAcceptanceTest extends ExecutionEngineFunSuite with NewPlannerTes
     // Then
     result should equal("Oskar")
   }
+
+  test("exists should work with dynamic property look up") {
+    val node = createLabeledNode(Map("prop" -> "foo"), "Person")
+    createLabeledNode("Person")
+
+    val result = executeWithAllPlanners("MATCH (n:Person) WHERE exists(n['prop']) RETURN n")
+    result.toList should equal(List(Map("n" -> node)))
+  }
+
+  test("EXISTS should work with maps") {
+    // GIVEN
+    val query = "WITH {name: 'Mats', name2: 'Pontus'} AS map RETURN exists(map.name)"
+
+    // WHEN
+    val result = executeScalarWithAllPlanners[Boolean](query)
+
+    // THEN
+    result shouldBe true
+  }
+
+  test("EXISTS should work with null in maps") {
+    // GIVEN
+    val query = "WITH {name: null} AS map RETURN exists(map.name)"
+
+    // WHEN
+    val result = executeScalarWithAllPlanners[Boolean](query)
+
+    // THEN
+    result shouldBe false
+  }
+
+  test("EXISTS should work when key is missing") {
+    // GIVEN
+    val query = "WITH {name: null} AS map RETURN exists(map.nonExistantKey)"
+
+    // WHEN
+    val result = executeScalarWithAllPlanners[Boolean](query)
+
+    // THEN
+    result shouldBe false
+  }
+
+  test("IS NOT NULL should work with maps") {
+    // GIVEN
+    val query = "WITH {name: 'Mats', name2: 'Pontus'} AS map RETURN map.name IS NOT NULL"
+
+    // WHEN
+    val result = executeScalarWithAllPlanners[Boolean](query)
+
+    // THEN
+    result shouldBe true
+  }
+
+  test("IS NOT NULL should work with null in maps") {
+    // GIVEN
+    val query = "WITH {name: null} AS map RETURN map.name IS NOT NULL"
+
+    // WHEN
+    val result = executeScalarWithAllPlanners[Boolean](query)
+
+    // THEN
+    result shouldBe false
+  }
+
+  test("IS NOT NULL should work when key is missing") {
+    // GIVEN
+    val query = "WITH {name: null} AS map RETURN map.nonExistantKey IS NOT NULL"
+
+    // WHEN
+    val result = executeScalarWithAllPlanners[Boolean](query)
+
+    // THEN
+    result shouldBe false
+  }
+
+  test("HAS should work with maps") {
+    // GIVEN
+    val query = "WITH {name: 'Mats', name2: 'Pontus'} AS map RETURN has(map.name2)"
+
+    // WHEN
+    val result = executeScalarWithAllPlanners[Boolean](query)
+
+    // THEN
+    result shouldBe true
+  }
+
+  test("HAS should work with null in maps") {
+    // GIVEN
+    val query = "WITH {name: null} AS map RETURN has(map.name)"
+
+    // WHEN
+    val result = executeScalarWithAllPlanners[Boolean](query)
+
+    // THEN
+    result shouldBe false
+  }
+
+  test("HAS should work when key is missing") {
+    // GIVEN
+    val query = "WITH {name: null} AS map RETURN has(map.nonExistantKey)"
+
+    // WHEN
+    val result = executeScalarWithAllPlanners[Boolean](query)
+
+    // THEN
+    result shouldBe false
+  }
+
+  test("has should work with dynamic property look up") {
+    val node = createLabeledNode(Map("prop" -> "foo"), "Person")
+    createLabeledNode("Person")
+
+    val result = executeWithAllPlanners("MATCH (n:Person) WHERE has(n['prop']) RETURN n")
+    result.toList should equal(List(Map("n" -> node)))
+  }
+
+
+
 }

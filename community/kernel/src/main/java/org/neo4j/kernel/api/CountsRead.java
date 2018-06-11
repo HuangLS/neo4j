@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.kernel.api;
 
-interface CountsRead
+public interface CountsRead
 {
     int ANY_LABEL = -1;
     int ANY_RELATIONSHIP_TYPE = -1;
@@ -73,14 +73,6 @@ interface CountsRead
      * <tr>
      * <td>{@link #ANY_LABEL}</td>      <td>{@code REL}</td>                     <td>{@code RHS}</td>
      * <td>{@code MATCH}</td>    <td>{@code ()-[r:REL]->(:RHS)}</td>    <td>{@code RETURN count(r)}</td>
-     * </tr>
-     * <tr>
-     * <td>{@code LHS}</td>             <td>{@link #ANY_RELATIONSHIP_TYPE}</td>  <td>{@code RHS}</td>
-     * <td>{@code MATCH}</td>    <td>{@code (:LHS)-[r]->(:RHS)}</td>    <td>{@code RETURN count(r)}</td>
-     * </tr>
-     * <tr>
-     * <td>{@code LHS}</td>             <td>{@code REL}</td>                     <td>{@code RHS}</td>
-     * <td>{@code MATCH}</td>    <td>{@code (:LHS)-[r:REL]->(:RHS)}</td><td>{@code RETURN count(r)}</td>
      * </tr>
      * </tdata>
      * </table>

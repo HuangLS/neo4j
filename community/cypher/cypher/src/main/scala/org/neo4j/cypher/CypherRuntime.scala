@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,7 +25,6 @@ case object CypherRuntime extends CypherOptionCompanion[CypherRuntime] {
 
   case object default extends CypherRuntime("default")
   case object interpreted extends CypherRuntime("interpreted")
-  case object compiled extends CypherRuntime("compiled")
 
-  val all: Set[CypherRuntime] = Set(interpreted, compiled)
+  val all: Set[CypherRuntime] = Set(interpreted)
 }

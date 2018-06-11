@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,18 +19,17 @@
  */
 package org.neo4j.server.rrd;
 
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.io.IOException;
-
 import org.junit.Test;
 import org.rrd4j.DsType;
 import org.rrd4j.core.RrdDb;
 import org.rrd4j.core.Sample;
+
+import java.io.IOException;
+
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 public class RrdSamplerTest
 {
@@ -47,22 +46,6 @@ public class RrdSamplerTest
         sampler.updateSample();
 
         verify( sample ).setValue( "myTest", 15 );
-    }
-
-    @Test
-    public void shouldIgnoreUnableToSampleExceptions() throws IOException
-    {
-        Sampleable failingSampleable = new FailingSamplable( "myTest" );
-
-        RrdDb rrd = mock( RrdDb.class );
-        final Sample sample = mock( Sample.class );
-        when( rrd.createSample( anyLong() ) ).thenReturn( sample );
-
-        RrdSampler sampler = new RrdSamplerImpl( rrd, failingSampleable );
-
-        sampler.updateSample();
-
-        verify( sample, never() ).setValue( "myTest", 15 );
     }
 
     private class TestSamplable implements Sampleable
@@ -84,31 +67,6 @@ public class RrdSamplerTest
         public double getValue()
         {
             return value;
-        }
-
-        public DsType getType()
-        {
-            return DsType.GAUGE;
-        }
-    }
-
-    private class FailingSamplable implements Sampleable
-    {
-        private String name;
-
-        private FailingSamplable( String name )
-        {
-            this.name = name;
-        }
-
-        public String getName()
-        {
-            return name;
-        }
-
-        public double getValue()
-        {
-            throw new UnableToSampleException();
         }
 
         public DsType getType()

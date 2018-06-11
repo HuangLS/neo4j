@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,11 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner
 
-import org.neo4j.cypher.internal.compiler.v2_3.InternalException
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{Identifier, LabelName, Hint}
-import org.neo4j.cypher.internal.compiler.v2_3.perty._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.Cardinality
-import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{StrictnessMode, IdName, PatternRelationship}
+import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, PatternRelationship, StrictnessMode}
+import org.neo4j.cypher.internal.frontend.v2_3.InternalException
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{Identifier, Hint, LabelName}
+import org.neo4j.cypher.internal.frontend.v2_3.perty._
 
 import scala.annotation.tailrec
 import scala.collection.GenTraversableOnce
@@ -137,7 +137,18 @@ case class PlannerQuery(graph: QueryGraph = QueryGraph.empty,
     recurse(in, this)
   }
 
-  def labelInfo: Map[IdName, Set[LabelName]] = lastQueryGraph.selections.labelInfo
+  def labelInfo: Map[IdName, Set[LabelName]] = {
+    val labelInfo = lastQueryGraph.selections.labelInfo
+    val projectedLabelInfo = lastQueryHorizon match {
+      case projection: QueryProjection =>
+        projection.projections.collect {
+          case (projectedName, Identifier(name)) if labelInfo.contains(IdName(name)) =>
+              IdName(projectedName) -> labelInfo(IdName(name))
+        }
+      case _ => Map.empty[IdName, Set[LabelName]]
+    }
+    labelInfo ++ projectedLabelInfo
+  }
 }
 
 object PlannerQuery {

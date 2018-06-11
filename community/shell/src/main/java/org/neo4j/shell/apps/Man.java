@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -147,9 +147,10 @@ public class Man extends AbstractApp
      * contains an introductory message and also lists all available apps for
      * the server.
      *
-     * @param server
-     *            the server to ask for
-     * @return the short introductory help string.
+     * @param out the output
+     * @param server the server to ask for
+     * @param list if {@code true}, a list of the commands is printed
+     * @throws RemoteException in case of remoting errors
      */
     public static void printHelpString( Output out, ShellServer server, boolean list )
             throws RemoteException

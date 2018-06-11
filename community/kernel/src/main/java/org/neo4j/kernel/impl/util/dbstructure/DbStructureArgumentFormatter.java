@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,8 +25,8 @@ import java.util.Collection;
 import java.util.List;
 
 import org.neo4j.helpers.Strings;
-import org.neo4j.kernel.api.constraints.MandatoryNodePropertyConstraint;
-import org.neo4j.kernel.api.constraints.MandatoryRelationshipPropertyConstraint;
+import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
+import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 
@@ -94,19 +94,19 @@ public enum DbStructureArgumentFormatter implements ArgumentFormatter
             int propertyKeyId = constraint.propertyKey();
             builder.append( format( "new UniquenessConstraint( %s, %s )", labelId, propertyKeyId ) );
         }
-        else if ( arg instanceof MandatoryNodePropertyConstraint )
+        else if ( arg instanceof NodePropertyExistenceConstraint )
         {
-            MandatoryNodePropertyConstraint constraint = (MandatoryNodePropertyConstraint) arg;
+            NodePropertyExistenceConstraint constraint = (NodePropertyExistenceConstraint) arg;
             int labelId = constraint.label();
             int propertyKeyId = constraint.propertyKey();
-            builder.append( format( "new MandatoryNodePropertyConstraint( %s, %s )", labelId, propertyKeyId ) );
+            builder.append( format( "new NodePropertyExistenceConstraint( %s, %s )", labelId, propertyKeyId ) );
         }
-        else if ( arg instanceof MandatoryRelationshipPropertyConstraint )
+        else if ( arg instanceof RelationshipPropertyExistenceConstraint )
         {
-            MandatoryRelationshipPropertyConstraint constraint = (MandatoryRelationshipPropertyConstraint) arg;
+            RelationshipPropertyExistenceConstraint constraint = (RelationshipPropertyExistenceConstraint) arg;
             int relTypeId = constraint.relationshipType();
             int propertyKeyId = constraint.propertyKey();
-            builder.append( format( "new MandatoryRelationshipPropertyConstraint( %s, %s )", relTypeId, propertyKeyId ) );
+            builder.append( format( "new RelationshipPropertyExistenceConstraint( %s, %s )", relTypeId, propertyKeyId ) );
         }
         else
         {

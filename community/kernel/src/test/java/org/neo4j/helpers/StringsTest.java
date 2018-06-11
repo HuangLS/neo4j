@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -78,5 +78,12 @@ public class StringsTest
         assertEquals( "a\\rbc", Strings.escape( "a\rbc" ) );
         assertEquals( "a\\bbc", Strings.escape( "a\bbc" ) );
         assertEquals( "a\\fbc", Strings.escape( "a\fbc" ) );
+    }
+
+    @Test
+    public void testJoiningLines()
+    {
+        assertEquals( "a" + System.lineSeparator() + "b" + System.lineSeparator() + "c" + System.lineSeparator(),
+                Strings.joinAsLines( "a", "b", "c" ) );
     }
 }

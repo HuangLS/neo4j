@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,7 @@ import static org.neo4j.kernel.impl.util.Bits.bitsFromLongs;
  * Caches labels for each node. Tries to keep memory as 8b (a long) per node. If a particular node has many labels
  * it will spill over into two or more longs in a separate array.
  */
-public class NodeLabelsCache implements MemoryStatsVisitor.Home
+public class NodeLabelsCache implements MemoryStatsVisitor.Visitable
 {
     public static class Client
     {

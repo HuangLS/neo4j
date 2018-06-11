@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -47,7 +47,7 @@ case class TopPipe(source: Pipe, sortDescription: List[SortItem], countExpressio
       val v2 = b._1
       var i = 0
       while (i < sortItemsCount) {
-        val res = signum(comparer.compare(v1(i), v2(i)))
+        val res = signum(comparer.compare(Some("ORDER BY"), v1(i), v2(i)))
         if (res != 0) {
           val sortItem = sortItems(i)
           return if (sortItem.ascending) res else -res
@@ -75,38 +75,43 @@ case class TopPipe(source: Pipe, sortDescription: List[SortItem], countExpressio
       input
     else {
 
-      val lessThan = new LessThanComparator(this)
-
       val first = input.next()
       val count = countExpression(first).asInstanceOf[Number].intValue()
-      var result = new Array[SortDataWithContext](count)
-      result(0) = arrayEntry(first)
-      var last : Int = 0
 
-      while ( last < count - 1 && input.hasNext ) {
-        last += 1
-        result(last) = arrayEntry(input.next())
-      }
-
-      if (input.isEmpty) {
-        result.slice(0,last + 1).sorted(lessThan).iterator.map(_._2)
+      if (count <= 0) {
+        Iterator.empty
       } else {
-        result = result.sorted(lessThan)
 
-        val search = binarySearch(result, lessThan) _
-        input.foreach {
-          ctx =>
-            val next = arrayEntry(ctx)
-            if (lessThan.compare(next, result(last)) < 0) {
-              val idx = search(next)
-              val insertPosition = if (idx < 0 )  - idx - 1 else idx + 1
-              if (insertPosition >= 0 && insertPosition < count) {
-                Array.copy(result, insertPosition, result, insertPosition + 1, count - insertPosition - 1)
-                result(insertPosition) = next
-              }
-            }
+        var result = new Array[SortDataWithContext](count)
+        result(0) = arrayEntry(first)
+        var last : Int = 0
+
+        while ( last < count - 1 && input.hasNext ) {
+          last += 1
+          result(last) = arrayEntry(input.next())
         }
-        result.toIterator.map(_._2)
+
+        val lessThan = new LessThanComparator(this)
+        if (input.isEmpty) {
+          result.slice(0,last + 1).sorted(lessThan).iterator.map(_._2)
+        } else {
+          result = result.sorted(lessThan)
+
+          val search = binarySearch(result, lessThan) _
+          input.foreach {
+            ctx =>
+              val next = arrayEntry(ctx)
+              if (lessThan.compare(next, result(last)) < 0) {
+                val idx = search(next)
+                val insertPosition = if (idx < 0 )  - idx - 1 else idx + 1
+                if (insertPosition >= 0 && insertPosition < count) {
+                  Array.copy(result, insertPosition, result, insertPosition + 1, count - insertPosition - 1)
+                  result(insertPosition) = next
+                }
+              }
+          }
+          result.toIterator.map(_._2)
+        }
       }
     }
   }

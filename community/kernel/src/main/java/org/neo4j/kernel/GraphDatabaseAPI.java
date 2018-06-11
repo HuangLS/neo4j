@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,12 @@
  */
 package org.neo4j.kernel;
 
+import java.net.URL;
+
 import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.kernel.impl.store.StoreId;
+import org.neo4j.kernel.security.URLAccessValidationError;
 
 /**
  * This API can be used to get access to services.
@@ -39,6 +42,14 @@ public interface GraphDatabaseAPI extends GraphDatabaseService
 
     /** Provides the unique id assigned to this database. */
     StoreId storeId();
+
+    /**
+     * Validate whether this database instance is permitted to reach out to the specified URL (e.g. when using {@code LOAD CSV} in Cypher).
+     *
+     * @param url the URL being validated
+     * @return an updated URL that should be used for accessing the resource
+     */
+    URL validateURLAccess( URL url ) throws URLAccessValidationError;
 
     @Deprecated
     String getStoreDir();

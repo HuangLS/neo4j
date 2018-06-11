@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -60,10 +60,12 @@ public class ConfiguringPageCacheFactoryTest
     public void shouldUseConfiguredPageSizeAndFitAsManyPagesAsItCan() throws Throwable
     {
         // Given
+        final int pageSize = 4096;
+        final int maxPages = 60;
         Config config = new Config();
         config.applyChanges( stringMap(
-                mapped_memory_page_size.name(), "4096",
-                pagecache_memory.name(), Integer.toString( 4096 * 16 ) ) );
+                mapped_memory_page_size.name(), "" + pageSize,
+                pagecache_memory.name(), Integer.toString( pageSize * maxPages ) ) );
 
         // When
         ConfiguringPageCacheFactory factory = new ConfiguringPageCacheFactory(
@@ -72,8 +74,8 @@ public class ConfiguringPageCacheFactoryTest
         // Then
         try ( PageCache cache = factory.getOrCreatePageCache() )
         {
-            assertThat( cache.pageSize(), equalTo( 4096 ) );
-            assertThat( cache.maxCachedPages(), equalTo( 16 ) );
+            assertThat( cache.pageSize(), equalTo( pageSize ) );
+            assertThat( cache.maxCachedPages(), equalTo( maxPages ) );
         }
     }
 

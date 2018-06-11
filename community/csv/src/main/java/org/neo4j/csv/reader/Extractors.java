@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 
+import static java.lang.Character.isWhitespace;
 import static java.lang.reflect.Modifier.isStatic;
 
 import static org.neo4j.collection.primitive.PrimitiveLongCollections.EMPTY_LONG_ARRAY;
@@ -83,13 +84,18 @@ public class Extractors
     private final Extractor<float[]> floatArray;
     private final Extractor<double[]> doubleArray;
 
+    public Extractors( char arrayDelimiter )
+    {
+        this( arrayDelimiter, Configuration.DEFAULT.emptyQuotedStringsAsNull() );
+    }
+
     /**
      * Why do we have a public constructor here and why isn't this class an enum?
      * It's because the array extractors can be configured with an array delimiter,
      * something that would be impossible otherwise. There's an equivalent {@link #valueOf(String)}
      * method to keep the feel of an enum.
      */
-    public Extractors( char arrayDelimiter )
+    public Extractors( char arrayDelimiter, boolean emptyStringsAsNull )
     {
         try
         {
@@ -105,7 +111,7 @@ public class Extractors
                 }
             }
 
-            add( string = new StringExtractor() );
+            add( string = new StringExtractor( emptyStringsAsNull ) );
             add( long_ = new LongExtractor() );
             add( int_ = new IntExtractor() );
             add( char_ = new CharExtractor() );
@@ -273,13 +279,15 @@ public class Extractors
         protected abstract boolean extract0( char[] data, int offset, int length );
     }
 
-    private static class StringExtractor extends AbstractSingleValueExtractor<String>
+    public static class StringExtractor extends AbstractSingleValueExtractor<String>
     {
         private String value;
+        private final boolean emptyStringsAsNull;
 
-        StringExtractor()
+        public StringExtractor( boolean emptyStringsAsNull )
         {
             super( String.class.getSimpleName() );
+            this.emptyStringsAsNull = emptyStringsAsNull;
         }
 
         @Override
@@ -291,7 +299,7 @@ public class Extractors
         @Override
         protected boolean nullValue( int length, boolean skippedChars )
         {
-            return length == 0 && !skippedChars;
+            return length == 0 && (!skippedChars || emptyStringsAsNull);
         }
 
         @Override
@@ -557,8 +565,16 @@ public class Extractors
         @Override
         protected boolean extract0( char[] data, int offset, int length )
         {
-            // TODO Figure out a way to do this conversion without round tripping to String
-            value = Float.parseFloat( String.valueOf( data, offset, length ) );
+            try
+            {
+                // TODO Figure out a way to do this conversion without round tripping to String
+                // parseFloat automatically handles leading/trailing whitespace so no need for us to do it
+                value = Float.parseFloat( String.valueOf( data, offset, length ) );
+            }
+            catch ( NumberFormatException ignored )
+            {
+                throw new NumberFormatException( "Not a number: \"" + String.valueOf( data, offset, length ) + "\"" );
+            }
             return true;
         }
 
@@ -592,8 +608,16 @@ public class Extractors
         @Override
         protected boolean extract0( char[] data, int offset, int length )
         {
-            // TODO Figure out a way to do this conversion without round tripping to String
-            value = Double.parseDouble( String.valueOf( data, offset, length ) );
+            try
+            {
+                // TODO Figure out a way to do this conversion without round tripping to String
+                // parseDouble automatically handles leading/trailing whitespace so no need for us to do it
+                value = Double.parseDouble( String.valueOf( data, offset, length ) );
+            }
+            catch ( NumberFormatException ignored )
+            {
+                throw new NumberFormatException( "Not a number: \"" + String.valueOf( data, offset, length ) + "\"" );
+            }
             return true;
         }
 
@@ -804,6 +828,7 @@ public class Extractors
             {
                 int numberOfChars = charsToNextDelimiter( data, offset+charIndex, length-charIndex );
                 // TODO Figure out a way to do this conversion without round tripping to String
+                // parseFloat automatically handles leading/trailing whitespace so no need for us to do it
                 value[arrayIndex] = Float.parseFloat( String.valueOf( data, offset+charIndex, numberOfChars ) );
                 charIndex += numberOfChars;
             }
@@ -828,6 +853,7 @@ public class Extractors
             {
                 int numberOfChars = charsToNextDelimiter( data, offset+charIndex, length-charIndex );
                 // TODO Figure out a way to do this conversion without round tripping to String
+                // parseDouble automatically handles leading/trailing whitespace so no need for us to do it
                 value[arrayIndex] = Double.parseDouble( String.valueOf( data, offset+charIndex, numberOfChars ) );
                 charIndex += numberOfChars;
             }
@@ -857,25 +883,51 @@ public class Extractors
         }
     }
 
-    private static long extractLong( char[] data, int offset, int length )
+    private static long extractLong( char[] data, int originalOffset, int fullLength )
     {
-        if ( length == 0 )
+        long result = 0;
+        boolean negate = false;
+        int offset = originalOffset;
+        int length = fullLength;
+
+        // Leading whitespace can be ignored
+        while ( length > 0 && isWhitespace( data[offset] ) )
         {
-            throw new NumberFormatException( "For input string \"" + String.valueOf( data, offset, length ) + "\"" );
+            offset++;
+            length--;
+        }
+        // Trailing whitespace can be ignored
+        while ( length > 0 && isWhitespace( data[offset + length - 1] ) )
+        {
+            length--;
         }
 
-        long result = 0;
-        int i = 0;
-        boolean negate = false;
-        if ( data[offset] == '-' )
+        if ( length > 0 && data[offset] == '-' )
         {
             negate = true;
-            i++;
+            offset++;
+            length--;
         }
-        for ( ; i < length; i++ )
+
+        if ( length < 1 )
         {
-            result = result*10 + digit( data[offset+i] );
+            throw new NumberFormatException(
+                    "Not an integer: \"" + String.valueOf( data, originalOffset, fullLength ) + "\"" );
         }
+
+        try
+        {
+            for (int i = 0; i < length; i++ )
+            {
+                result = result * 10 + digit( data[offset + i] );
+            }
+        }
+        catch ( NumberFormatException ignored )
+        {
+            throw new NumberFormatException(
+                    "Not an integer: \"" + String.valueOf( data, originalOffset, fullLength ) + "\"" );
+        }
+
         return negate ? -result : result;
     }
 
@@ -884,7 +936,7 @@ public class Extractors
         int digit = ch - '0';
         if ( (digit < 0) || (digit > 9) )
         {
-            throw new NumberFormatException( "Invalid digit character '" + ch + "'" );
+            throw new NumberFormatException();
         }
         return digit;
     }
@@ -896,19 +948,36 @@ public class Extractors
         Boolean.TRUE.toString().getChars( 0, BOOLEAN_TRUE_CHARACTERS.length, BOOLEAN_TRUE_CHARACTERS, 0 );
     }
 
-    private static boolean extractBoolean( char[] data, int offset, int length )
+    private static boolean extractBoolean( char[] data, int originalOffset, int fullLength )
     {
-        if ( BOOLEAN_TRUE_CHARACTERS.length != length )
+        int offset = originalOffset;
+        int length = fullLength;
+        // Leading whitespace can be ignored
+        while ( length > 0 && isWhitespace( data[offset] ) )
+        {
+            offset++;
+            length--;
+        }
+        // Trailing whitespace can be ignored
+        while ( length > 0 && isWhitespace( data[offset + length - 1] ) )
+        {
+            length--;
+        }
+
+        // See if the rest exactly match "true"
+        if ( length != BOOLEAN_TRUE_CHARACTERS.length )
         {
             return false;
         }
-        for ( int i = 0; i < length; i++ )
+
+        for ( int i = 0; i < BOOLEAN_TRUE_CHARACTERS.length && i < length; i++ )
         {
-            if ( data[offset+i] != BOOLEAN_TRUE_CHARACTERS[i] )
+            if ( data[offset + i] != BOOLEAN_TRUE_CHARACTERS[i] )
             {
                 return false;
             }
         }
+
         return true;
     }
 

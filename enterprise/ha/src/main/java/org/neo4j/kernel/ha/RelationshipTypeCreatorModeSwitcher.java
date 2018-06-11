@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,17 +19,16 @@
  */
 package org.neo4j.kernel.ha;
 
-import java.net.URI;
-
 import org.neo4j.function.Supplier;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.api.KernelAPI;
 import org.neo4j.kernel.ha.cluster.AbstractModeSwitcher;
-import org.neo4j.kernel.ha.cluster.HighAvailabilityMemberStateMachine;
+import org.neo4j.kernel.ha.cluster.ModeSwitcherNotifier;
 import org.neo4j.kernel.ha.com.RequestContextFactory;
 import org.neo4j.kernel.ha.com.master.Master;
 import org.neo4j.kernel.impl.core.DefaultRelationshipTypeCreator;
 import org.neo4j.kernel.impl.core.TokenCreator;
+import org.neo4j.kernel.lifecycle.LifeSupport;
 
 public class RelationshipTypeCreatorModeSwitcher extends AbstractModeSwitcher<TokenCreator>
 {
@@ -38,14 +37,14 @@ public class RelationshipTypeCreatorModeSwitcher extends AbstractModeSwitcher<To
     private final Supplier<KernelAPI> kernelSupplier;
     private final IdGeneratorFactory idGeneratorFactory;
 
-    public RelationshipTypeCreatorModeSwitcher( HighAvailabilityMemberStateMachine stateMachine,
+    public RelationshipTypeCreatorModeSwitcher( ModeSwitcherNotifier modeSwitcherNotifier,
                                                 DelegateInvocationHandler<TokenCreator> delegate,
                                                 DelegateInvocationHandler<Master> master,
                                                 RequestContextFactory requestContextFactory,
                                                 Supplier<KernelAPI> kernelSupplier,
                                                 IdGeneratorFactory idGeneratorFactory )
     {
-        super( stateMachine, delegate );
+        super( modeSwitcherNotifier, delegate );
         this.master = master;
         this.requestContextFactory = requestContextFactory;
         this.kernelSupplier = kernelSupplier;
@@ -53,13 +52,13 @@ public class RelationshipTypeCreatorModeSwitcher extends AbstractModeSwitcher<To
     }
 
     @Override
-    protected TokenCreator getMasterImpl()
+    protected TokenCreator getMasterImpl( LifeSupport life )
     {
         return new DefaultRelationshipTypeCreator( kernelSupplier, idGeneratorFactory );
     }
 
     @Override
-    protected TokenCreator getSlaveImpl( URI serverHaUri )
+    protected TokenCreator getSlaveImpl( LifeSupport life )
     {
         return new SlaveRelationshipTypeCreator( master.cement(), requestContextFactory );
     }

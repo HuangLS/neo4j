@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,8 +23,9 @@ import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{NestedPipeE
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{ArgumentPipe, ExpandAllPipe, LazyTypes}
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments.{EstimatedRows, LegacyExpression}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.BeLikeMatcher._
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 import org.neo4j.cypher.{ExecutionEngineFunSuite, NewPlannerTestSupport}
-import org.neo4j.graphdb.{Direction, Relationship}
+import org.neo4j.graphdb.Relationship
 import org.scalatest.Matchers
 
 class PatternExpressionAcceptanceTest extends ExecutionEngineFunSuite with Matchers with NewPlannerTestSupport {
@@ -374,7 +375,7 @@ class PatternExpressionAcceptanceTest extends ExecutionEngineFunSuite with Match
     val pipe = legacyExpression.value.asInstanceOf[NestedPipeExpression].pipe
 
     pipe should beLike {
-      case ExpandAllPipe(_: ArgumentPipe, "n", _, _, Direction.OUTGOING, LazyTypes(List("HAS"))) => ()
+      case ExpandAllPipe(_: ArgumentPipe, "n", _, _, SemanticDirection.OUTGOING, LazyTypes(List("HAS"))) => ()
     }
 
     pipe.sources.head.asInstanceOf[ArgumentPipe].estimatedCardinality should equal(Some(3.0))

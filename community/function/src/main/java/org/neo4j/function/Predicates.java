@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,6 +27,7 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * Constructors for basic {@link Predicate} types
+ * @deprecated This class relies on deprecated interfaces, and will be retrofitted to work with the {@code java.util.function} interfaces in 3.0.
  */
 public class Predicates
 {
@@ -199,17 +200,38 @@ public class Predicates
     public static <TYPE> void await( Supplier<TYPE> supplier, Predicate<TYPE> predicate, long timeout, TimeUnit unit )
             throws TimeoutException, InterruptedException
     {
+        await( Suppliers.compose( supplier, predicate ), timeout, unit );
+    }
+
+    public static void await( Supplier<Boolean> condition, long timeout, TimeUnit unit )
+            throws TimeoutException, InterruptedException
+    {
         long sleep = Math.max( unit.toMillis( timeout ) / 100, 1 );
         long deadline = System.currentTimeMillis() + unit.toMillis( timeout );
         do
         {
-            if ( predicate.test( supplier.get() ) )
+            if ( condition.get() )
             {
                 return;
             }
             Thread.sleep( sleep );
         }
         while ( System.currentTimeMillis() < deadline );
-        throw new TimeoutException( "Waited for " + timeout + " " + unit + ", but " + predicate + " was not accepted." );
+        throw new TimeoutException( "Waited for " + timeout + " " + unit + ", but " + condition + " was not accepted." );
+    }
+
+
+    public static void awaitForever( Supplier<Boolean> condition, long checkInterval, TimeUnit unit ) throws InterruptedException
+    {
+        long sleep = unit.toMillis( checkInterval );
+        do
+        {
+            if ( condition.get() )
+            {
+                return;
+            }
+            Thread.sleep( sleep );
+        }
+        while ( true );
     }
 }

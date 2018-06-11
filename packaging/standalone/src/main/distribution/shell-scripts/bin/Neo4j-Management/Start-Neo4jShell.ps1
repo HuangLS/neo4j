@@ -1,4 +1,4 @@
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -17,6 +17,50 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+<#
+.SYNOPSIS
+Start a Neo4j shell process
+
+.DESCRIPTION
+Start a Neo4j shell process
+
+.PARAMETER Neo4jServer
+An object representing a Neo4j Server.  Either an empty string (path determined by Get-Neo4jHome), a string (path to Neo4j installation) or a valid Neo4j Server object
+
+.PARAMETER UseHost
+The hostname of the Neo4j Shell server to connect to.  If no host is specified, the host is determined from the Neo4j Configuration files (default)
+
+.PARAMETER UsePort
+The TCP port of the Neo4j Shell server to connect to.  If no port is specified, the port is determined from the Neo4j Configuration files (default)
+
+.PARAMETER Wait
+Wait for the shell process to complete
+
+.PARAMETER PassThru
+Pass through the Neo4j Server object instead of the result of the shell process
+
+.PARAMETER OtherArgs
+All other parameters are passed through to the Neo4j Shell Utility
+
+.EXAMPLE
+'C:\Neo4j\neo4j-community' | Start-Neo4jShell -file "C:\Database.cypher" -Wait
+
+Start and wait for a Neo4j Shell for the instance at C:\Neo4j\neo4j-community and execute the cypher statements in C:\Database.cypher
+
+.OUTPUTS
+System.Int32
+Exitcode of shell process
+
+System.Management.Automation.PSCustomObject
+Neo4j Server object (-PassThru)
+
+.LINK
+Initialize-Neo4jServer
+
+.LINK
+http://neo4j.com/docs/stable/shell.html
+
+#>
 Function Start-Neo4jShell
 {
   [cmdletBinding(SupportsShouldProcess=$false,ConfirmImpact='Low')]
@@ -25,10 +69,11 @@ Function Start-Neo4jShell
     [object]$Neo4jServer = ''
     
     ,[Parameter(Mandatory=$false,ValueFromPipeline=$false)]
+    [Alias('Host')]
     [string]$UseHost = ''
 
     ,[Parameter(Mandatory=$false,ValueFromPipeline=$false)]
-    [Alias('ShellPort')]
+    [Alias('ShellPort','Port')]
     [ValidateRange(0,65535)]
     [int]$UsePort = -1
     
@@ -95,7 +140,10 @@ Function Start-Neo4jShell
     # Add unbounded command line arguments
     if ($OtherArgs -ne $null) { $ShellArgs += $OtherArgs }
 
-    $result = (Start-Process -FilePath $JavaCMD.java -ArgumentList $ShellArgs -Wait:$Wait -NoNewWindow:$Wait -PassThru)
+    if ($PSCmdlet.ShouldProcess("$($JavaCMD.java) $($ShellArgs)", 'Start Neo4j Shell'))
+    {
+      $result = (Start-Process -FilePath $JavaCMD.java -ArgumentList $ShellArgs -Wait:$Wait -NoNewWindow:$Wait -PassThru)
+    }
     
     if ($PassThru) { Write-Output $thisServer } else { Write-Output $result.ExitCode }
   }

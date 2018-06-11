@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,16 +23,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.neo4j.consistency.report.ConsistencyReport;
-import org.neo4j.consistency.store.DiffRecordAccess;
 import org.neo4j.consistency.store.RecordAccess;
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
 import org.neo4j.kernel.impl.store.SchemaRuleAccess;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.IndexRule;
 import org.neo4j.kernel.impl.store.record.LabelTokenRecord;
-import org.neo4j.kernel.impl.store.record.MandatoryNodePropertyConstraintRule;
-import org.neo4j.kernel.impl.store.record.MandatoryRelationshipPropertyConstraintRule;
+import org.neo4j.kernel.impl.store.record.NodePropertyExistenceConstraintRule;
 import org.neo4j.kernel.impl.store.record.PropertyKeyTokenRecord;
+import org.neo4j.kernel.impl.store.record.RelationshipPropertyExistenceConstraintRule;
 import org.neo4j.kernel.impl.store.record.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.store.record.SchemaRule;
 import org.neo4j.kernel.impl.store.record.UniquePropertyConstraintRule;
@@ -113,25 +112,18 @@ public class SchemaRecordCheck implements RecordCheck<DynamicRecord, Consistency
                     strategy.checkUniquenessConstraintRule( (UniquePropertyConstraintRule) rule, record, records,
                             engine );
                     break;
-                case MANDATORY_NODE_PROPERTY_CONSTRAINT:
-                    strategy.checkMandatoryNodePropertyRule( (MandatoryNodePropertyConstraintRule) rule, record,
+                case NODE_PROPERTY_EXISTENCE_CONSTRAINT:
+                    strategy.checkNodePropertyExistenceRule( (NodePropertyExistenceConstraintRule) rule, record,
                             records, engine );
                     break;
-                case MANDATORY_RELATIONSHIP_PROPERTY_CONSTRAINT:
-                    strategy.checkMandatoryRelationshipPropertyRule( (MandatoryRelationshipPropertyConstraintRule) rule,
+                case RELATIONSHIP_PROPERTY_EXISTENCE_CONSTRAINT:
+                    strategy.checkRelationshipPropertyExistenceRule( (RelationshipPropertyExistenceConstraintRule) rule,
                             record, records, engine );
                     break;
                 default:
                     engine.report().unsupportedSchemaRuleKind( kind );
             }
         }
-    }
-
-    @Override
-    public void checkChange( DynamicRecord oldRecord, DynamicRecord newRecord,
-            CheckerEngine<DynamicRecord, ConsistencyReport.SchemaConsistencyReport> engine,
-            DiffRecordAccess records )
-    {
     }
 
     private interface CheckStrategy
@@ -142,10 +134,10 @@ public class SchemaRecordCheck implements RecordCheck<DynamicRecord, Consistency
         void checkUniquenessConstraintRule( UniquePropertyConstraintRule rule, DynamicRecord record,
                 RecordAccess records, CheckerEngine<DynamicRecord,ConsistencyReport.SchemaConsistencyReport> engine );
 
-        void checkMandatoryNodePropertyRule( MandatoryNodePropertyConstraintRule rule, DynamicRecord record,
+        void checkNodePropertyExistenceRule( NodePropertyExistenceConstraintRule rule, DynamicRecord record,
                 RecordAccess records, CheckerEngine<DynamicRecord,ConsistencyReport.SchemaConsistencyReport> engine );
 
-        void checkMandatoryRelationshipPropertyRule( MandatoryRelationshipPropertyConstraintRule rule,
+        void checkRelationshipPropertyExistenceRule( RelationshipPropertyExistenceConstraintRule rule,
                 DynamicRecord record, RecordAccess records,
                 CheckerEngine<DynamicRecord,ConsistencyReport.SchemaConsistencyReport> engine );
     }
@@ -187,14 +179,14 @@ public class SchemaRecordCheck implements RecordCheck<DynamicRecord, Consistency
         }
 
         @Override
-        public void checkMandatoryNodePropertyRule( MandatoryNodePropertyConstraintRule rule, DynamicRecord record,
+        public void checkNodePropertyExistenceRule( NodePropertyExistenceConstraintRule rule, DynamicRecord record,
                 RecordAccess records, CheckerEngine<DynamicRecord,ConsistencyReport.SchemaConsistencyReport> engine )
         {
             checkLabelAndPropertyRule( rule, rule.getPropertyKey(), record, records, engine );
         }
 
         @Override
-        public void checkMandatoryRelationshipPropertyRule( MandatoryRelationshipPropertyConstraintRule rule,
+        public void checkRelationshipPropertyExistenceRule( RelationshipPropertyExistenceConstraintRule rule,
                 DynamicRecord record, RecordAccess records,
                 CheckerEngine<DynamicRecord,ConsistencyReport.SchemaConsistencyReport> engine )
         {
@@ -251,13 +243,13 @@ public class SchemaRecordCheck implements RecordCheck<DynamicRecord, Consistency
         }
 
         @Override
-        public void checkMandatoryNodePropertyRule( MandatoryNodePropertyConstraintRule rule, DynamicRecord record,
+        public void checkNodePropertyExistenceRule( NodePropertyExistenceConstraintRule rule, DynamicRecord record,
                 RecordAccess records, CheckerEngine<DynamicRecord,ConsistencyReport.SchemaConsistencyReport> engine )
         {
         }
 
         @Override
-        public void checkMandatoryRelationshipPropertyRule( MandatoryRelationshipPropertyConstraintRule rule,
+        public void checkRelationshipPropertyExistenceRule( RelationshipPropertyExistenceConstraintRule rule,
                 DynamicRecord record, RecordAccess records,
                 CheckerEngine<DynamicRecord,ConsistencyReport.SchemaConsistencyReport> engine )
         {

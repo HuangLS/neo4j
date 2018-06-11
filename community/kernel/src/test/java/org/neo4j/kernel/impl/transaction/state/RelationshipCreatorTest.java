@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,13 @@
  */
 package org.neo4j.kernel.impl.transaction.state;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -35,7 +35,11 @@ import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.MyRelTypes;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.locking.AcquireLockTimeoutException;
+import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.locking.NoOpClient;
+import org.neo4j.kernel.impl.locking.ResourceTypes;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.LabelTokenRecord;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
@@ -61,10 +65,10 @@ public class RelationshipCreatorTest
     {
         // GIVEN
         long nodeId = createNodeWithRelationships( DENSE_NODE_THRESHOLD );
-        NeoStore neoStore = flipToNeoStore();
+        NeoStores neoStores = flipToNeoStores();
 
-        Tracker tracker = new Tracker( neoStore );
-        RelationshipGroupGetter groupGetter = new RelationshipGroupGetter( neoStore.getRelationshipGroupStore() );
+        Tracker tracker = new Tracker( neoStores );
+        RelationshipGroupGetter groupGetter = new RelationshipGroupGetter( neoStores.getRelationshipGroupStore() );
         RelationshipCreator relationshipCreator = new RelationshipCreator( tracker, groupGetter, 5 );
 
         // WHEN
@@ -76,10 +80,10 @@ public class RelationshipCreatorTest
         assertFalse( tracker.relationshipLocksAcquired.isEmpty() );
     }
 
-    private NeoStore flipToNeoStore()
+    private NeoStores flipToNeoStores()
     {
         return dbRule.getGraphDatabaseAPI().getDependencyResolver().resolveDependency(
-                NeoStoreSupplier.class ).get();
+                NeoStoresSupplier.class ).get();
     }
 
     private long createNodeWithRelationships( int count )
@@ -97,23 +101,28 @@ public class RelationshipCreatorTest
         }
     }
 
-    static class Tracker implements RelationshipLocker, RecordAccessSet
+    static class Tracker extends NoOpClient implements RecordAccessSet
     {
         private final RecordAccessSet delegate;
         private final TrackingRecordAccess<RelationshipRecord, Void> relRecords;
         private final Set<Long> relationshipLocksAcquired = new HashSet<>();
         private final Set<Long> changedRelationships = new HashSet<>();
 
-        public Tracker( NeoStore neoStore )
+        public Tracker( NeoStores neoStores )
         {
-            this.delegate = new DirectRecordAccessSet( neoStore );
+            this.delegate = new DirectRecordAccessSet( neoStores );
             this.relRecords = new TrackingRecordAccess<>( delegate.getRelRecords(), this );
         }
 
         @Override
-        public void getWriteLock( long relId )
+        public void acquireExclusive( Locks.ResourceType resourceType, long... resourceIds )
+                throws AcquireLockTimeoutException
         {
-            relationshipLocksAcquired.add( relId );
+            assertEquals( ResourceTypes.RELATIONSHIP, resourceType );
+            for ( long resourceId : resourceIds )
+            {
+                relationshipLocksAcquired.add( resourceId );
+            }
         }
 
         protected void changingRelationship( long relId )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,58 +23,79 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
+import org.junit.runners.Suite.SuiteClasses;
 
 import java.io.File;
 
 import org.neo4j.graphdb.DependencyResolver;
+import org.neo4j.graphdb.DynamicLabel;
+import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.graphdb.InvalidTransactionTypeException;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.QueryExecutionException;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.schema.ConstraintDefinition;
 import org.neo4j.graphdb.schema.ConstraintType;
+import org.neo4j.graphdb.schema.IndexDefinition;
+import org.neo4j.helpers.Exceptions;
 import org.neo4j.kernel.TopLevelTransaction;
+import org.neo4j.kernel.api.ConstraintHaIT.NodePropertyExistenceConstraintHaIT;
+import org.neo4j.kernel.api.ConstraintHaIT.RelationshipPropertyExistenceConstraintHaIT;
+import org.neo4j.kernel.api.ConstraintHaIT.UniquenessConstraintHaIT;
+import org.neo4j.kernel.api.exceptions.InvalidTransactionTypeKernelException;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.HighlyAvailableGraphDatabase;
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge;
-import org.neo4j.kernel.impl.coreapi.schema.MandatoryNodePropertyConstraintDefinition;
-import org.neo4j.kernel.impl.coreapi.schema.MandatoryRelationshipPropertyConstraintDefinition;
+import org.neo4j.kernel.impl.coreapi.schema.NodePropertyExistenceConstraintDefinition;
+import org.neo4j.kernel.impl.coreapi.schema.RelationshipPropertyExistenceConstraintDefinition;
 import org.neo4j.kernel.impl.coreapi.schema.UniquenessConstraintDefinition;
-import org.neo4j.test.ha.ClusterManager;
+import org.neo4j.kernel.impl.ha.ClusterManager;
 import org.neo4j.test.ha.ClusterRule;
 import org.neo4j.tooling.GlobalGraphOperations;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.runners.Suite.SuiteClasses;
 import static org.neo4j.graphdb.DynamicLabel.label;
 import static org.neo4j.graphdb.DynamicRelationshipType.withName;
 import static org.neo4j.helpers.collection.Iterables.count;
 import static org.neo4j.helpers.collection.Iterables.single;
 import static org.neo4j.helpers.collection.Iterables.toList;
+import static org.neo4j.helpers.collection.IteratorUtil.singleOrNull;
 import static org.neo4j.io.fs.FileUtils.deleteRecursively;
-import static org.neo4j.kernel.api.ConstraintHaIT.*;
 
 @RunWith( Suite.class )
 @SuiteClasses( {
-        MandatoryNodePropertyConstraintHaIT.class,
-        MandatoryRelationshipPropertyConstraintHaIT.class,
+        NodePropertyExistenceConstraintHaIT.class,
+        RelationshipPropertyExistenceConstraintHaIT.class,
         UniquenessConstraintHaIT.class
 } )
 public class ConstraintHaIT
 {
-    public static class MandatoryNodePropertyConstraintHaIT extends AbstractConstraintHaIT
+    public static class NodePropertyExistenceConstraintHaIT extends AbstractConstraintHaIT
     {
         @Override
         protected void createConstraint( GraphDatabaseService db, String type, String value )
         {
-            db.schema().constraintFor( label( type ) ).assertPropertyExists( value ).create();
+            db.execute( String.format( "CREATE CONSTRAINT ON (n:`%s`) ASSERT exists(n.`%s`)", type, value ) );
+        }
+
+        @Override
+        protected ConstraintDefinition getConstraint( GraphDatabaseService db, String type, String value )
+        {
+            return singleOrNull( db.schema().getConstraints( DynamicLabel.label( type ) ) );
+        }
+
+        @Override
+        protected IndexDefinition getIndex( GraphDatabaseService db, String type, String value )
+        {
+            return null;
         }
 
         @Override
@@ -113,16 +134,28 @@ public class ConstraintHaIT
         @Override
         protected Class<? extends ConstraintDefinition> constraintDefinitionClass()
         {
-            return MandatoryNodePropertyConstraintDefinition.class;
+            return NodePropertyExistenceConstraintDefinition.class;
         }
     }
 
-    public static class MandatoryRelationshipPropertyConstraintHaIT extends AbstractConstraintHaIT
+    public static class RelationshipPropertyExistenceConstraintHaIT extends AbstractConstraintHaIT
     {
         @Override
         protected void createConstraint( GraphDatabaseService db, String type, String value )
         {
-            db.schema().constraintFor( withName( type ) ).assertPropertyExists( value ).create();
+            db.execute( String.format( "CREATE CONSTRAINT ON ()-[r:`%s`]-() ASSERT exists(r.`%s`)", type, value ) );
+        }
+
+        @Override
+        protected ConstraintDefinition getConstraint( GraphDatabaseService db, String type, String value )
+        {
+            return singleOrNull( db.schema().getConstraints( DynamicRelationshipType.withName( type ) ) );
+        }
+
+        @Override
+        protected IndexDefinition getIndex( GraphDatabaseService db, String type, String value )
+        {
+            return null;
         }
 
         @Override
@@ -166,7 +199,7 @@ public class ConstraintHaIT
         @Override
         protected Class<? extends ConstraintDefinition> constraintDefinitionClass()
         {
-            return MandatoryRelationshipPropertyConstraintDefinition.class;
+            return RelationshipPropertyExistenceConstraintDefinition.class;
         }
     }
 
@@ -175,7 +208,19 @@ public class ConstraintHaIT
         @Override
         protected void createConstraint( GraphDatabaseService db, String type, String value )
         {
-            db.schema().constraintFor( label( type ) ).assertPropertyIsUnique( value ).create();
+            db.execute( String.format( "CREATE CONSTRAINT ON (n:`%s`) ASSERT n.`%s` IS UNIQUE", type, value ) );
+        }
+
+        @Override
+        protected ConstraintDefinition getConstraint( GraphDatabaseService db, String type, String value )
+        {
+            return singleOrNull( db.schema().getConstraints( DynamicLabel.label( type ) ) );
+        }
+
+        @Override
+        protected IndexDefinition getIndex( GraphDatabaseService db, String type, String value )
+        {
+            return singleOrNull( db.schema().getIndexes( DynamicLabel.label( type ) ) );
         }
 
         @Override
@@ -215,13 +260,36 @@ public class ConstraintHaIT
 
     public abstract static class AbstractConstraintHaIT
     {
+        @Rule
+        public ClusterRule clusterRule = new ClusterRule( getClass() )
+                .withSharedSetting( HaSettings.read_timeout, "4000s" );
+
         private static final String TYPE = "Type";
         private static final String PROPERTY_KEY = "name";
 
-        @Rule
-        public ClusterRule clusterRule = new ClusterRule( getClass() );
+        // These type/key methods are due to the ClusterRule being a ClassRule so that one cluster
+        // is used for all the tests, and so they need to have each their own constraint
+        protected String type( int id )
+        {
+            return TYPE + "_" + getClass().getSimpleName() + "_" + id;
+        }
+
+        protected String key( int id )
+        {
+            return PROPERTY_KEY + "_" + getClass().getSimpleName() + "_" + id;
+        }
 
         protected abstract void createConstraint( GraphDatabaseService db, String type, String value );
+
+        /**
+         * @return {@code null} if it has been dropped.
+         */
+        protected abstract ConstraintDefinition getConstraint( GraphDatabaseService db, String type, String value );
+
+        /**
+         * @return {@code null} if it has been dropped.
+         */
+        protected abstract IndexDefinition getIndex( GraphDatabaseService db, String type, String value );
 
         protected abstract void createEntityInTx( GraphDatabaseService db, String type, String propertyKey,
                 String value );
@@ -240,11 +308,13 @@ public class ConstraintHaIT
             // given
             ClusterManager.ManagedCluster cluster = clusterRule.startCluster();
             HighlyAvailableGraphDatabase master = cluster.getMaster();
+            String type = type( 0 );
+            String key = key( 0 );
 
             // when
             try ( Transaction tx = master.beginTx() )
             {
-                createConstraint( master, TYPE, PROPERTY_KEY );
+                createConstraint( master, type, key );
                 tx.success();
             }
 
@@ -255,9 +325,9 @@ public class ConstraintHaIT
             {
                 try ( Transaction tx = clusterMember.beginTx() )
                 {
-                    ConstraintDefinition constraint = single( clusterMember.schema().getConstraints() );
-                    validateLabelOrRelationshipType( constraint );
-                    assertEquals( PROPERTY_KEY, single( constraint.getPropertyKeys() ) );
+                    ConstraintDefinition constraint = getConstraint( clusterMember, type, key );
+                    validateLabelOrRelationshipType( constraint, type );
+                    assertEquals( key, single( constraint.getPropertyKeys() ) );
                     tx.success();
                 }
             }
@@ -269,16 +339,18 @@ public class ConstraintHaIT
             // given
             ClusterManager.ManagedCluster cluster = clusterRule.startCluster();
             HighlyAvailableGraphDatabase slave = cluster.getAnySlave();
+            String type = type( 1 );
+            String key = key( 1 );
 
             // when
             try ( Transaction ignored = slave.beginTx() )
             {
-                createConstraint( slave, TYPE, PROPERTY_KEY );
+                createConstraint( slave, type, key );
                 fail( "We expected to not be able to create a constraint on a slave in a cluster." );
             }
-            catch ( Exception e )
+            catch ( QueryExecutionException e )
             {
-                assertThat( e, instanceOf( InvalidTransactionTypeException.class ) );
+                assertThat( Exceptions.rootCause( e ), instanceOf( InvalidTransactionTypeKernelException.class ) );
             }
         }
 
@@ -288,21 +360,26 @@ public class ConstraintHaIT
             // given
             ClusterManager.ManagedCluster cluster = clusterRule.startCluster();
             HighlyAvailableGraphDatabase master = cluster.getMaster();
+            String type = type( 2 );
+            String key = key( 2 );
 
+            long constraintCountBefore, indexCountBefore;
             try ( Transaction tx = master.beginTx() )
             {
-                createConstraint( master, TYPE, PROPERTY_KEY );
+                constraintCountBefore = count( master.schema().getConstraints() );
+                indexCountBefore = count( master.schema().getIndexes() );
+                createConstraint( master, type, key );
                 tx.success();
             }
             cluster.sync();
 
             // and given I have some data for the constraint
-            createEntityInTx( cluster.getAnySlave(), TYPE, PROPERTY_KEY, "Foo" );
+            createEntityInTx( cluster.getAnySlave(), type, key, "Foo" );
 
             // when
             try ( Transaction tx = master.beginTx() )
             {
-                single( master.schema().getConstraints() ).drop();
+                getConstraint( master, type, key ).drop();
                 tx.success();
             }
             cluster.sync();
@@ -312,9 +389,9 @@ public class ConstraintHaIT
             {
                 try ( Transaction tx = clusterMember.beginTx() )
                 {
-                    assertEquals( count( clusterMember.schema().getConstraints() ), 0 );
-                    assertEquals( count( clusterMember.schema().getIndexes() ), 0 );
-                    createConstraintViolation( clusterMember, TYPE, PROPERTY_KEY, "Foo" );
+                    assertNull( getConstraint( clusterMember, type, key ) );
+                    assertNull( getIndex( clusterMember, type, key ) );
+                    createConstraintViolation( clusterMember, type, key, "Foo" );
                     tx.success();
                 }
             }
@@ -325,25 +402,27 @@ public class ConstraintHaIT
         {
             // Given
             ClusterManager.ManagedCluster cluster =
-                    clusterRule.config( HaSettings.read_timeout, "4000s" ).startCluster();
+                    clusterRule.withSharedSetting( HaSettings.read_timeout, "4000s" ).startCluster();
             HighlyAvailableGraphDatabase slave = cluster.getAnySlave();
             HighlyAvailableGraphDatabase master = cluster.getMaster();
+            String type = type( 3 );
+            String key = key( 3 );
 
             ThreadToStatementContextBridge txBridge = threadToStatementContextBridge( slave );
 
             // And given there is an entity with property
-            createEntityInTx( master, TYPE, PROPERTY_KEY, "Foo" );
+            createEntityInTx( master, type, key, "Foo" );
 
             // And given that I begin a transaction that will create a constraint violation
             slave.beginTx();
-            createConstraintViolation( slave, TYPE, PROPERTY_KEY, "Foo" );
+            createConstraintViolation( slave, type, key, "Foo" );
             TopLevelTransaction slaveTx = txBridge.getTopLevelTransactionBoundToThisThread( true );
             txBridge.unbindTransactionFromCurrentThread();
 
             // When I create a constraint
             try ( Transaction tx = master.beginTx() )
             {
-                createConstraint( master, TYPE, PROPERTY_KEY );
+                createConstraint( master, type, key );
                 tx.success();
             }
 
@@ -355,7 +434,8 @@ public class ConstraintHaIT
                 slaveTx.close();
                 fail( "Expected this commit to fail :(" );
             }
-            catch ( org.neo4j.graphdb.TransactionFailureException e )
+            catch ( org.neo4j.graphdb.TransactionFailureException |
+                    org.neo4j.graphdb.TransientTransactionFailureException e )
             {
                 assertThat(
                         e.getCause().getCause(),
@@ -364,13 +444,13 @@ public class ConstraintHaIT
             }
 
             // And then both master and slave should keep working, accepting reads
-            assertConstraintHolds( master, TYPE, PROPERTY_KEY, "Foo" );
+            assertConstraintHolds( master, type, key, "Foo" );
             cluster.sync();
-            assertConstraintHolds( slave, TYPE, PROPERTY_KEY, "Foo" );
+            assertConstraintHolds( slave, type, key, "Foo" );
 
             // And then I should be able to perform new write transactions, on both master and slave
-            createEntityInTx( slave, TYPE, PROPERTY_KEY, "Bar" );
-            createEntityInTx( master, TYPE, PROPERTY_KEY, "Baz" );
+            createEntityInTx( slave, type, key, "Bar" );
+            createEntityInTx( master, type, key, "Baz" );
         }
 
         @Test
@@ -378,6 +458,8 @@ public class ConstraintHaIT
         {
             // Given
             ClusterManager.ManagedCluster cluster = clusterRule.startCluster();
+            String type = type( 4 );
+            String key = key( 4 );
 
             HighlyAvailableGraphDatabase master = cluster.getMaster();
 
@@ -390,7 +472,7 @@ public class ConstraintHaIT
 
             try ( Transaction tx = master.beginTx() )
             {
-                createConstraint( master, TYPE, PROPERTY_KEY );
+                createConstraint( master, type, key );
                 tx.success();
             }
 
@@ -400,10 +482,10 @@ public class ConstraintHaIT
             // Then
             try ( Transaction ignored = slave.beginTx() )
             {
-                ConstraintDefinition definition = single( slave.schema().getConstraints() );
+                ConstraintDefinition definition = getConstraint( slave, type, key );
                 assertThat( definition, instanceOf( constraintDefinitionClass() ) );
-                assertThat( single( definition.getPropertyKeys() ), equalTo( PROPERTY_KEY ) );
-                validateLabelOrRelationshipType( definition );
+                assertThat( single( definition.getPropertyKeys() ), equalTo( key ) );
+                validateLabelOrRelationshipType( definition, type );
             }
         }
 
@@ -413,15 +495,15 @@ public class ConstraintHaIT
             return dependencyResolver.resolveDependency( ThreadToStatementContextBridge.class );
         }
 
-        private static void validateLabelOrRelationshipType( ConstraintDefinition constraint )
+        private static void validateLabelOrRelationshipType( ConstraintDefinition constraint, String type )
         {
-            if ( constraint.isConstraintType( ConstraintType.MANDATORY_RELATIONSHIP_PROPERTY ) )
+            if ( constraint.isConstraintType( ConstraintType.RELATIONSHIP_PROPERTY_EXISTENCE ) )
             {
-                assertEquals( TYPE, constraint.getRelationshipType().name() );
+                assertEquals( type, constraint.getRelationshipType().name() );
             }
             else
             {
-                assertEquals( TYPE, constraint.getLabel().name() );
+                assertEquals( type, constraint.getLabel().name() );
             }
         }
     }

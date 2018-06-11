@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.unsafe.impl.batchimport.input;
 
+import java.io.IOException;
 import java.io.OutputStream;
 
 import org.neo4j.function.Function;
@@ -28,6 +29,23 @@ import org.neo4j.function.Function;
  */
 public class Collectors
 {
+    public static Collector silentBadCollector( int tolerance )
+    {
+        return silentBadCollector( tolerance, BadCollector.COLLECT_ALL );
+    }
+
+    public static Collector silentBadCollector( int tolerance, int collect )
+    {
+        return badCollector( new OutputStream()
+        {
+            @Override
+            public void write( int i ) throws IOException
+            {
+                // ignored
+            }
+        }, tolerance, collect );
+    }
+
     public static Collector badCollector( OutputStream out, int tolerance )
     {
         return badCollector( out, tolerance, BadCollector.COLLECT_ALL );
@@ -55,9 +73,10 @@ public class Collectors
         };
     }
 
-    public static int collect( boolean skipBadRelationships, boolean skipDuplicateNodes )
+    public static int collect( boolean skipBadRelationships, boolean skipDuplicateNodes, boolean ignoreExtraColumns )
     {
         return (skipBadRelationships ? BadCollector.BAD_RELATIONSHIPS : 0 ) |
-               (skipDuplicateNodes ? BadCollector.DUPLICATE_NODES : 0 );
+               (skipDuplicateNodes ? BadCollector.DUPLICATE_NODES : 0 ) |
+               (ignoreExtraColumns ? BadCollector.EXTRA_COLUMNS : 0 );
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,8 @@
 package org.neo4j.kernel.impl.transaction.log.checkpoint;
 
 import java.io.IOException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.neo4j.kernel.KernelHealth;
 import org.neo4j.kernel.impl.transaction.log.LogPosition;
@@ -33,8 +35,6 @@ import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 
-import static org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointer.PrintFormat.prefix;
-
 public class CheckPointerImpl extends LifecycleAdapter implements CheckPointer
 {
     private final TransactionAppender appender;
@@ -45,10 +45,21 @@ public class CheckPointerImpl extends LifecycleAdapter implements CheckPointer
     private final KernelHealth kernelHealth;
     private final Log msgLog;
     private final CheckPointTracer tracer;
+    private final Lock lock;
+
+    private long lastCheckPointedTx;
 
     public CheckPointerImpl( TransactionIdStore transactionIdStore, CheckPointThreshold threshold,
             StoreFlusher storeFlusher, LogPruning logPruning, TransactionAppender appender, KernelHealth kernelHealth,
             LogProvider logProvider, CheckPointTracer tracer )
+    {
+        this( transactionIdStore, threshold, storeFlusher, logPruning, appender, kernelHealth, logProvider, tracer,
+                new ReentrantLock() );
+    }
+
+    public CheckPointerImpl( TransactionIdStore transactionIdStore, CheckPointThreshold threshold,
+            StoreFlusher storeFlusher, LogPruning logPruning, TransactionAppender appender, KernelHealth kernelHealth,
+            LogProvider logProvider, CheckPointTracer tracer, Lock lock )
     {
         this.appender = appender;
         this.transactionIdStore = transactionIdStore;
@@ -58,6 +69,7 @@ public class CheckPointerImpl extends LifecycleAdapter implements CheckPointer
         this.kernelHealth = kernelHealth;
         this.msgLog = logProvider.getLog( CheckPointerImpl.class );
         this.tracer = tracer;
+        this.lock = lock;
     }
 
     @Override
@@ -67,29 +79,78 @@ public class CheckPointerImpl extends LifecycleAdapter implements CheckPointer
     }
 
     @Override
-    public void forceCheckPoint() throws IOException
+    public long forceCheckPoint( TriggerInfo info ) throws IOException
     {
-        doCheckPoint( LogCheckPointEvent.NULL );
+        lock.lock();
+        try
+        {
+            return doCheckPoint( info, LogCheckPointEvent.NULL );
+        }
+        finally
+        {
+            lock.unlock();
+        }
     }
 
     @Override
-    public void checkPointIfNeeded() throws IOException
+    public long tryCheckPoint( TriggerInfo info ) throws IOException
     {
-        if ( threshold.isCheckPointingNeeded( transactionIdStore.getLastClosedTransactionId() ) )
+        if ( lock.tryLock() )
         {
-            try ( LogCheckPointEvent event = tracer.beginCheckPoint() )
+            try
             {
-                doCheckPoint( event );
+                return doCheckPoint( info, LogCheckPointEvent.NULL );
+            }
+            finally
+            {
+                lock.unlock();
+            }
+        }
+        else
+        {
+            lock.lock();
+            try
+            {
+                msgLog.info( info.describe( lastCheckPointedTx ) +
+                             " Check pointing was already running, completed now" );
+                return lastCheckPointedTx;
+            }
+            finally
+            {
+                lock.unlock();
             }
         }
     }
 
-    private void doCheckPoint( LogCheckPointEvent logCheckPointEvent ) throws IOException
+    @Override
+    public long checkPointIfNeeded( TriggerInfo info ) throws IOException
+    {
+        lock.lock();
+        try
+        {
+            if ( threshold.isCheckPointingNeeded( transactionIdStore.getLastClosedTransactionId(), info ) )
+            {
+                try ( LogCheckPointEvent event = tracer.beginCheckPoint() )
+                {
+                    return doCheckPoint( info, event );
+                }
+            }
+            return -1;
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
+    private long doCheckPoint( TriggerInfo triggerInfo, LogCheckPointEvent logCheckPointEvent ) throws IOException
     {
         long[] lastClosedTransaction = transactionIdStore.getLastClosedTransaction();
         long lastClosedTransactionId = lastClosedTransaction[0];
         LogPosition logPosition = new LogPosition( lastClosedTransaction[1], lastClosedTransaction[2] );
-        msgLog.info( prefix( lastClosedTransactionId ) + "Starting check pointing..." );
+
+        String prefix = triggerInfo.describe( lastClosedTransactionId );
+        msgLog.info( prefix + " Starting check pointing..." );
 
         /*
          * Check kernel health before going into waiting for transactions to be closed, to avoid
@@ -102,8 +163,9 @@ public class CheckPointerImpl extends LifecycleAdapter implements CheckPointer
          * First we flush the store. If we fail now or during the flush, on recovery we'll find the
          * earlier check point and replay from there all the log entries. Everything will be ok.
          */
-        msgLog.info( prefix( lastClosedTransactionId ) + " Starting store flush..." );
+        msgLog.info( prefix + " Starting store flush..." );
         storeFlusher.forceEverything();
+        msgLog.info( prefix + " Store flush completed" );
 
         /*
          * Check kernel health before going to write the next check point.  In case of a panic this check point
@@ -111,14 +173,21 @@ public class CheckPointerImpl extends LifecycleAdapter implements CheckPointer
          * repair the damages.
          */
         kernelHealth.assertHealthy( IOException.class );
+
+        msgLog.info( prefix + " Starting appending check point entry into the tx log..." );
         appender.checkPoint( logPosition, logCheckPointEvent );
         threshold.checkPointHappened( lastClosedTransactionId );
-        msgLog.info( prefix( lastClosedTransactionId ) + "Check pointing completed" );
+        msgLog.info( prefix + " Appending check point entry into the tx log completed" );
+
+        msgLog.info( prefix + " Check pointing completed" );
 
         /*
          * Prune up to the version pointed from the latest check point,
          * since it might be an earlier version than the current log version.
          */
         logPruning.pruneLogs( logPosition.getLogVersion() );
+
+        lastCheckPointedTx = lastClosedTransactionId;
+        return lastClosedTransactionId;
     }
 }

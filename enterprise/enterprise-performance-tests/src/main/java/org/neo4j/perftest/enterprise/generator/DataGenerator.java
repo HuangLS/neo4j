@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -47,6 +47,7 @@ import org.neo4j.unsafe.batchinsert.BatchInserter;
 import org.neo4j.unsafe.batchinsert.BatchInserters;
 
 import static java.util.Arrays.asList;
+
 import static org.neo4j.perftest.enterprise.util.Configuration.SYSTEM_PROPERTIES;
 import static org.neo4j.perftest.enterprise.util.Configuration.settingsOf;
 import static org.neo4j.perftest.enterprise.util.Predicate.integerRange;
@@ -125,7 +126,7 @@ public class DataGenerator
                 new DefaultFileSystemAbstraction(), new Config( config ), PageCacheTracer.NULL,
                 NullLog.getInstance() );
         PageCache pageCache = pageCacheFactory.getOrCreatePageCache();
-        StoreAccess stores = new StoreAccess( pageCache, storeDir );
+        StoreAccess stores = new StoreAccess( pageCache, storeDir ).initialize();
         try
         {
             printCount( stores.getNodeStore() );
@@ -136,7 +137,7 @@ public class DataGenerator
             if ( configuration.get( report_stats ) )
             {
                 PropertyStats stats = new PropertyStats();
-                stats.applyFiltered( stores.getPropertyStore(), RecordStore.IN_USE );
+                stats.applyFiltered( stores.getPropertyStore() );
                 // TODO please pass in the PrintStream as an argument
                 System.out.println( stats );
             }

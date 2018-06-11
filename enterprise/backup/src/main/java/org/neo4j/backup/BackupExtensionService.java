@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -63,6 +63,7 @@ public abstract class BackupExtensionService extends Service
      * 
      * @param address Cluster address as passed in the command line
      * @param arguments all arguments to the backup command
+     * @param logService the logging service to use
      * @return A URI where the scheme is the service's name and there exist host
      *         and port parts that point to a backup source.
      */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -49,6 +49,7 @@ import org.neo4j.graphdb.PropertyContainer;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipExpander;
 import org.neo4j.graphdb.RelationshipType;
+import org.neo4j.graphdb.ResourceIterable;
 import org.neo4j.graphdb.index.AutoIndexer;
 import org.neo4j.graphdb.index.Index;
 import org.neo4j.graphdb.index.IndexHits;
@@ -56,12 +57,11 @@ import org.neo4j.graphdb.index.IndexManager;
 import org.neo4j.graphdb.index.ReadableIndex;
 import org.neo4j.graphdb.index.UniqueFactory;
 import org.neo4j.graphdb.index.UniqueFactory.UniqueEntity;
+import org.neo4j.graphdb.schema.ConstraintCreator;
 import org.neo4j.graphdb.schema.ConstraintDefinition;
 import org.neo4j.graphdb.schema.ConstraintType;
 import org.neo4j.graphdb.schema.IndexCreator;
 import org.neo4j.graphdb.schema.IndexDefinition;
-import org.neo4j.graphdb.schema.ConstraintCreator;
-import org.neo4j.graphdb.schema.RelationshipConstraintCreator;
 import org.neo4j.graphdb.traversal.TraversalDescription;
 import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.collection.IterableWrapper;
@@ -121,7 +121,6 @@ public class DatabaseActions
     private final LeaseManager leases;
 
     private final TraversalDescriptionBuilder traversalDescriptionBuilder;
-    private final boolean enableScriptSandboxing;
     private final PropertySettingStrategy propertySetter;
 
     public static class Provider extends InjectableProvider<DatabaseActions>
@@ -155,7 +154,6 @@ public class DatabaseActions
     {
         this.leases = leaseManager;
         this.graphDb = graphDatabaseAPI;
-        this.enableScriptSandboxing = enableScriptSandboxing;
         this.traversalDescriptionBuilder = new TraversalDescriptionBuilder( enableScriptSandboxing );
         this.propertySetter = new PropertySettingStrategy( graphDb );
     }
@@ -1457,16 +1455,18 @@ public class DatabaseActions
         return new ListRepresentation( RepresentationType.NODE, nodeRepresentations );
     }
 
-    public ListRepresentation getAllLabels()
+    public ListRepresentation getAllLabels( boolean inUse )
     {
-        Collection<ValueRepresentation> labelNames = asSet( map( new Function<Label, ValueRepresentation>()
+        GlobalGraphOperations operations = GlobalGraphOperations.at( graphDb );
+        ResourceIterable<Label> labels = inUse ? operations.getAllLabelsInUse() : operations.getAllLabels();
+        Collection<ValueRepresentation> labelNames = asSet( map( new Function<Label,ValueRepresentation>()
         {
             @Override
             public ValueRepresentation apply( Label label )
             {
                 return ValueRepresentation.string( label.name() );
             }
-        }, GlobalGraphOperations.at( graphDb ).getAllLabels() ) );
+        }, labels ) );
 
 
         return new ListRepresentation( RepresentationType.STRING, labelNames );
@@ -1535,31 +1535,6 @@ public class DatabaseActions
         for ( String key : propertyKeys )
         {
             constraintCreator = constraintCreator.assertPropertyIsUnique( key );
-        }
-        ConstraintDefinition constraintDefinition = constraintCreator.create();
-        return new ConstraintDefinitionRepresentation( constraintDefinition );
-    }
-
-    public ConstraintDefinitionRepresentation createNodePropertyExistenceConstraint( String labelName,
-            Iterable<String> propertyKeys )
-    {
-        ConstraintCreator constraintCreator = graphDb.schema().constraintFor( label( labelName ) );
-        for ( String key : propertyKeys )
-        {
-            constraintCreator = constraintCreator.assertPropertyExists( key );
-        }
-        ConstraintDefinition constraintDefinition = constraintCreator.create();
-        return new ConstraintDefinitionRepresentation( constraintDefinition );
-    }
-
-    public ConstraintDefinitionRepresentation createRelationshipPropertyExistenceConstraint( String typeName,
-            Iterable<String> propertyKeys )
-    {
-        RelationshipType type = DynamicRelationshipType.withName( typeName );
-        RelationshipConstraintCreator constraintCreator = graphDb.schema().constraintFor( type );
-        for ( String key : propertyKeys )
-        {
-            constraintCreator = constraintCreator.assertPropertyExists( key );
         }
         ConstraintDefinition constraintDefinition = constraintCreator.create();
         return new ConstraintDefinitionRepresentation( constraintDefinition );
@@ -1714,7 +1689,7 @@ public class DatabaseActions
             @Override
             public boolean test( ConstraintDefinition item )
             {
-                return item.isConstraintType( ConstraintType.MANDATORY_NODE_PROPERTY ) &&
+                return item.isConstraintType( ConstraintType.NODE_PROPERTY_EXISTENCE ) &&
                        propertyKeysSet.equals( asSet( item.getPropertyKeys() ) );
             }
         };
@@ -1727,7 +1702,7 @@ public class DatabaseActions
             @Override
             public boolean test( ConstraintDefinition item )
             {
-                return item.isConstraintType( ConstraintType.MANDATORY_RELATIONSHIP_PROPERTY ) &&
+                return item.isConstraintType( ConstraintType.RELATIONSHIP_PROPERTY_EXISTENCE ) &&
                        propertyKeysSet.equals( asSet( item.getPropertyKeys() ) );
             }
         };
@@ -1754,12 +1729,12 @@ public class DatabaseActions
     public Representation getLabelExistenceConstraints( String labelName )
     {
         return new ListRepresentation( CONSTRAINT_DEFINITION, map( CONSTRAINT_DEF_TO_REPRESENTATION,
-                filteredNodeConstraints( labelName, ConstraintType.MANDATORY_NODE_PROPERTY ) ) );
+                filteredNodeConstraints( labelName, ConstraintType.NODE_PROPERTY_EXISTENCE ) ) );
     }
 
     public Representation getRelationshipTypeExistenceConstraints( String typeName )
     {
         return new ListRepresentation( CONSTRAINT_DEFINITION, map( CONSTRAINT_DEF_TO_REPRESENTATION,
-                filteredRelationshipConstraints( typeName, ConstraintType.MANDATORY_RELATIONSHIP_PROPERTY ) ) );
+                filteredRelationshipConstraints( typeName, ConstraintType.RELATIONSHIP_PROPERTY_EXISTENCE ) ) );
     }
 }

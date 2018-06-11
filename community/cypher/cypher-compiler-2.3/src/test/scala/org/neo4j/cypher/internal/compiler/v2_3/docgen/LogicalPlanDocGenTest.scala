@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,11 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.docgen
 
-import org.neo4j.cypher.internal.compiler.v2_3.perty._
-import org.neo4j.cypher.internal.compiler.v2_3.perty.gen.{DocHandlerTestSuite, toStringDocGen}
-import org.neo4j.cypher.internal.compiler.v2_3.perty.print.{PrintNewLine, PrintText, condense}
+import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{IdName, LogicalLeafPlan, LogicalPlan, LogicalPlanWithoutExpressions}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.{CardinalityEstimation, PlannerQuery}
-import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{LogicalPlanWithoutExpressions, IdName, LogicalLeafPlan, LogicalPlan}
+import org.neo4j.cypher.internal.frontend.v2_3.perty._
+import org.neo4j.cypher.internal.frontend.v2_3.perty.gen.{DocHandlerTestSuite, toStringDocGen}
+import org.neo4j.cypher.internal.frontend.v2_3.perty.print.{PrintNewLine, PrintText, condense}
 
 class LogicalPlanDocGenTest extends DocHandlerTestSuite[Any] {
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,8 @@
  */
 package org.neo4j.cypher.internal
 
-import org.neo4j.cypher.internal.compiler.v2_3.InputPosition
-import org.neo4j.cypher.internal.compiler.v2_3.parser._
+import org.neo4j.cypher.internal.frontend.v2_3.InputPosition
+import org.neo4j.cypher.internal.frontend.v2_3.parser.Base
 import org.parboiled.scala._
 
 final case class PreParsedStatement(statement: String, options: Seq[PreParserOption], offset: InputPosition)
@@ -45,7 +45,7 @@ case object CypherPreParser extends Parser with Base {
   }
 
   def PlannerOption: Rule1[PreParserOption] = rule("planner option") (
-      option("planner", "cost") ~ push(GreedyPlannerOption)
+      option("planner", "cost") ~ push(CostPlannerOption)
     | option("planner", "greedy") ~ push(GreedyPlannerOption)
     | option("planner", "rule") ~ push(RulePlannerOption)
     | option("planner", "idp") ~ push(IDPPlannerOption)
@@ -54,12 +54,13 @@ case object CypherPreParser extends Parser with Base {
 
   def RuntimeOption = rule("runtime option")(
     option("runtime", "interpreted") ~ push(InterpretedRuntimeOption)
-      | option("runtime", "compiled") ~ push(CompiledRuntimeOption)
+        //Only here for the parser to be backwards compatible
+      | option("runtime", "compiled") ~ push(InterpretedRuntimeOption)
   )
 
   @deprecated
   def PlannerDeprecated = rule("PLANNER") (
-      keyword("PLANNER COST") ~ push(GreedyPlannerOption)
+      keyword("PLANNER COST") ~ push(CostPlannerOption)
     | keyword("PLANNER GREEDY") ~ push(GreedyPlannerOption)
     | keyword("PLANNER IDP") ~ push(IDPPlannerOption)
     | keyword("PLANNER DP") ~ push(DPPlannerOption)

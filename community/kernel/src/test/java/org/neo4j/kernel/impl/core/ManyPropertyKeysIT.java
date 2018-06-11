@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,15 +33,14 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.GraphDatabaseAPI;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.PropertyKeyTokenStore;
 import org.neo4j.kernel.impl.store.PropertyStore;
 import org.neo4j.kernel.impl.store.StoreFactory;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.PropertyKeyTokenRecord;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
 import org.neo4j.logging.NullLogProvider;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.test.OtherThreadExecutor;
 import org.neo4j.test.OtherThreadExecutor.WorkerCommand;
 import org.neo4j.test.PageCacheRule;
@@ -122,10 +121,9 @@ public class ManyPropertyKeysIT
     {
         DefaultFileSystemAbstraction fs = new DefaultFileSystemAbstraction();
         PageCache pageCache = pageCacheRule.getPageCache( fs );
-        StoreFactory storeFactory =
-                new StoreFactory( fs, storeDir, pageCache, NullLogProvider.getInstance(), new Monitors() );
-        NeoStore neoStore = storeFactory.newNeoStore( true );
-        PropertyKeyTokenStore store = neoStore.getPropertyKeyTokenStore();
+        StoreFactory storeFactory = new StoreFactory( fs, storeDir, pageCache, NullLogProvider.getInstance() );
+        NeoStores neoStores = storeFactory.openAllNeoStores( true );
+        PropertyKeyTokenStore store = neoStores.getPropertyKeyTokenStore();
         for ( int i = 0; i < propertyKeyCount; i++ )
         {
             PropertyKeyTokenRecord record = new PropertyKeyTokenRecord( (int) store.nextId() );
@@ -135,7 +133,7 @@ public class ManyPropertyKeysIT
             record.setNameId( (int) first( nameRecords ).getId() );
             store.updateRecord( record );
         }
-        neoStore.close();
+        neoStores.close();
 
         return database();
     }
@@ -158,7 +156,7 @@ public class ManyPropertyKeysIT
 
     private int propertyKeyCount( GraphDatabaseAPI db )
     {
-        return (int) db.getDependencyResolver().resolveDependency( NeoStoreSupplier.class ).get()
+        return (int) db.getDependencyResolver().resolveDependency( NeoStoresSupplier.class ).get()
                 .getPropertyKeyTokenStore().getHighId();
     }
 

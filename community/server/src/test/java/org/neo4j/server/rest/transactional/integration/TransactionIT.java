@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -166,17 +166,19 @@ public class TransactionIT extends AbstractRestFunctionalTestBase
                       "} ] }";
 
         // begin and execute
+        // given statement is badly escaped and it is a client error, thus tx is rolled back at once
         Response begin = http.POST( "/db/data/transaction", quotedJson( json ) );
 
         String commitResource = begin.stringFromContent( "commit" );
 
-        // commit
+        // commit fails because tx was rolled back on the previous step
         Response commit = http.POST( commitResource );
 
         assertThat( begin.status(), equalTo( 201 ) );
         assertThat( begin, hasErrors( Status.Request.InvalidFormat ) );
-        assertThat( commit.status(), equalTo( 200 ) );
-        assertThat( commit, containsNoErrors() );
+
+        assertThat( commit.status(), equalTo( 404 ) );
+        assertThat( commit, hasErrors( Status.Transaction.UnknownId ) );
 
         assertThat( countNodes(), equalTo( nodesInDatabaseBeforeTransaction ) );
     }
@@ -781,6 +783,27 @@ public class TransactionIT extends AbstractRestFunctionalTestBase
     }
 
     @Test
+    public void shouldHandleMapParametersCorrectly() throws Exception
+    {
+        Response response = http.POST(
+                "/db/data/transaction/commit",
+                quotedJson("{ 'statements': [ { 'statement': " +
+                        "'WITH {map} AS map RETURN map[0]', 'parameters':{'map':[{'index':0,'name':'a'},{'index':1,'name':'b'}]} } ] }"));
+
+        // then
+        assertThat( response.status(), equalTo( 200 ) );
+
+        JsonNode data = response.get( "results" ).get( 0 );
+        JsonNode row = data.get( "data" ).get( 0 ).get( "row" );
+        assertThat( row.size(), equalTo( 1 ) );
+
+        assertThat( row.get(0).get("index").asInt(), equalTo( 0 ) );
+        assertThat( row.get(0).get("name").asText(), equalTo( "a" ) );
+
+        assertThat( response.get( "errors" ).size(), equalTo( 0 ) );
+    }
+
+    @Test
     public void restFormatNodesShouldHaveSensibleUris() throws Throwable
     {
         // given
@@ -848,6 +871,15 @@ public class TransactionIT extends AbstractRestFunctionalTestBase
         assertPath( restNode.get( "all_relationships" ), "/node/\\d+/relationships/all", hostname, scheme );
         assertPath( restNode.get( "incoming_typed_relationships" ),
                 "/node/\\d+/relationships/in/\\{-list\\|&\\|types\\}", hostname, scheme );
+    }
+
+    @Test
+    public void correctStatusCodeWhenUsingHintWithoutAnyIndex() throws Exception
+    {
+        // begin and execute and commit
+        Response begin = http.POST( "/db/data/transaction/commit", quotedJson( "{ 'statements': [ { 'statement': " +
+                                                                               "'MATCH (n:Test) USING INDEX n:Test(foo) WHERE n.foo = 42 RETURN n.foo' } ] }" ) );
+        assertThat( begin, hasErrors( Status.Request.Schema.NoSuchIndex ) );
     }
 
     private void assertPath( JsonNode jsonURIString, String path, String hostname, final String scheme )

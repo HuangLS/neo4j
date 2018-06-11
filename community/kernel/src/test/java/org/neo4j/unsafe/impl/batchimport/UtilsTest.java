@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,9 @@
  */
 package org.neo4j.unsafe.impl.batchimport;
 
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,6 +43,10 @@ import static org.neo4j.unsafe.impl.batchimport.input.InputEntity.NO_PROPERTIES;
 
 public class UtilsTest
 {
+
+    @Rule
+    public ExpectedException expectedException = ExpectedException.none();
+
     @Test
     public void shouldDetectCollisions() throws Exception
     {
@@ -53,6 +59,24 @@ public class UtilsTest
 
         // THEN
         assertTrue( collides );
+    }
+
+    @Test
+    public void failSafeCastLongToIntOnOverflow()
+    {
+        expectedException.expect( ArithmeticException.class );
+        expectedException.expectMessage( "Value 2147483648 is too big to be represented as int" );
+
+        Utils.safeCastLongToInt( Integer.MAX_VALUE + 1l );
+    }
+
+    @Test
+    public void failSafeCastLongToShortOnOverflow()
+    {
+        expectedException.expect( ArithmeticException.class );
+        expectedException.expectMessage( "Value 32768 is too big to be represented as short" );
+
+        Utils.safeCastLongToShort( Short.MAX_VALUE + 1l );
     }
 
     @Test

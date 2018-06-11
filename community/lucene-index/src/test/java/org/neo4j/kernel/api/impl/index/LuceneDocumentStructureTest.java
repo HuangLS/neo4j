@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -133,12 +133,12 @@ public class LuceneDocumentStructureTest
     public void shouldBuildRangeSeekByNumberQueryForStrings() throws Exception
     {
         // given
-        TermRangeQuery query = documentStructure.newRangeSeekByNumberQuery( 12.0d, false, null, true );
+        TermRangeQuery query = documentStructure.newInclusiveNumericRangeSeekQuery( 12.0d, null );
 
         // then
         assertEquals( "number", query.getField() );
         assertEquals( NumericUtils.doubleToPrefixCoded( 12.0d ) , query.getLowerTerm() );
-        assertEquals( false, query.includesLower() );
+        assertEquals( true, query.includesLower() );
         assertEquals( null, query.getUpperTerm() );
         assertEquals( true, query.includesUpper() );
     }

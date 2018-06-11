@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.unsafe.impl.batchimport;
 
+import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMapper;
 import org.neo4j.unsafe.impl.batchimport.input.Collector;
 import org.neo4j.unsafe.impl.batchimport.input.InputCache;
@@ -29,7 +30,7 @@ import org.neo4j.unsafe.impl.batchimport.stats.StatsProvider;
 import static org.neo4j.unsafe.impl.batchimport.Utils.idsOf;
 
 /**
- * Performs {@link IdMapper#prepare(InputIterable, Collector, org.neo4j.helpers.progress.ProgressListener)}
+ * Performs {@link IdMapper#prepare(InputIterable, Collector, ProgressListener)}
  * embedded in a {@link Stage} as to take advantage of statistics and monitoring provided by that framework.
  */
 public class IdMapperPreparationStage extends Stage

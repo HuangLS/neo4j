@@ -10,7 +10,7 @@
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 ### END INIT INFO
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
@@ -140,13 +140,19 @@ buildclasspath() {
 
 detectrunning() {
   if [ $DIST_OS = "solaris" ] ; then
-      ## SmartOS has a different lsof command line arguments
-      newpid=$(lsof -o $NEO4J_SERVER_PORT | grep '::' | head -n1 | cut -d ' ' -f 1)
+    ## SmartOS has a different lsof command line arguments
+    newpid=$(lsof -o $NEO4J_SERVER_PORT | grep '::' | head -n1 | cut -d ' ' -f 1)
   else
-      ## This could be achieved with filtering using -sTCP:LISTEN but this option is not available
-      ## on lsof v4.78 which is the one bundled with some distros. So we have to do this grep below
-      newpid=$(lsof -i :$NEO4J_SERVER_PORT -F T -Ts | grep -i "TST=LISTEN" -B1 | head -n1)
+    LSOFVER=$(lsof -v 2>&1 | grep revision | grep -v latest | cut -d: -f2 | tr -d ' ' | tr -d .)
+    #Newer versions of lsof has the -sTCP:LISTEN flag, which is exactly what we need.
+    #This flag does not exist before 4.78, therefore grepping for TST=LISTEN worked there.
+    #Only in 4.89 did grepping begin to not work, as the output from lsof changed.
+    if [ "$LSOFVER" -ge 478 ]; then
+      newpid=$(lsof -i :"$NEO4J_SERVER_PORT" -sTCP:LISTEN -t)
+    else
+      newpid=$(lsof -i :"$NEO4J_SERVER_PORT" -F T -Ts | grep -i "TST=LISTEN" -B1 | head -n1)
       newpid=${newpid:1}
+    fi
   fi
 }
 
@@ -258,6 +264,7 @@ startit() {
 
 console() {
 
+  detectos
   checkstatus
   checklimits
 
@@ -268,7 +275,7 @@ console() {
     buildclasspath
     checkandrepairenv
 
-    "$JAVACMD" -cp "${CLASSPATH}" $JAVA_OPTS \
+    exec "$JAVACMD" -cp "${CLASSPATH}" $JAVA_OPTS \
         -Dneo4j.home="${NEO4J_HOME}" -Dneo4j.instance="${NEO4J_INSTANCE}" \
         -Dfile.encoding=UTF-8 \
         #{neo4j.mainClass}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.api.txstate;
 
+import org.act.temporalProperty.impl.MemTable;
+
 import java.util.Iterator;
 
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
@@ -34,8 +36,12 @@ import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.cursor.PropertyItem;
 import org.neo4j.kernel.api.cursor.RelationshipItem;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
+import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
 import org.neo4j.kernel.api.index.IndexDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureSignature.ProcedureName;
 import org.neo4j.kernel.api.properties.DefinedProperty;
+import org.neo4j.kernel.api.properties.TemporalProperty;
 import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.api.state.NodeState;
 import org.neo4j.kernel.impl.api.state.PropertyContainerState;
@@ -43,6 +49,7 @@ import org.neo4j.kernel.impl.api.state.RelationshipState;
 import org.neo4j.kernel.impl.api.store.RelationshipIterator;
 import org.neo4j.kernel.impl.util.diffsets.ReadableDiffSets;
 import org.neo4j.kernel.impl.util.diffsets.ReadableRelationshipDiffSets;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
 
 /**
  * Kernel transaction state.
@@ -53,7 +60,13 @@ import org.neo4j.kernel.impl.util.diffsets.ReadableRelationshipDiffSets;
  */
 public interface ReadableTxState
 {
-    void accept( TxStateVisitor visitor ) throws ConstraintValidationKernelException;
+
+    MemTable getNodeTemporalProperties();
+
+    MemTable getRelationshipTemporalProperties();
+
+
+    void accept( TxStateVisitor visitor ) throws ConstraintValidationKernelException, CreateConstraintFailureException;
 
     boolean hasChanges();
 
@@ -182,6 +195,10 @@ public interface ReadableTxState
     Cursor<NodeItem> augmentNodesGetAllCursor( Cursor<NodeItem> cursor );
 
     Cursor<RelationshipItem> augmentRelationshipsGetAllCursor( Cursor<RelationshipItem> cursor );
+
+    Iterator<ProcedureDescriptor> augmentProcedures( Iterator<ProcedureDescriptor> procs );
+
+    ProcedureDescriptor getProcedure( ProcedureName name );
 
     /**
      * The way tokens are created is that the first time a token is needed it gets created in its own little

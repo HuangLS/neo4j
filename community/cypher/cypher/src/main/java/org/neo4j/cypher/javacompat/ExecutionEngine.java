@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,6 +29,9 @@ import org.neo4j.logging.NullLogProvider;
 
 /**
  * To run a Cypher query, use this class.
+ *
+ * This class construct and initialize both the cypher compiler and the cypher runtime, which is a very expensive
+ * operation so please make sure this will be constructed only once and properly reused.
  *
  * @deprecated use {@link org.neo4j.graphdb.GraphDatabaseService#execute(String)} instead.
  */

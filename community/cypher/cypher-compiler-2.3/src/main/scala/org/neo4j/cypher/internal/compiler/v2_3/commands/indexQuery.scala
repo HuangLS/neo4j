@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,12 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.commands
 
-import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expression, PrefixSeekRangeExpression, InequalitySeekRangeExpression}
+import org.neo4j.cypher.internal.compiler.v2_3.ExecutionContext
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expression, InequalitySeekRangeExpression, PrefixSeekRangeExpression}
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.IsCollection
 import org.neo4j.cypher.internal.compiler.v2_3.mutation.GraphElementPropertyFunctions
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
-import org.neo4j.cypher.internal.compiler.v2_3.{CypherTypeException, ExecutionContext}
+import org.neo4j.cypher.internal.frontend.v2_3.CypherTypeException
 import org.neo4j.graphdb.Node
 
 import scala.collection.GenTraversableOnce
@@ -50,11 +51,11 @@ object indexQuery extends GraphElementPropertyFunctions {
 
     case RangeQueryExpression(rangeWrapper) =>
       val range = rangeWrapper match {
-        // StringSeekRange => PrefixRange("Petra")
-        case s: PrefixSeekRangeExpression => s.range
+        case s: PrefixSeekRangeExpression =>
+          s.range.map(expression => makeValueNeoSafe(expression(m)(state)))
 
-        // ValueSeekRange(RangeGT(InclusiveBound(n.prop + 12)) => RangeGT(InclusiveBound(15)))
-        case InequalitySeekRangeExpression(range) => range.mapBounds(_(m)(state)).mapBounds(makeValueNeoSafe)
+        case InequalitySeekRangeExpression(innerRange) =>
+          innerRange.mapBounds(expression => makeValueNeoSafe(expression(m)(state)))
       }
       index(range).toIterator
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -60,5 +60,14 @@ public class Token
     public String toString()
     {
         return getClass().getSimpleName() + "[name:" + name + ", id:" + id + "]";
+    }
+
+    public static class Factory implements TokenFactory<Token>
+    {
+        @Override
+        public Token newToken( String name, int id )
+        {
+            return new Token( name, id );
+        }
     }
 }

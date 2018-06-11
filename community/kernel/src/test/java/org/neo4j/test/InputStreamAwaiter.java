@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,7 +31,6 @@ public class InputStreamAwaiter
     private final InputStream input;
     private final byte[] bytes = new byte[1024];
     private final Clock clock;
-    private static final String NEW_LINE = System.getProperty( "line.separator" );
 
     public InputStreamAwaiter( InputStream input )
     {
@@ -56,7 +55,7 @@ public class InputStreamAwaiter
                 buffer.append( new String( bytes, 0, input.read( bytes ) ) );
             }
 
-            String[] lines = buffer.toString().split( NEW_LINE );
+            String[] lines = buffer.toString().split( System.lineSeparator() );
             for ( String line : lines )
             {
                 if ( expectedLine.equals( line ) )

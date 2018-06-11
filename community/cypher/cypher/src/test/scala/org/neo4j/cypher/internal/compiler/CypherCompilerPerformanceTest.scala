@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,10 +21,11 @@ package org.neo4j.cypher.internal.compiler
 
 import org.neo4j.cypher.GraphDatabaseFunSuite
 import org.neo4j.cypher.internal.CypherCompiler.{CLOCK, DEFAULT_QUERY_PLAN_TTL, DEFAULT_STATISTICS_DIVERGENCE_THRESHOLD}
-import org.neo4j.cypher.internal.compatibility.WrappedMonitors2_3
+import org.neo4j.cypher.internal.compatibility.{EntityAccessorWrapper2_3, WrappedMonitors2_3}
 import org.neo4j.cypher.internal.compiler.v2_3.tracing.rewriters.RewriterStepSequencer
-import org.neo4j.cypher.internal.compiler.v2_3.{GreedyPlannerName, CypherCompilerFactory, InfoLogger, _}
-import org.neo4j.cypher.internal.spi.v2_3.GeneratedQueryStructure
+import org.neo4j.cypher.internal.compiler.v2_3.{CypherCompilerFactory, GreedyPlannerName, InfoLogger, _}
+import org.neo4j.kernel.GraphDatabaseAPI
+import org.neo4j.kernel.impl.core.NodeManager
 
 class CypherCompilerPerformanceTest extends GraphDatabaseFunSuite {
 
@@ -168,19 +169,26 @@ class CypherCompilerPerformanceTest extends GraphDatabaseFunSuite {
   }
 
   def createCurrentCompiler = {
+    val nodeManager = graph.asInstanceOf[GraphDatabaseAPI].getDependencyResolver.resolveDependency(classOf[NodeManager])
+
     CypherCompilerFactory.costBasedCompiler(
       graph = graph,
-      queryCacheSize = 1,
-      statsDivergenceThreshold = DEFAULT_STATISTICS_DIVERGENCE_THRESHOLD,
-      queryPlanTTL = DEFAULT_QUERY_PLAN_TTL,
+      new EntityAccessorWrapper2_3(nodeManager),
+      CypherCompilerConfiguration(
+        queryCacheSize = 1,
+        statsDivergenceThreshold = DEFAULT_STATISTICS_DIVERGENCE_THRESHOLD,
+        queryPlanTTL = DEFAULT_QUERY_PLAN_TTL,
+        useErrorsOverWarnings = false,
+        idpMaxTableSize = 128,
+        idpIterationDuration = 1000,
+        nonIndexedLabelWarningThreshold = 10000L
+      ),
       clock = CLOCK,
-      structure = GeneratedQueryStructure,
       monitors = new WrappedMonitors2_3(kernelMonitors),
       logger = DEV_NULL,
       rewriterSequencer = RewriterStepSequencer.newPlain,
       plannerName = Some(GreedyPlannerName),
-      runtimeName = Some(CompiledRuntimeName),
-      useErrorsOverWarnings = false
+      runtimeName = Some(InterpretedRuntimeName)
     )
   }
 

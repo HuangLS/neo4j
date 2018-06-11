@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,8 +24,8 @@ import org.junit.Test;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import org.neo4j.consistency.ConsistencyCheckService;
 import org.neo4j.graphdb.DependencyResolver;
@@ -40,14 +40,14 @@ import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.NodeStore;
 import org.neo4j.kernel.impl.store.PropertyStore;
 import org.neo4j.kernel.impl.store.RelationshipStore;
 import org.neo4j.kernel.impl.store.record.PropertyBlock;
 import org.neo4j.kernel.impl.store.record.PropertyRecord;
 import org.neo4j.kernel.impl.storemigration.MigrationTestUtils;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.TargetDirectory;
 
@@ -103,14 +103,14 @@ public class StoreMigratorFrom21IT
         ConsistencyCheckService service = new ConsistencyCheckService();
 
         ConsistencyCheckService.Result result = service.runFullConsistencyCheck(
-                dir.getAbsoluteFile(), new Config(), ProgressMonitorFactory.NONE, NullLogProvider.getInstance() );
+                dir.getAbsoluteFile(), new Config(), ProgressMonitorFactory.NONE, NullLogProvider.getInstance(), false );
         assertTrue( result.isSuccessful() );
 
         database = builder.newGraphDatabase();
         // Upgrade is now completed. Verify the contents:
         DependencyResolver dependencyResolver = ((GraphDatabaseAPI) database).getDependencyResolver();
-        NeoStoreSupplier supplier = dependencyResolver.resolveDependency( NeoStoreSupplier.class );
-        NeoStore store = supplier.get();
+        NeoStoresSupplier supplier = dependencyResolver.resolveDependency( NeoStoresSupplier.class );
+        NeoStores store = supplier.get();
         NodeStore nodeStore = store.getNodeStore();
         RelationshipStore relStore = store.getRelationshipStore();
         PropertyStore propertyStore = store.getPropertyStore();
@@ -193,11 +193,7 @@ public class StoreMigratorFrom21IT
 
     private void verifyPropertiesEqual( PropertyContainer entity, Pair<String,String>... expectedProperties )
     {
-        HashMap<String,String> properties = new HashMap<>();
-        for ( String propertyKey : entity.getPropertyKeys() )
-        {
-            properties.put( propertyKey, (String) entity.getProperty( propertyKey ) );
-        }
+        Map<String, String> properties = (Map) entity.getAllProperties();
         assertThat( properties, is( IteratorUtil.asMap( Arrays.asList( expectedProperties ) ) ) );
     }
 

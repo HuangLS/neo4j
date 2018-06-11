@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -131,57 +131,5 @@ class ExecutionResultTest extends ExecutionEngineFunSuite {
 
     assert(stats.uniqueConstraintsAdded === 0)
     assert(stats.uniqueConstraintsRemoved === 0)
-  }
-
-  test("correct statistics for mandatory node property constraint added") {
-    val result = execute("create constraint on (n:Person) assert n.name is not null")
-    val stats  = result.queryStatistics()
-
-    assert(stats.mandatoryConstraintsAdded === 1)
-    assert(stats.mandatoryConstraintsRemoved === 0)
-  }
-
-  test("correct statistics for mandatory node property constraint added twice") {
-    execute("create constraint on (n:Person) assert n.name is not null")
-    val result = execute("create constraint on (n:Person) assert n.name is not null")
-    val stats  = result.queryStatistics()
-
-    assert(stats.mandatoryConstraintsAdded === 0)
-    assert(stats.mandatoryConstraintsRemoved === 0)
-  }
-
-  test("correct statistics for mandatory node property constraint dropped") {
-    execute("create constraint on (n:Person) assert n.name is not null")
-    val result = execute("drop constraint on (n:Person) assert n.name is not null")
-    val stats  = result.queryStatistics()
-
-    assert(stats.mandatoryConstraintsAdded === 0)
-    assert(stats.mandatoryConstraintsRemoved === 1)
-  }
-
-  test("correct statistics for mandatory relationship property constraint added") {
-    val result = execute("create constraint on ()-[r:KNOWS]-() assert r.since is not null")
-    val stats  = result.queryStatistics()
-
-    assert(stats.mandatoryConstraintsAdded === 1)
-    assert(stats.mandatoryConstraintsRemoved === 0)
-  }
-
-  test("correct statistics for mandatory relationship property constraint added twice") {
-    execute("create constraint on ()-[r:KNOWS]-() assert r.since is not null")
-    val result = execute("create constraint on ()-[r:KNOWS]-() assert r.since is not null")
-    val stats  = result.queryStatistics()
-
-    assert(stats.mandatoryConstraintsAdded === 0)
-    assert(stats.mandatoryConstraintsRemoved === 0)
-  }
-
-  test("correct statistics for mandatory relationship property constraint dropped") {
-    execute("create constraint on ()-[r:KNOWS]-() assert r.since is not null")
-    val result = execute("drop constraint on ()-[r:KNOWS]-() assert r.since is not null")
-    val stats  = result.queryStatistics()
-
-    assert(stats.mandatoryConstraintsAdded === 0)
-    assert(stats.mandatoryConstraintsRemoved === 1)
   }
 }

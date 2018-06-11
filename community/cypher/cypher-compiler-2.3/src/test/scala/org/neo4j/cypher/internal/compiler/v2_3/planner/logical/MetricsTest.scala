@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,20 +19,20 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical
 
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class MetricsTest extends CypherFunSuite {
 
   test("negating a selectivity behaves as expected") {
-    Selectivity(.1).negate should not equal Selectivity.ONE
-    Selectivity(5.6e-17).negate should not equal Selectivity.ONE
-    Selectivity(1e-300).negate should not equal Selectivity.ONE
+    Selectivity.of(.1).get.negate should not equal Selectivity.ONE
+    Selectivity.of(5.6e-17).get.negate should not equal Selectivity.ONE
+    Selectivity.of(1e-300).get.negate should not equal Selectivity.ONE
 
     Selectivity.ZERO.negate should equal(Selectivity.ONE)
-    Selectivity(0).negate should equal(Selectivity.ONE)
+    Selectivity.ZERO.negate should equal(Selectivity.ONE)
 
     Selectivity.ONE.negate should equal(Selectivity.ZERO)
-    Selectivity(1).negate should equal(Selectivity.ZERO)
+    Selectivity.ONE.negate should equal(Selectivity.ZERO)
 
     Selectivity.CLOSEST_TO_ONE.negate should not equal Selectivity.ONE
   }

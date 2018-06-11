@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.kernel.impl.api;
 import org.junit.Test;
 
 import org.neo4j.graphdb.TransactionTerminatedException;
+import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.labelscan.LabelScanReader;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 
@@ -69,7 +70,7 @@ public class KernelStatementTest
     public void shouldThrowTerminateExceptionWhenTransactionTerminated() throws Exception
     {
         KernelTransactionImplementation transaction = mock( KernelTransactionImplementation.class );
-        when( transaction.shouldBeTerminated() ).thenReturn( true );
+        when( transaction.getReasonIfTerminated() ).thenReturn( Status.General.UnknownFailure );
 
         KernelStatement statement = new KernelStatement(
             transaction, mock( IndexReaderFactory.class ),
@@ -87,9 +88,8 @@ public class KernelStatementTest
 
         when( scanStore.newReader() ).thenReturn( scanReader );
         KernelStatement statement =
-                new KernelStatement(
-                        mock( KernelTransactionImplementation.class ),
-                        mock( IndexReaderFactory.class ), scanStore, null, null, null, null );
+                new KernelStatement( mock( KernelTransactionImplementation.class ), mock( IndexReaderFactory.class ),
+                        scanStore, null, null, null, null );
 
         statement.acquire();
 

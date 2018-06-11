@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,10 @@ package org.neo4j.helpers.collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * @deprecated This class will be removed in the next major release.
+ */
+@Deprecated
 public class LruMap<K, V> extends LinkedHashMap<K,V >
 {
     private final int maxEntries;

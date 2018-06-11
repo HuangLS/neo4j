@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,24 +19,26 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.execution
 
-import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.ExpressionConverters._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.OtherConverters._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.PatternConverters._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.convert.commands.StatementConverters
 import org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters.projectNamedPaths
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{Expression, Identifier, NodeStartItem, RelTypeName}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.EntityProducerFactory
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{AggregationExpression, Expression => CommandExpression}
-import org.neo4j.cypher.internal.compiler.v2_3.commands.{EntityProducerFactory, Predicate => CommandPredicate, True}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.{True, _}
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders.prepare.KeyTokenResolver
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{PipeInfo, PlanFingerprint}
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.Eagerly
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{LazyTypes, _}
+import org.neo4j.cypher.internal.compiler.v2_3.planner.CantHandleQueryException
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.Metrics
-import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
-import org.neo4j.cypher.internal.compiler.v2_3.planner.{CantHandleQueryException, SemanticTable}
+import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{Limit, Skip, Union, _}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.{InstrumentedGraphStatistics, PlanContext}
 import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.compiler.v2_3.{ExecutionContext, Monitors, PlannerName, ast => compilerAst}
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.helpers.Eagerly
+import org.neo4j.cypher.internal.frontend.v2_3.{Rewriter, SemanticTable, ast, bottomUp}
 import org.neo4j.graphdb.Relationship
 import org.neo4j.helpers.Clock
 
@@ -87,16 +89,16 @@ class PipeExecutionPlanBuilder(clock: Clock, monitors: Monitors) {
           UndirectedRelationshipByIdSeekPipe(id, relIdExpr.asCommandSeekArgs, toNode, fromNode)()
 
         case NodeIndexSeek(IdName(id), label, propertyKey, valueExpr, _) =>
-          NodeIndexSeekPipe(id, label, propertyKey, valueExpr.map(buildExpression), IndexSeekModeFactory(unique = false).fromQueryExpression(valueExpr))()
+          NodeIndexSeekPipe(id, label, propertyKey, valueExpr.map(buildExpression), IndexSeekModeFactory(unique = false, readOnly = true).fromQueryExpression(valueExpr))()
 
         case NodeUniqueIndexSeek(IdName(id), label, propertyKey, valueExpr, _) =>
-          NodeIndexSeekPipe(id, label, propertyKey, valueExpr.map(buildExpression), IndexSeekModeFactory(unique = true).fromQueryExpression(valueExpr))()
+          NodeIndexSeekPipe(id, label, propertyKey, valueExpr.map(buildExpression), IndexSeekModeFactory(unique = true, readOnly = true).fromQueryExpression(valueExpr))()
 
         case NodeIndexScan(IdName(id), label, propertyKey, _) =>
           NodeIndexScanPipe(id, label, propertyKey)()
 
         case Selection(predicates, left) =>
-          FilterPipe(buildPipe(left), predicates.map(buildPredicate).reduce(_ ++ _))()
+          FilterPipe(buildPipe(left), predicates.map(buildPredicate).reduce(_ andWith _))()
 
         case CartesianProduct(left, right) =>
           CartesianProductPipe(buildPipe(left), buildPipe(right))()
@@ -108,18 +110,18 @@ class PipeExecutionPlanBuilder(clock: Clock, monitors: Monitors) {
           ExpandIntoPipe(buildPipe(left), fromName, relName, toName, dir, LazyTypes(types))()
 
         case OptionalExpand(left, IdName(fromName), dir, types, IdName(toName), IdName(relName), ExpandAll, predicates) =>
-          val predicate = predicates.map(buildPredicate).reduceOption(_ ++ _).getOrElse(True())
+          val predicate = predicates.map(buildPredicate).reduceOption(_ andWith _).getOrElse(True())
           OptionalExpandAllPipe(buildPipe(left), fromName, relName, toName, dir, LazyTypes(types), predicate)()
 
         case OptionalExpand(left, IdName(fromName), dir, types, IdName(toName), IdName(relName), ExpandInto, predicates) =>
-          val predicate = predicates.map(buildPredicate).reduceOption(_ ++ _).getOrElse(True())
+          val predicate = predicates.map(buildPredicate).reduceOption(_ andWith _).getOrElse(True())
           OptionalExpandIntoPipe(buildPipe(left), fromName, relName, toName, dir, LazyTypes(types), predicate)()
 
         case VarExpand(left, IdName(fromName), dir, projectedDir, types, IdName(toName), IdName(relName), VarPatternLength(min, max), expansionMode, predicates) =>
           val (keys, exprs) = predicates.unzip
           val commands = exprs.map(buildPredicate)
           val predicate = (context: ExecutionContext, state: QueryState, rel: Relationship) => {
-            keys.zip(commands).forall { case (identifier: Identifier, expr: CommandPredicate) =>
+            keys.zip(commands).forall { case (identifier: Identifier, expr: Predicate) =>
               context(identifier.name) = rel
               val result = expr.isTrue(context)(state)
               context.remove(identifier.name)
@@ -180,15 +182,15 @@ class PipeExecutionPlanBuilder(clock: Clock, monitors: Monitors) {
           LimitPipe(buildPipe(lhs), buildExpression(count))()
 
         case SortedLimit(lhs, exp, sortItems) =>
-          TopPipe(buildPipe(lhs), sortItems.map(_.asCommandSortItem).toList, exp.asCommandExpression)()
+          TopPipe(buildPipe(lhs), sortItems.map(_.asCommandSortItem).toList, toCommandExpression(exp))()
 
         // TODO: Maybe we shouldn't encode distinct as an empty aggregation.
         case Aggregation(Projection(source, expressions), groupingExpressions, aggregatingExpressions)
           if aggregatingExpressions.isEmpty && expressions == groupingExpressions =>
-          DistinctPipe(buildPipe(source), groupingExpressions.mapValues(_.asCommandExpression))()
+          DistinctPipe(buildPipe(source), Eagerly.immutableMapValues(groupingExpressions, buildExpression))()
 
         case Aggregation(source, groupingExpressions, aggregatingExpressions) if aggregatingExpressions.isEmpty =>
-          DistinctPipe(buildPipe(source), groupingExpressions.mapValues(_.asCommandExpression))()
+          DistinctPipe(buildPipe(source), groupingExpressions.mapValues(toCommandExpression))()
 
         case Aggregation(source, groupingExpressions, aggregatingExpressions) =>
           EagerAggregationPipe(
@@ -197,25 +199,27 @@ class PipeExecutionPlanBuilder(clock: Clock, monitors: Monitors) {
             Eagerly.immutableMapValues[String, ast.Expression, AggregationExpression](aggregatingExpressions, buildExpression(_).asInstanceOf[AggregationExpression])
           )()
 
-        case FindShortestPaths(source, shortestPath) =>
-          val legacyShortestPaths = shortestPath.expr.asLegacyPatterns(shortestPath.name.map(_.name))
-          val legacyShortestPath = legacyShortestPaths.head
-          new ShortestPathPipe(buildPipe(source), legacyShortestPath)()
+        case FindShortestPaths(source, shortestPathPattern, predicates) =>
+          val legacyShortestPath = shortestPathPattern.expr.asLegacyPatterns(shortestPathPattern.name.map(_.name)).head
+          new ShortestPathPipe(buildPipe(source), legacyShortestPath, predicates.map(toCommandPredicate))()
 
         case Union(lhs, rhs) =>
           NewUnionPipe(buildPipe(lhs), buildPipe(rhs))()
 
         case UnwindCollection(lhs, identifier, collection) =>
-          UnwindPipe(buildPipe(lhs), collection.asCommandExpression, identifier.name)()
+          UnwindPipe(buildPipe(lhs), toCommandExpression(collection), identifier.name)()
 
         case LegacyIndexSeek(id, hint: NodeStartItem, _) =>
           val source = new SingleRowPipe()
-          val ep = entityProducerFactory.nodeStartItems((planContext, StatementConverters.StartItemConverter(hint).asCommandStartItem))
+          val ep = entityProducerFactory.readNodeStartItems((planContext, StatementConverters.StartItemConverter(hint).asCommandStartItem))
           NodeStartPipe(source, id.name, ep)()
 
         case ProduceResult(columns, lhs) =>
           val source = buildPipe(lhs)
           ProduceResultsPipe(source, columns)()
+
+        case TriadicSelection(positivePredicate, left, sourceId, seenId, targetId, right) =>
+          TriadicSelectionPipe(positivePredicate, buildPipe(left), sourceId.name, seenId.name, targetId.name, buildPipe(right))()
 
         case x =>
           throw new CantHandleQueryException(x.toString)
@@ -226,11 +230,13 @@ class PipeExecutionPlanBuilder(clock: Clock, monitors: Monitors) {
 
     object buildPipeExpressions extends Rewriter {
       val instance = Rewriter.lift {
-        case ast.NestedPlanExpression(patternPlan, pattern) =>
+        case compilerAst.NestedPlanExpression(patternPlan, pattern) =>
           val pos = pattern.position
           val pipe = buildPipe(patternPlan)
-          val step = projectNamedPaths.patternPartPathExpression(ast.EveryPath(pattern.pattern.element))
-          val result = ast.NestedPipeExpression(pipe, ast.PathExpression(step)(pos))(pos)
+          val path = ast.EveryPath(pattern.pattern.element)
+          val step: PathStep = projectNamedPaths.patternPartPathExpression(path)
+          val pathExpression: PathExpression = ast.PathExpression(step)(pos)
+          val result = compilerAst.NestedPipeExpression(pipe, pathExpression)(pos)
           result
       }
 
@@ -240,13 +246,13 @@ class PipeExecutionPlanBuilder(clock: Clock, monitors: Monitors) {
     def buildExpression(expr: ast.Expression): CommandExpression = {
       val rewrittenExpr = expr.endoRewrite(buildPipeExpressions)
 
-      rewrittenExpr.asCommandExpression.rewrite(resolver.resolveExpressions(_, planContext))
+      toCommandExpression(rewrittenExpr).rewrite(resolver.resolveExpressions(_, planContext))
     }
 
-    def buildPredicate(expr: ast.Expression): CommandPredicate = {
+    def buildPredicate(expr: ast.Expression): Predicate = {
       val rewrittenExpr: Expression = expr.endoRewrite(buildPipeExpressions)
 
-      rewrittenExpr.asCommandPredicate.rewrite(resolver.resolveExpressions(_, planContext)).asInstanceOf[CommandPredicate]
+      toCommandPredicate(rewrittenExpr).rewrite(resolver.resolveExpressions(_, planContext)).asInstanceOf[Predicate]
     }
 
     val topLevelPipe = buildPipe(plan)

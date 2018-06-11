@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -279,11 +279,19 @@ public class LockServiceMicroBenchmark
             return new WriteRelease( resource );
         }
 
+        @Override
+        public Lock acquireRelationshipLock( long relationshipId, LockType type )
+        {
+            AbstractLockService.LockedRelationship resource = new AbstractLockService.LockedRelationship( relationshipId );
+            getWriteLock( resource, threadMark.get() );
+            return new WriteRelease( resource );
+        }
+
         private class WriteRelease extends Lock
         {
-            private final AbstractLockService.LockedNode resource;
+            private final AbstractLockService.LockedPropertyContainer resource;
 
-            WriteRelease( AbstractLockService.LockedNode resource )
+            WriteRelease( AbstractLockService.LockedPropertyContainer resource )
             {
                 this.resource = resource;
             }

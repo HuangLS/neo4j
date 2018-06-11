@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -162,10 +162,10 @@ public class LegacyIndexTransactionStateImpl implements LegacyIndexTransactionSt
         }
         else if ( command.getEntityType() == IndexEntityType.Relationship.id() )
         {
-            commands = nodeCommands.get( indexName );
+            commands = relationshipCommands.get( indexName );
             if ( commands == null )
             {
-                nodeCommands.put( indexName, commands = new ArrayList<>() );
+                relationshipCommands.put( indexName, commands = new ArrayList<>() );
             }
         }
         else
@@ -244,7 +244,7 @@ public class LegacyIndexTransactionStateImpl implements LegacyIndexTransactionSt
 
     /** Set this data structure to it's initial state, allowing it to be re-used as if it had just been new'ed up. */
     @Override
-    public void initialize()
+    public void clear()
     {
         if ( !transactions.isEmpty() )
         {

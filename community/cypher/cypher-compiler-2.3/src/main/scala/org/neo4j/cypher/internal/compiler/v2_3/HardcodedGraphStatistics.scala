@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,17 +21,18 @@ package org.neo4j.cypher.internal.compiler.v2_3
 
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, Selectivity}
 import org.neo4j.cypher.internal.compiler.v2_3.spi.GraphStatistics
+import org.neo4j.cypher.internal.frontend.v2_3.{PropertyKeyId, RelTypeId, LabelId}
 
 
 case object HardcodedGraphStatistics extends HardcodedGraphStatisticsValues
 
 class HardcodedGraphStatisticsValues extends GraphStatistics {
   val NODES_CARDINALITY = Cardinality(10000)
-  val NODES_WITH_LABEL_SELECTIVITY = Selectivity(0.2)
+  val NODES_WITH_LABEL_SELECTIVITY = Selectivity.of(0.2).get
   val NODES_WITH_LABEL_CARDINALITY = NODES_CARDINALITY * NODES_WITH_LABEL_SELECTIVITY
   val RELATIONSHIPS_CARDINALITY = Cardinality(50000)
-  val INDEX_SELECTIVITY = Selectivity(.02)
-  val INDEX_PROPERTY_EXISTS_SELECTIVITY = Selectivity(.5)
+  val INDEX_SELECTIVITY = Selectivity.of(.02).get
+  val INDEX_PROPERTY_EXISTS_SELECTIVITY = Selectivity.of(.5).get
 
   def indexSelectivity(label: LabelId, property: PropertyKeyId): Option[Selectivity] =
     Some(INDEX_SELECTIVITY)

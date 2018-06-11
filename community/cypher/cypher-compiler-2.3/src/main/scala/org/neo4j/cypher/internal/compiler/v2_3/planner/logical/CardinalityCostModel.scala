@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{HasLabels, Property}
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{HasLabels, Property}
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.Metrics._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans._
 
@@ -31,21 +31,23 @@ object CardinalityCostModel extends CostModel {
    */
   private val CPU_BOUND: CostPerRow = 0.1
   private val FAST_STORE: CostPerRow = 1.0
-  private val SLOW_STORE: CostPerRow = 10.0
-  private val PROBE_BUILD_COST: CostPerRow = FAST_STORE
-  private val PROBE_SEARCH_COST: CostPerRow = PROBE_BUILD_COST * .5
-  private val EAGERNESS_MULTIPLIER: Multiplier = 3.0
+  private val SLOW_STORE: CostPerRow = 12.0
+  private val PROBE_BUILD_COST: CostPerRow = 3.1
+  private val PROBE_SEARCH_COST: CostPerRow = 2.4
+  private val EAGERNESS_MULTIPLIER: Multiplier = 2.0
 
   private def costPerRow(plan: LogicalPlan): CostPerRow = plan match {
 
-    case _: Expand |
-         _: VarExpand |
-         _: AllNodesScan |
+    case  _: AllNodesScan |
          _: DirectedRelationshipByIdSeek |
          _: UndirectedRelationshipByIdSeek |
-         _: ProjectEndpoints |
-         _: NodeByLabelScan
+         _: ProjectEndpoints
     => FAST_STORE
+
+    case _: NodeByLabelScan => 1.6
+
+    case _: Expand |
+         _: VarExpand  => 2.5
 
     // Filtering on labels and properties
     case Selection(predicates, _) if predicates.exists {

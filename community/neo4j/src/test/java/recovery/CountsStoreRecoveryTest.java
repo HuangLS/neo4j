@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,16 +30,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.io.fs.FileSystemAbstraction;
-import org.neo4j.io.pagecache.PagedFile;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.impl.api.CountsVisitor;
 import org.neo4j.kernel.impl.api.index.inmemory.InMemoryIndexProvider;
 import org.neo4j.kernel.impl.api.index.inmemory.InMemoryIndexProviderFactory;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.MetaDataStore;
 import org.neo4j.kernel.impl.store.counts.CountsTracker;
 import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointer;
+import org.neo4j.kernel.impl.transaction.log.checkpoint.SimpleTriggerInfo;
 import org.neo4j.test.EphemeralFileSystemRule;
-import org.neo4j.test.ReflectionUtil;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
 import static org.junit.Assert.assertEquals;
@@ -83,15 +83,15 @@ public class CountsStoreRecoveryTest
 
     private void flushNeoStoreOnly() throws Exception
     {
-        NeoStore neoStore = ((GraphDatabaseAPI) db).getDependencyResolver().resolveDependency( NeoStore.class );
-        PagedFile storeFile = ReflectionUtil.getPrivateField( neoStore, "storeFile", PagedFile.class );
-        storeFile.flushAndForce();
+        NeoStores neoStores = ((GraphDatabaseAPI) db).getDependencyResolver().resolveDependency( NeoStores.class );
+        MetaDataStore metaDataStore = neoStores.getMetaDataStore();
+        metaDataStore.flush();
     }
 
     private CountsTracker counts()
     {
         return ((GraphDatabaseAPI) db).getDependencyResolver()
-                                      .resolveDependency( NeoStore.class )
+                                      .resolveDependency( NeoStores.class )
                                       .getCounts();
     }
 
@@ -99,7 +99,9 @@ public class CountsStoreRecoveryTest
     private void checkPoint() throws IOException
     {
         ((GraphDatabaseAPI) db).getDependencyResolver()
-                               .resolveDependency( CheckPointer.class ).forceCheckPoint();
+                               .resolveDependency( CheckPointer.class ).forceCheckPoint(
+                new SimpleTriggerInfo( "test" )
+        );
     }
 
     private void crashAndRestart()

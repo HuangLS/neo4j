@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.graphdb.impl.notification;
 
+import java.util.List;
 import java.util.Set;
 
 public interface NotificationDetail
@@ -27,7 +28,7 @@ public interface NotificationDetail
 
     String value();
 
-    public final static class Factory
+    final class Factory
     {
         public static NotificationDetail index( final String labelName, final String propertyKeyName )
         {
@@ -35,26 +36,70 @@ public interface NotificationDetail
                     String.format( "index on :%s(%s)", labelName, propertyKeyName ), true );
         }
 
-        public static NotificationDetail join( String identifier )
+        public static NotificationDetail label( final String labelName )
         {
-            return createNotificationDetail( "hinted hash join",
-                    String.format( "on node identifier %s", identifier ), true );
+            return createNotificationDetail( "the missing label name is", labelName, true );
+        }
+
+        public static NotificationDetail relationshipType( final String relType )
+        {
+            return createNotificationDetail( "the missing relationship type is", relType, true );
+        }
+
+        public static NotificationDetail propertyName( final String name )
+        {
+            return createNotificationDetail( "the missing property name is", name, true );
+        }
+
+        public static NotificationDetail joinKey( List<String> identifiers )
+        {
+            boolean singular = identifiers.size() == 1;
+            StringBuilder builder = new StringBuilder();
+            boolean first = true;
+            for ( String identifier : identifiers )
+            {
+                if ( first )
+                {
+                    first = false;
+                }
+                else
+                {
+                    builder.append( ", " );
+                }
+                builder.append( identifier );
+            }
+            return createNotificationDetail(
+                singular ? "hinted join key identifier" : "hinted join key identifiers",
+                builder.toString(),
+                singular
+            );
         }
 
         public static NotificationDetail cartesianProduct( Set<String> identifiers )
         {
+            return createNotificationDetail( identifiers, "identifier", "identifiers" );
+        }
+
+        public static NotificationDetail indexSeekOrScan( Set<String> labels )
+        {
+            return createNotificationDetail( labels, "indexed label", "indexed labels" );
+        }
+
+        private static NotificationDetail createNotificationDetail( Set<String> elements, String singularTerm,
+                String pluralTerm )
+        {
             StringBuilder builder = new StringBuilder();
             builder.append( "(" );
             String separator = "";
-            for ( String identifier : identifiers )
+            for ( String element : elements )
             {
                 builder.append( separator );
-                builder.append( identifier );
+                builder.append( element );
                 separator = ", ";
             }
             builder.append( ")" );
-            boolean singular = identifiers.size() == 1;
-            return createNotificationDetail( singular ? "identifier" : "identifiers", builder.toString(), singular );
+            boolean singular = elements.size() == 1;
+            return createNotificationDetail( singular ? singularTerm : pluralTerm, builder.toString(), singular );
         }
 
         private static NotificationDetail createNotificationDetail( final String name, final String value,
@@ -77,7 +122,7 @@ public interface NotificationDetail
                 @Override
                 public String toString()
                 {
-                    return String.format( "%s %s %s", name, singular ? "is" : "are:", value );
+                    return String.format( "%s %s %s", name, singular ? "is:" : "are:", value );
                 }
             };
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,8 +21,9 @@ package org.neo4j.cypher.internal.compiler.v2_3.planner.logical
 
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters.{normalizeReturnClauses, normalizeWithClauses}
-import org.neo4j.cypher.internal.compiler.v2_3.ast.{Query, Statement}
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{Query, Statement}
 import org.neo4j.cypher.internal.compiler.v2_3.planner._
+import org.neo4j.cypher.internal.frontend.v2_3.{SemanticTable, inSequence}
 import org.scalatest.mock.MockitoSugar
 
 trait QueryGraphProducer extends MockitoSugar {
@@ -37,7 +38,7 @@ trait QueryGraphProducer extends MockitoSugar {
     val mkException = new SyntaxExceptionCreator(query, Some(pos))
     val semanticChecker = new SemanticChecker
     val cleanedStatement: Statement = ast.endoRewrite(inSequence(normalizeReturnClauses(mkException), normalizeWithClauses(mkException)))
-    val semanticState = semanticChecker.check(query, cleanedStatement, devNullLogger, mkException)
+    val semanticState = semanticChecker.check(query, cleanedStatement, mkException)
 
     val (firstRewriteStep, _, postConditions) = astRewriter.rewrite(query, cleanedStatement, semanticState)
     val semanticTable = SemanticTable(types = semanticState.typeTable, recordedScopes = semanticState.recordedScopes)

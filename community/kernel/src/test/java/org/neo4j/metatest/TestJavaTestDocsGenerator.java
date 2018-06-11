@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -108,17 +108,14 @@ public class TestJavaTestDocsGenerator implements GraphHolder
         doc.document( directory.getAbsolutePath(), sectionName );
     }
 
-    /**
-     * Title2.
-     *
-     * @@snippet1
-     *
-     *            more stuff
-     *
-     *
-     * @@snippet2
-     */
-    @Documented
+    @Documented( "Title2.\n" +
+                 "\n" +
+                 "@@snippet1\n" +
+                 "\n" +
+                 "           more stuff\n" +
+                 "\n" +
+                 "\n" +
+                 "@@snippet2" )
     @Test
     @Graph( "I know you" )
     public void canCreateDocsFromSnippetsInAnnotations() throws Exception

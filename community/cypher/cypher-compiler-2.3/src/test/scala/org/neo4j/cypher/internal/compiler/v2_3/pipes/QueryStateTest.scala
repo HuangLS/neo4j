@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class QueryStateTest extends CypherFunSuite {
 
@@ -34,31 +34,5 @@ class QueryStateTest extends CypherFunSuite {
 
     //THEN
     ts1 should equal(ts2)
-  }
-
-  test("case_class_copying_should_still_see_same_time") {
-    //GIVEN
-    val state = QueryStateHelper.empty
-
-    //WHEN
-    val ts1 = state.readTimeStamp()
-    Thread.sleep(10)
-    val stateCopy = state.copy(params = Map.empty)
-
-    //THEN
-    ts1 should equal(stateCopy.readTimeStamp())
-  }
-
-  test("if_state_is_copied_and_time_seen_in_one_querystate_it_should_be_reflected_in_copies") {
-    //GIVEN
-    val state = QueryStateHelper.empty
-
-    //WHEN
-    val stateCopy = state.copy(params = Map.empty)
-    val ts1 = state.readTimeStamp()
-    Thread.sleep(10)
-
-    //THEN
-    ts1 should equal(stateCopy.readTimeStamp())
   }
 }

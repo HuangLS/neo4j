@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,11 @@ package org.neo4j.cypher
 import org.neo4j.graphdb.Result.ResultVisitor
 import org.neo4j.graphdb._
 
+/**
+  * @deprecated See { @link org.neo4j.graphdb.Result}, and use
+  * { @link org.neo4j.graphdb.GraphDatabaseService#execute(String, Map)} instead.
+  */
+@Deprecated
 trait ExtendedExecutionResult extends ExecutionResult {
   def planDescriptionRequested: Boolean
   def executionType: QueryExecutionType

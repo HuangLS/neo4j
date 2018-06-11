@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,8 +20,8 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes.matching
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Literal
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class PatternRelationshipTest extends CypherFunSuite {
 
@@ -31,7 +31,7 @@ class PatternRelationshipTest extends CypherFunSuite {
     val b = new PatternNode("b")
 
     // then r can be constructed
-    val r = a.relateTo("r", b, Seq(), Direction.BOTH)
+    val r = a.relateTo("r", b, Seq(), SemanticDirection.BOTH)
 
     // such that
     r.getOtherNode(a) should equal(b)
@@ -43,7 +43,7 @@ class PatternRelationshipTest extends CypherFunSuite {
     val b = new PatternNode("b")
 
     // then r can be constructed
-    val r = a.relateTo("r", b, Seq(), Direction.BOTH, Map("prop" -> Literal(42)))
+    val r = a.relateTo("r", b, Seq(), SemanticDirection.BOTH, Map("prop" -> Literal(42)))
 
     // such that
     r.getOtherNode(a) should equal(b)
@@ -55,7 +55,7 @@ class PatternRelationshipTest extends CypherFunSuite {
     val b = new PatternNode("b")
 
     // then r can be constructed
-    val r = a.relateViaVariableLengthPathTo("p", b, Some(1), Some(2), Seq("REL"), Direction.BOTH, Some("r"),  Map("prop" -> Literal(42)))
+    val r = a.relateViaVariableLengthPathTo("p", b, Some(1), Some(2), Seq("REL"), SemanticDirection.BOTH, Some("r"),  Map("prop" -> Literal(42)))
 
     // such that
     r.getOtherNode(a) should equal(b)

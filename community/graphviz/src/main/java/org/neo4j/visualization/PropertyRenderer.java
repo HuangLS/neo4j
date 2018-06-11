@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,7 +22,6 @@ package org.neo4j.visualization;
 /**
  * The {@link PropertyRenderer} is responsible for rendering the properties of a
  * node or relationship.
- * @author Tobias Ivarsson <tobias.ivarsson@neotechnology.com>
  * @param <E>
  *            A base exception type that can be thrown by the methods of this
  *            renderer.

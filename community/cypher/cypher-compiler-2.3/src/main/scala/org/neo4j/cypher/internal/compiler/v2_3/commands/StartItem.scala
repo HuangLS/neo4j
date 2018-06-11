@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,7 +24,8 @@ import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, _}
 import org.neo4j.cypher.internal.compiler.v2_3.mutation._
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.Argument
 import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescription.Arguments
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.{SymbolTable, TypeSafe}
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
 trait NodeStartItemIdentifiers extends StartItem {
   def identifiers: Seq[(String, CypherType)] = Seq(identifierName -> CTNode)
@@ -77,7 +78,7 @@ case class NodeByIndex(varName: String, idxName: String, key: Expression, expres
     Arguments.LegacyIndex(idxName),
     Arguments.LegacyExpression(key)))
   with ReadOnlyStartItem with NodeStartItemIdentifiers with Hint {
-  override def localEffects(symbols: SymbolTable) = Effects(ReadsNodes)
+  override def localEffects(symbols: SymbolTable) = Effects(ReadsAllNodes)
 }
 
 case class NodeByIndexQuery(varName: String, idxName: String, query: Expression)
@@ -85,7 +86,7 @@ case class NodeByIndexQuery(varName: String, idxName: String, query: Expression)
     Arguments.LegacyExpression(query),
     Arguments.LegacyIndex(idxName)))
   with ReadOnlyStartItem with NodeStartItemIdentifiers with Hint {
-  override def localEffects(symbols: SymbolTable) = Effects(ReadsNodes)
+  override def localEffects(symbols: SymbolTable) = Effects(ReadsAllNodes)
 }
 
 trait Hint
@@ -121,30 +122,30 @@ case class RangeQueryExpression[T](expression: T) extends QueryExpression[T] {
 case class SchemaIndex(identifier: String, label: String, property: String, kind: SchemaIndexKind, query: Option[QueryExpression[Expression]])
   extends StartItem(identifier, query.map(q => Arguments.LegacyExpression(q.expression)).toSeq :+ Arguments.Index(label, property))
   with ReadOnlyStartItem with Hint with NodeStartItemIdentifiers {
-  override def localEffects(symbols: SymbolTable) = Effects(ReadsLabel(label), ReadsNodeProperty(property))
+  override def localEffects(symbols: SymbolTable) = Effects(ReadsNodesWithLabels(label), ReadsGivenNodeProperty(property))
 }
 
 case class NodeById(varName: String, expression: Expression)
   extends StartItem(varName, Seq(Arguments.LegacyExpression(expression)))
   with ReadOnlyStartItem with NodeStartItemIdentifiers {
-  override def localEffects(symbols: SymbolTable) = Effects(ReadsNodes)
+  override def localEffects(symbols: SymbolTable) = Effects(ReadsAllNodes)
 }
 
 case class NodeByIdOrEmpty(varName: String, expression: Expression)
   extends StartItem(varName, Seq(Arguments.LegacyExpression(expression)))
   with ReadOnlyStartItem with NodeStartItemIdentifiers {
-  override def localEffects(symbols: SymbolTable) = Effects(ReadsNodes)
+  override def localEffects(symbols: SymbolTable) = Effects(ReadsAllNodes)
 }
 
 case class NodeByLabel(varName: String, label: String)
   extends StartItem(varName, Seq(Arguments.LabelName(label)))
   with ReadOnlyStartItem with Hint with NodeStartItemIdentifiers {
-  override def localEffects(symbols: SymbolTable) = Effects(ReadsLabel(label))
+  override def localEffects(symbols: SymbolTable) = Effects(ReadsNodesWithLabels(label))
 }
 
 case class AllNodes(columnName: String) extends StartItem(columnName, Seq.empty)
   with ReadOnlyStartItem with NodeStartItemIdentifiers {
-  override def localEffects(symbols: SymbolTable) = Effects(ReadsNodes)
+  override def localEffects(symbols: SymbolTable) = Effects(ReadsAllNodes)
 }
 
 case class AllRelationships(columnName: String) extends StartItem(columnName, Seq.empty)

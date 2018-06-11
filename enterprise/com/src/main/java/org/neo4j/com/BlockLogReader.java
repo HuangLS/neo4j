@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,12 +28,13 @@ import org.jboss.netty.buffer.ChannelBuffer;
 /**
  * The counterpart of {@link BlockLogBuffer}, sits on the receiving end and
  * reads chunks of log. It is provided with a {@link ChannelBuffer} which feeds
- * a series of chunks formatted as follows: <li>If the first byte is 0, then it
- * is 256 bytes in total size (including the first byte) AND there are more
- * coming.</li> <li>If the first byte is not 0, then its value cast as an
- * integer is the total size of the chunk AND there are no more - the stream is
- * complete</li>
- *
+ * a series of chunks formatted as follows:
+ * <ul>
+ * <li>If the first byte is 0, then it is 256 bytes in total size (including the first byte) AND there are more
+ * coming.</li>
+ * <li>If the first byte is not 0, then its value cast as an
+ * integer is the total size of the chunk AND there are no more - the stream is complete</li>
+ * </ul>
  */
 public class BlockLogReader implements ReadableByteChannel
 {

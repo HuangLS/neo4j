@@ -4,7 +4,7 @@
   <parent>
     <groupId>org.neo4j</groupId>
     <artifactId>parent</artifactId>
-    <version>2.3-SNAPSHOT</version>
+    <version>2.3.13-SNAPSHOT</version>
     <relativePath>../..</relativePath>
   </parent>
 
@@ -14,7 +14,7 @@
 
   <name>Neo4j - Server Assembler</name>
 
-  <version>2.3-SNAPSHOT</version>
+  <version>2.3.13-SNAPSHOT</version>
 
   <description>This project assembles the Neo4j stand-alone distribution,
     pulling together all the deliverable artifacts and packaging them
@@ -51,16 +51,18 @@
     <org.neo4j.server.webserver.https.enabled>true</org.neo4j.server.webserver.https.enabled>
     <org.neo4j.webserver.https.port>7473</org.neo4j.webserver.https.port>
 
-    <org.neo4j.server.webserver.https.cert.location>conf/ssl/snakeoil.cert</org.neo4j.server.webserver.https.cert.location>
-    <org.neo4j.server.webserver.https.key.location>conf/ssl/snakeoil.key</org.neo4j.server.webserver.https.key.location>
+    <dbms.security.tls_certificate_file>conf/ssl/snakeoil.cert</dbms.security.tls_certificate_file>
+    <dbms.security.tls_key_file>conf/ssl/snakeoil.key</dbms.security.tls_key_file>
     <org.neo4j.server.webserver.https.keystore.location>data/keystore</org.neo4j.server.webserver.https.keystore.location>
     <org.neo4j.webservice.packages>org.neo4j.rest.web,org.neo4j.webadmin,org.neo4j.webadmin.backup,org.neo4j.webadmin.console,org.neo4j.webadmin.domain,org.neo4j.webadmin.parser,org.neo4j.webadmin.properties,org.neo4j.webadmin.resources,org.neo4j.webadmin.rest,org.neo4j.webadmin.rrd,org.neo4j.webadmin.task,org.neo4j.webadmin.utils</org.neo4j.webservice.packages>
     <org.neo4j.server.bundledir>system/lib</org.neo4j.server.bundledir>
     <dbms.security.require_auth>true</dbms.security.require_auth>
+    <dbms.browser.remote_content_hostname_whitelist>http://guides.neo4j.com,https://guides.neo4j.com,http://localhost,https://localhost</dbms.browser.remote_content_hostname_whitelist>
+    <dbms.security.allow_outgoing_browser_connections>true</dbms.security.allow_outgoing_browser_connections>
 
     <!-- Additional configuration to append to neo4j-server.properties -->
-    <feature-config.ndp></feature-config.ndp>
-    <config.neo4j-server.additional>${feature-config.ndp}</config.neo4j-server.additional>
+    <feature-config.bolt></feature-config.bolt>
+    <config.neo4j-server.additional>${feature-config.bolt}</config.neo4j-server.additional>
 
     <!-- Runtime properties. These are used to bootstrap the server. All other configuration should happen through a configuration file. Each of these should have a sensible default, so that the server can operate without them defined. -->
     <neo4j.home>${project.build.directory}/neo4j</neo4j.home>
@@ -163,7 +165,7 @@ terms of the relevant Commercial Agreement.
           <failIfMissing>true</failIfMissing>
           <plainTextReport>true</plainTextReport>
           <prependText>notice-agpl-prefix.txt</prependText>
-          <excludedGroups>^((org.neo4j){1}|(org.neo4j.app){1}|(org.neo4j.browser){1}|(org.neo4j.doc){1}|(org.neo4j.server.plugin){1}|(org.neo4j.assembly){1})$</excludedGroups>
+          <excludedGroups>^((org.neo4j){1}|(org.neo4j.app){1}|(org.neo4j.doc){1}|(org.neo4j.server.plugin){1}|(org.neo4j.assembly){1})$</excludedGroups>
         </configuration>
         <executions>
           <execution>
@@ -332,37 +334,14 @@ terms of the relevant Commercial Agreement.
 
   <profiles>
     <profile>
-      <id>freeze</id>
+      <id>feature-bolt</id>
       <activation>
         <activeByDefault>false</activeByDefault>
-        <property>
-          <name>freeze</name>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>ease-maven-plugin</artifactId>
-            <groupId>org.neo4j.build.plugins</groupId>
-            <executions>
-              <execution>
-                <id>freeze-artifacts</id>
-                <phase>none</phase>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>feature-ndp</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-        <property> <name>feature.ndp</name> </property>
+        <property> <name>feature.bolt</name> </property>
       </activation>
       <properties>
-        <feature-config.ndp># Enable Neo4j Data Protocol, for alpha testing and preview
-xx.ndp.enabled=true</feature-config.ndp>
+        <feature-config.bolt># Enable Bolt, for alpha testing and preview
+xx.bolt.enabled=true</feature-config.bolt>
       </properties>
     </profile>
   </profiles>

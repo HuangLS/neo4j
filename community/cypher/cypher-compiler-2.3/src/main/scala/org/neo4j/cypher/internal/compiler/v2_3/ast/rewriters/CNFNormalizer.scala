@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,11 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
-import org.neo4j.cypher.internal.compiler.v2_3.{repeat, _}
+import org.neo4j.cypher.internal.compiler.v2_3._
+import org.neo4j.cypher.internal.frontend.v2_3.Foldable._
+import org.neo4j.cypher.internal.frontend.v2_3.Rewritable._
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.{Rewriter, bottomUp, inSequence, repeat}
 
 case class CNFNormalizer()(implicit monitor: AstRewritingMonitor) extends Rewriter {
 
@@ -30,7 +33,9 @@ case class CNFNormalizer()(implicit monitor: AstRewritingMonitor) extends Rewrit
     deMorganRewriter(),
     distributeLawsRewriter(),
     flattenBooleanOperators,
-    simplifyPredicates
+    simplifyPredicates,
+    // Redone here since CNF normalization might introduce negated inequalities (which this removes)
+    normalizeSargablePredicates
   )
 }
 
@@ -50,8 +55,26 @@ case class deMorganRewriter()(implicit monitor: AstRewritingMonitor) extends Rew
   private val instance: Rewriter = repeatWithSizeLimit(bottomUp(step))(monitor)
 }
 
+object distributeLawsRewriter {
+  // converting from DNF to CNF is exponentially expensive, so we only do it for a small amount of clauses
+  // see https://en.wikipedia.org/wiki/Conjunctive_normal_form#Conversion_into_CNF
+  val DNF_CONVERSION_LIMIT = 8
+}
+
 case class distributeLawsRewriter()(implicit monitor: AstRewritingMonitor) extends Rewriter {
-  def apply(that: AnyRef): AnyRef = instance(that)
+  def apply(that: AnyRef): AnyRef = {
+    if (dnfCounts(that) < distributeLawsRewriter.DNF_CONVERSION_LIMIT)
+      instance(that)
+    else {
+      monitor.abortedRewritingDueToLargeDNF(that)
+      that
+    }
+  }
+
+  private def dnfCounts(value: Any) = value.treeFold(1) {
+    case Or(lhs, a: And) => (acc, children) => children(acc + 1)
+    case Or(a: And, rhs) => (acc, children) => children(acc + 1)
+  }
 
   private val step = Rewriter.lift {
     case p@Or(exp1, And(exp2, exp3)) => And(Or(exp1, exp2)(p.position), Or(exp1.endoRewrite(copyIdentifiers), exp3)(p.position))(p.position)

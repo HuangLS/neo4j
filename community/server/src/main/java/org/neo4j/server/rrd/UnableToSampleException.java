@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,4 +24,13 @@ public class UnableToSampleException extends RuntimeException
 
     private static final long serialVersionUID = 112443232112435425L;
 
+    public UnableToSampleException( String message )
+    {
+        super( message );
+    }
+
+    public UnableToSampleException( String message, Exception cause )
+    {
+        super( message, cause );
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,22 +19,26 @@
  */
 package org.neo4j.server.rrd.sampler;
 
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
+import org.neo4j.kernel.AvailabilityGuard;
+import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
 
 public class PropertyCountSampleable extends DatabasePrimitivesSampleableBase
 {
-    public PropertyCountSampleable( NeoStoreSupplier neoStoreSupplier )
+    public PropertyCountSampleable( NeoStoresSupplier neoStore, AvailabilityGuard guard )
     {
-        super( neoStoreSupplier );
+        super( neoStore, guard );
     }
 
-    @Override public String getName()
+    @Override
+    public String getName()
     {
         return "property_count";
     }
 
-    @Override public double getValue()
+    @Override
+    protected double readValue( NeoStores neoStore )
     {
-        return getNeoStore().getPropertyStore().getNumberOfIdsInUse();
+        return neoStore.getPropertyStore().getNumberOfIdsInUse();
     }
 }

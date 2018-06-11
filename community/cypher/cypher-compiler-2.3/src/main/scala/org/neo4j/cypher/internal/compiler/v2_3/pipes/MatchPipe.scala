@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.Predicate
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.AllReadEffects
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.{MatchingContext, PatternGraph}
 
@@ -50,6 +51,8 @@ case class MatchPipe(source: Pipe,
 
   override def planDescription =
     source.planDescription.andThen(this.id, matchingContext.builder.name, identifiers)
+
+  def mergeStartPoint = matchingContext.builder.startPoint
 
   def dup(sources: List[Pipe]): Pipe = {
     val (head :: Nil) = sources

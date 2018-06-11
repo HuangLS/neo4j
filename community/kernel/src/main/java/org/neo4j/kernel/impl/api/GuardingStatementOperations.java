@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,12 +19,17 @@
  */
 package org.neo4j.kernel.impl.api;
 
+import org.act.temporalProperty.query.range.TimeRangeQuery;
+
+import java.util.List;
+
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.collection.primitive.PrimitiveLongIterator;
 import org.neo4j.cursor.Cursor;
 import org.neo4j.kernel.api.cursor.NodeItem;
 import org.neo4j.kernel.api.cursor.RelationshipItem;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
+import org.neo4j.kernel.api.exceptions.PropertyNotFoundException;
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintValidationKernelException;
 import org.neo4j.kernel.api.exceptions.schema.IndexBrokenKernelException;
@@ -37,6 +42,10 @@ import org.neo4j.kernel.impl.api.operations.EntityReadOperations;
 import org.neo4j.kernel.impl.api.operations.EntityWriteOperations;
 import org.neo4j.kernel.impl.api.store.RelationshipIterator;
 import org.neo4j.kernel.impl.api.store.StoreStatement;
+import org.neo4j.temporal.IntervalEntry;
+import org.neo4j.temporal.TemporalIndexManager;
+import org.neo4j.temporal.TemporalPropertyReadOperation;
+import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 public class GuardingStatementOperations implements
         EntityWriteOperations,
@@ -54,6 +63,41 @@ public class GuardingStatementOperations implements
         this.entityWriteDelegate = entityWriteDelegate;
         this.entityReadDelegate = entityReadDelegate;
         this.guard = guard;
+    }
+
+    @Override
+    public List<IntervalEntry> getTemporalPropertyByIndex( KernelStatement statement, TemporalIndexManager.PropertyValueIntervalBuilder builder )
+    {
+        guard.check();
+        return entityReadDelegate.getTemporalPropertyByIndex( statement, builder );
+    }
+
+    @Override
+    public Object nodeGetTemporalProperty(KernelStatement statement, TemporalPropertyReadOperation query) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        return entityReadDelegate.nodeGetTemporalProperty(statement, query);
+    }
+
+    @Override
+    public Object relationshipGetTemporalProperty(KernelStatement statement, TemporalPropertyReadOperation query ) throws EntityNotFoundException, PropertyNotFoundException
+    {
+        guard.check();
+        return entityReadDelegate.relationshipGetTemporalProperty(statement, query);
+    }
+
+    @Override
+    public void nodeSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException
+    {
+        guard.check();
+        entityWriteDelegate.nodeSetTemporalProperty(statement, operation);
+    }
+
+    @Override
+    public void relationshipSetTemporalProperty(KernelStatement statement, TemporalPropertyWriteOperation operation) throws EntityNotFoundException, ConstraintValidationKernelException
+    {
+        guard.check();
+        entityWriteDelegate.relationshipSetTemporalProperty(statement, operation);
     }
 
     @Override
@@ -79,6 +123,13 @@ public class GuardingStatementOperations implements
     {
         guard.check();
         entityWriteDelegate.nodeDelete( state, nodeId );
+    }
+
+    @Override
+    public int nodeDetachDelete( KernelStatement state, long nodeId ) throws EntityNotFoundException
+    {
+        guard.check();
+        return entityWriteDelegate.nodeDetachDelete( state, nodeId );
     }
 
     @Override

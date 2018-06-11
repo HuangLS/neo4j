@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,8 +21,10 @@ package org.neo4j.cypher.internal.compiler.v2_3.pipes.matching
 
 import org.neo4j.cypher.internal.compiler.v2_3._
 import commands._
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates.Predicate
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
 import pipes.QueryState
-import symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 import collection.immutable
 
 /**
@@ -39,7 +41,7 @@ class MatchingContext(boundIdentifiers: SymbolTable,
   val builder: MatcherBuilder = decideWhichMatcherToUse()
 
   private def identifiers: immutable.Map[String, CypherType] =
-    patternGraph.patternRels.values.flatMap(p => p.identifiers2).toMap
+    patternGraph.patternRels.values.flatMap(p => p.flatMap(_.identifiers2)).toMap
 
   lazy val symbols = {
     val ids = identifiers
@@ -65,7 +67,8 @@ class MatchingContext(boundIdentifiers: SymbolTable,
 }
 
 trait MatcherBuilder {
-  def name:String
+  def name: String
+  def startPoint: String
   def getMatches(sourceRow: ExecutionContext, state: QueryState): Traversable[ExecutionContext]
 }
 

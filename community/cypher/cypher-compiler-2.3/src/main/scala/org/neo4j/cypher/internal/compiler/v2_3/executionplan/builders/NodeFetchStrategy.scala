@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,10 +21,10 @@ package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions._
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.KeyToken
-import org.neo4j.cypher.internal.compiler.v2_3.parser._
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
 
 /*
 This rather simple class finds a starting strategy for a given single node and a list of predicates required
@@ -104,8 +104,8 @@ object NodeByIdStrategy extends NodeStrategy {
     def computable(expression: Expression): Boolean = expression.symbolDependenciesMet(symbols)
 
     where.collect {
-      case predicate @ Equals(IdFunction(Identifier(id)), Literal(idValue)) if id == identifier && idValue.isInstanceOf[Number] => SolvedPredicate(Literal(idValue.asInstanceOf[Number].longValue()), predicate)
-      case predicate @ Equals(Literal(idValue), IdFunction(Identifier(id))) if id == identifier && idValue.isInstanceOf[Number] => SolvedPredicate(Literal(idValue.asInstanceOf[Number].longValue()), predicate)
+      case predicate @ Equals(IdFunction(Identifier(id)), Literal(idValue: Number)) if id == identifier => SolvedPredicate(Literal(idValue.longValue()), predicate)
+      case predicate @ Equals(Literal(idValue: Number), IdFunction(Identifier(id))) if id == identifier => SolvedPredicate(Literal(idValue.longValue()), predicate)
 
       case predicate @ Equals(IdFunction(Identifier(id)), expression) if id == identifier && computable(expression) => SolvedPredicate(expression, predicate)
       case predicate @ Equals(expression, IdFunction(Identifier(id))) if id == identifier && computable(expression) => SolvedPredicate(expression, predicate)
@@ -129,9 +129,10 @@ object IndexSeekStrategy extends NodeStrategy {
         val equalityItems: Seq[RatedStartItem] =
           for (equalityPredicate <- equalityPredicates if ctx.getIndexRule(labelPredicate.solution, equalityPredicate.solution).nonEmpty)
             yield {
-              val schemaIndex = SchemaIndex(node, labelPredicate.solution, equalityPredicate.solution, AnyIndex, None)
               val optConstraint = ctx.getUniquenessConstraint(labelPredicate.solution, equalityPredicate.solution)
               val rating = if (optConstraint.isDefined) Single else IndexEquality
+              val indexType = if (optConstraint.isDefined) UniqueIndex else AnyIndex
+              val schemaIndex = SchemaIndex(node, labelPredicate.solution, equalityPredicate.solution, indexType, None)
               RatedStartItem(schemaIndex, rating, solvedPredicates = Seq.empty,
                              newUnsolvedPredicates = equalityPredicate.newUnsolvedPredicate.toSeq)
             }
@@ -157,59 +158,32 @@ object IndexSeekStrategy extends NodeStrategy {
     result.flatten
   }
 
-  private def findEqualityPredicatesOnProperty(identifier: IdentifierName, where: Seq[Predicate], initialSymbols: SymbolTable): Seq[SolvedPredicate[PropertyKey]] = {
-    val symbols = initialSymbols.add(identifier, CTNode)
-
+  private def findEqualityPredicatesOnProperty(identifier: IdentifierName, where: Seq[Predicate], symbols: SymbolTable): Seq[SolvedPredicate[PropertyKey]] = {
     where.collect {
       case predicate @ Equals(Property(Identifier(id), propertyKey), expression)
-        if id == identifier && predicate.symbolDependenciesMet(symbols) => SolvedPredicate(propertyKey.name, predicate)
+        if id == identifier && expression.symbolDependenciesMet(symbols) => SolvedPredicate(propertyKey.name, predicate)
 
       case predicate @ Equals(expression, Property(Identifier(id), propertyKey))
-        if id == identifier && predicate.symbolDependenciesMet(symbols) => SolvedPredicate(propertyKey.name, predicate)
+        if id == identifier && expression.symbolDependenciesMet(symbols) => SolvedPredicate(propertyKey.name, predicate)
 
       case predicate @ AnyInCollection(expression, _, Equals(Property(Identifier(id), propertyKey),Identifier(_)))
-        if id == identifier && predicate.symbolDependenciesMet(symbols) => SolvedPredicate(propertyKey.name, predicate)
+        if id == identifier && expression.symbolDependenciesMet(symbols) => SolvedPredicate(propertyKey.name, predicate)
     }
   }
 
   private def findIndexSeekByPrefixPredicatesOnProperty(identifier: IdentifierName, where: Seq[Predicate], initialSymbols: SymbolTable): Seq[SolvedPredicate[PropertyKey]] = {
-    val symbols = initialSymbols.add(identifier, CTNode)
-
     where.collect {
-      case literalPredicate@LiteralLikePattern(
-      reg@LiteralRegularExpression(p@Property(Identifier(id), prop), _),
-      ParsedLikePattern(MatchText(prefix) :: (wildcard: WildcardLikePatternOp) :: tl),
-      caseInsensitive
-      ) if !caseInsensitive && id == identifier && literalPredicate.symbolDependenciesMet(symbols) =>
-        if (tl.isEmpty && wildcard == MatchMany) {
-          SolvedPredicate(prop.name, literalPredicate)
-        } else {
-          val pattern = ParsedLikePattern(List(MatchText(prefix), MatchMany))
-          val prefixPredicate = LiteralLikePattern(
-            LiteralRegularExpression(p, Literal(convertLikePatternToRegex(pattern, caseInsensitive))),
-            pattern,
-            caseInsensitive
-          )
-          val filterPattern = ParsedLikePattern(prefix.map(_ => MatchSingle).toList ++ (wildcard :: tl))
-          val filterPredicate = LiteralLikePattern(
-            LiteralRegularExpression(p, Literal(convertLikePatternToRegex(filterPattern, caseInsensitive))),
-            filterPattern,
-            caseInsensitive
-          )
-          SolvedPredicate(prop.name, predicate = prefixPredicate, newUnsolvedPredicate = Some(filterPredicate))
-        }
+      case literalPredicate@StartsWith(p@Property(Identifier(id), prop), _) if id == identifier =>
+        SolvedPredicate(prop.name, literalPredicate)
     }
   }
 
-  private def findIndexSeekByRangePredicatesOnProperty(identifier: IdentifierName, where: Seq[Predicate], initialSymbols: SymbolTable): Seq[SolvedPredicate[PropertyKey]] = {
-    val symbols = initialSymbols.add(identifier, CTNode)
-
+  private def findIndexSeekByRangePredicatesOnProperty(identifier: IdentifierName, where: Seq[Predicate], symbols: SymbolTable): Seq[SolvedPredicate[PropertyKey]] =
     where.collect {
-      case predicate@AndedPropertyComparablePredicates(Identifier(id), Property(_, key), comparables)
-        if id == identifier && predicate.symbolDependenciesMet(symbols) =>
+      case predicate@AndedPropertyComparablePredicates(Identifier(id), prop@Property(_, key), comparables)
+        if id == identifier && comparables.forall(_.other(prop).symbolDependenciesMet(symbols)) =>
         SolvedPredicate(key.name, predicate)
     }
-  }
 }
 
 object GlobalStrategy extends NodeStrategy {

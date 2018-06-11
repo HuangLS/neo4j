@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.neo4j.kernel.impl.transaction.log;
+
+import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.util.Slice;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -43,7 +46,7 @@ import org.neo4j.kernel.impl.store.record.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.transaction.command.Command;
 import org.neo4j.kernel.impl.transaction.command.Command.NodeCountsCommand;
 import org.neo4j.kernel.impl.transaction.command.Command.RelationshipCountsCommand;
-import org.neo4j.kernel.impl.transaction.command.NeoCommandHandler;
+import org.neo4j.kernel.impl.transaction.command.CommandHandler;
 import org.neo4j.kernel.impl.transaction.command.NeoCommandType;
 
 import static org.neo4j.helpers.collection.IteratorUtil.first;
@@ -52,7 +55,7 @@ import static org.neo4j.kernel.impl.util.Bits.bitFlags;
 import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.write2bLengthAndString;
 import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.write3bLengthAndString;
 
-public class CommandWriter implements NeoCommandHandler
+public class CommandWriter implements CommandHandler
 {
     private final WritableLogChannel channel;
 
@@ -64,6 +67,38 @@ public class CommandWriter implements NeoCommandHandler
     protected static byte needsLong( long value )
     {
         return value > Integer.MAX_VALUE ? (byte) 1 : (byte) 0;
+    }
+
+//    @Override
+//    public boolean visitNodeTemporalPropertyDeleteCommand(Command.NodeTemporalPropertyDeleteCommand command) throws IOException {
+//        channel.put( NeoCommandType.NODE_TEMPORAL_PRO_DELETE );
+//        channel.put( command.getId().getBytes(), command.getId().length() );
+//        return false;
+//    }
+//
+//    @Override
+//    public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
+//        channel.put( NeoCommandType.REL_TEMPORAL_PRO_DELETE );
+//        channel.put( command.getId().getBytes(), command.getId().length() );
+//        return false;
+//    }
+
+    @Override
+    public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
+        channel.put( NeoCommandType.NODE_TEMPORAL_PROPERTY_COMMAND );
+        Slice key = MemTable.encode( command.getIntervalKey(), command.getValue() );
+        channel.putInt( key.length() );
+        channel.put( key.getBytes(), key.length() );
+        return false;
+    }
+
+    @Override
+    public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
+        channel.put( NeoCommandType.REL_TEMPORAL_PROPERTY_COMMAND );
+        Slice key = MemTable.encode( command.getIntervalKey(), command.getValue() );
+        channel.putInt( key.length() );
+        channel.put( key.getBytes(), key.length() );
+        return false;
     }
 
     @Override
@@ -293,11 +328,15 @@ public class CommandWriter implements NeoCommandHandler
 
     private void writeMap( Map<String,Integer> map ) throws IOException
     {
-        channel.put( (byte) map.size() );
+        assert map.size() <= IndexDefineCommand.HIGHEST_POSSIBLE_ID :
+            "Can not write map with size larger than 2 bytes. Actual size " + map.size();
+        channel.putShort( (short) map.size() );
         for ( Map.Entry<String,Integer> entry : map.entrySet() )
         {
             write2bLengthAndString( channel, entry.getKey() );
             int id = entry.getValue();
+            assert id <= IndexDefineCommand.HIGHEST_POSSIBLE_ID :
+                "Can not write id larger than 2 bytes. Actual value " + id;
             channel.putShort( (short) id );
         }
     }

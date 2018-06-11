@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,16 @@
  */
 package org.neo4j.cypher.internal.compatibility
 
+import java.net.URL
+
 import org.neo4j.cypher.internal.compiler.v2_3.spi
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
 import org.neo4j.cypher.internal.compiler.v2_3.spi._
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 import org.neo4j.cypher.{ConstraintValidationException, CypherExecutionException}
-import org.neo4j.graphdb.{ConstraintViolationException => KernelConstraintViolationException, Direction, Node, PropertyContainer, Relationship}
+import org.neo4j.graphdb.{Node, PropertyContainer, Relationship, ConstraintViolationException => KernelConstraintViolationException}
 import org.neo4j.kernel.api.TokenNameLookup
 import org.neo4j.kernel.api.exceptions.KernelException
-import org.neo4j.kernel.api.index.IndexDescriptor
 
 class ExceptionTranslatingQueryContextFor2_3(inner: QueryContext) extends DelegatingQueryContext(inner) {
   override def setLabelsOnNode(node: Long, labelIds: Iterator[Int]): Int =
@@ -82,6 +85,9 @@ class ExceptionTranslatingQueryContextFor2_3(inner: QueryContext) extends Delega
   override def getOrCreatePropertyKeyId(propertyKey: String): Int =
     translateException(super.getOrCreatePropertyKeyId(propertyKey))
 
+  override def detachDeleteNode(node: Node) =
+    translateException(super.detachDeleteNode(node))
+
   override def addIndexRule(labelId: Int, propertyKeyId: Int) =
     translateException(super.addIndexRule(labelId, propertyKeyId))
 
@@ -94,10 +100,10 @@ class ExceptionTranslatingQueryContextFor2_3(inner: QueryContext) extends Delega
   override def getNodesByLabel(id: Int): Iterator[Node] =
     translateException(super.getNodesByLabel(id))
 
-  override def nodeGetDegree(node: Long, dir: Direction): Int =
+  override def nodeGetDegree(node: Long, dir: SemanticDirection): Int =
     translateException(super.nodeGetDegree(node, dir))
 
-  override def nodeGetDegree(node: Long, dir: Direction, relTypeId: Int): Int =
+  override def nodeGetDegree(node: Long, dir: SemanticDirection, relTypeId: Int): Int =
     translateException(super.nodeGetDegree(node, dir, relTypeId))
 
   override def getOrCreateFromSchemaState[K, V](key: K, creator: => V): V =
@@ -112,17 +118,17 @@ class ExceptionTranslatingQueryContextFor2_3(inner: QueryContext) extends Delega
   override def dropUniqueConstraint(labelId: Int, propertyKeyId: Int) =
     translateException(super.dropUniqueConstraint(labelId, propertyKeyId))
 
-  override def createNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int) =
-    translateException(super.createNodeMandatoryConstraint(labelId, propertyKeyId))
+  override def createNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int) =
+    translateException(super.createNodePropertyExistenceConstraint(labelId, propertyKeyId))
 
-  override def dropNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int) =
-    translateException(super.dropNodeMandatoryConstraint(labelId, propertyKeyId))
+  override def dropNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int) =
+    translateException(super.dropNodePropertyExistenceConstraint(labelId, propertyKeyId))
 
-  override def createRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int) =
-    translateException(super.createRelationshipMandatoryConstraint(relTypeId, propertyKeyId))
+  override def createRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int) =
+    translateException(super.createRelationshipPropertyExistenceConstraint(relTypeId, propertyKeyId))
 
-  override def dropRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int) =
-    translateException(super.dropRelationshipMandatoryConstraint(relTypeId, propertyKeyId))
+  override def dropRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int) =
+    translateException(super.dropRelationshipPropertyExistenceConstraint(relTypeId, propertyKeyId))
 
   override def withAnyOpenQueryContext[T](work: (QueryContext) => T): T =
     super.withAnyOpenQueryContext(qc =>
@@ -139,14 +145,14 @@ class ExceptionTranslatingQueryContextFor2_3(inner: QueryContext) extends Delega
   override def getRelTypeName(id: Int) =
     translateException(super.getRelTypeName(id))
 
-  override def uniqueIndexSeek(index: IndexDescriptor, value: Any) =
-    translateException(super.uniqueIndexSeek(index, value))
+  override def lockingExactUniqueIndexSearch(index: IndexDescriptor, value: Any) =
+    translateException(super.lockingExactUniqueIndexSearch(index, value))
 
   override def commitAndRestartTx() =
     translateException(super.commitAndRestartTx())
 
-  override def hasLocalFileAccess =
-    translateException(super.hasLocalFileAccess)
+  override def getImportURL(url: URL) =
+    translateException(super.getImportURL(url))
 
   override def relationshipStartNode(rel: Relationship) =
     translateException(super.relationshipStartNode(rel))

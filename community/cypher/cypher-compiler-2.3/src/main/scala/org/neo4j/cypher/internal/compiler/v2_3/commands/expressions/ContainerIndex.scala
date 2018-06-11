@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,10 +20,11 @@
 package org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.{IsCollection, IsMap, CollectionSupport, CastSupport}
-import org.neo4j.graphdb.PropertyContainer
-import pipes.QueryState
-import symbols._
+import org.neo4j.cypher.internal.compiler.v2_3.helpers.{CastSupport, CollectionSupport, IsCollection, IsMap}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
+import org.neo4j.cypher.internal.frontend.v2_3.CypherTypeException
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
 case class ContainerIndex(expression: Expression, index: Expression) extends NullInNullOutExpression(expression)
 with CollectionSupport {
@@ -32,18 +33,26 @@ with CollectionSupport {
   def compute(value: Any, ctx: ExecutionContext)(implicit state: QueryState): Any = {
     value match {
       case IsMap(m) =>
-        val idx = CastSupport.castOrFail[String](index(ctx))
-        m(state.query).getOrElse(idx, null)
+        val item = index(ctx)
+        if (item == null) null
+        else {
+          val key = CastSupport.castOrFail[String](item)
+          m(state.query).getOrElse(key, null)
+        }
 
       case IsCollection(collection) =>
-        var idx = CastSupport.castOrFail[Number](index(ctx)).intValue()
-        val collectionValue = collection.toList
+        val item = index(ctx)
+        if (item == null) null
+        else {
+          var idx = CastSupport.castOrFail[Number](item).intValue()
+          val collectionValue = collection.toVector
 
-        if (idx < 0)
-          idx = collectionValue.size + idx
+          if (idx < 0)
+            idx = collectionValue.size + idx
 
-        if (idx >= collectionValue.size || idx < 0) null
-        else collectionValue.apply(idx)
+          if (idx >= collectionValue.size || idx < 0) null
+          else collectionValue.apply(idx)
+        }
 
       case _ =>
         throw new CypherTypeException(s"""

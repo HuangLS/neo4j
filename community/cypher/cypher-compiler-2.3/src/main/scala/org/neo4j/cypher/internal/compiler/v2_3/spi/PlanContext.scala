@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,8 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.spi
 
-import org.neo4j.kernel.api.constraints.UniquenessConstraint
-import org.neo4j.kernel.api.index.IndexDescriptor
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.EntityProducer
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.{ExpanderStep, TraversalMatcher}
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.{IndexDescriptor, UniquenessConstraint}
+import org.neo4j.graphdb.Node
 
 /**
  * PlanContext is an internal access layer to the graph that is solely used during plan building
@@ -32,6 +34,8 @@ import org.neo4j.kernel.api.index.IndexDescriptor
 trait PlanContext extends TokenContext {
 
   def getIndexRule(labelName: String, propertyKey: String): Option[IndexDescriptor]
+
+  def hasIndexRule(labelName: String): Boolean
 
   def getUniqueIndexRule(labelName: String, propertyKey: String): Option[IndexDescriptor]
 
@@ -46,4 +50,11 @@ trait PlanContext extends TokenContext {
   def txIdProvider: () => Long
 
   def statistics: GraphStatistics
+
+  // Legacy traversal matchers (pre-Ronja) (These were moved out to remove the dependency on the kernel)
+  def monoDirectionalTraversalMatcher(steps: ExpanderStep, start: EntityProducer[Node]): TraversalMatcher
+
+  def bidirectionalTraversalMatcher(steps: ExpanderStep,
+                                    start: EntityProducer[Node],
+                                    end: EntityProducer[Node]): TraversalMatcher
 }

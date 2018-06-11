@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,11 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.pipes
 
-import org.neo4j.cypher.internal.compiler.v2_3.{EntityNotFoundException, ExecutionContext}
+import org.neo4j.cypher.internal.compiler.v2_3.ExecutionContext
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.NumericHelper
 import org.neo4j.cypher.internal.compiler.v2_3.spi.Operations
-import org.neo4j.graphdb.{Relationship, Node, PropertyContainer}
+import org.neo4j.cypher.internal.frontend.v2_3.EntityNotFoundException
+import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
 
 abstract class IdSeekIterator[T <: PropertyContainer]
   extends Iterator[ExecutionContext] with NumericHelper {

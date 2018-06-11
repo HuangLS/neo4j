@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Copyright (c) 2002-2015 "Neo Technology,"
+  Copyright (c) 2002-2018 "Neo Technology,"
   Network Engine for Objects in Lund AB [http://neotechnology.com]
 
   This file is part of Neo4j.
@@ -23,13 +23,13 @@
   <parent>
     <groupId>org.neo4j</groupId>
     <artifactId>parent</artifactId>
-    <version>2.3-SNAPSHOT</version>
+    <version>2.3.13-SNAPSHOT</version>
     <relativePath>../..</relativePath>
   </parent>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>neo4j-kernel</artifactId>
-  <version>2.3-SNAPSHOT</version>
+  <version>2.3.13-SNAPSHOT</version>
 
   <name>Neo4j - Graph Database Kernel</name>
   <description>
@@ -43,10 +43,8 @@
     <bundle.namespace>org.neo4j</bundle.namespace>
     <short-name>kernel</short-name>
     <version-package>kernel.impl</version-package>
-    <git.executable>git</git.executable>
     <license-text.header>GPL-3-header.txt</license-text.header>
     <licensing.prepend.text>notice-gpl-prefix.txt</licensing.prepend.text>
-    <git.directory>${project.basedir}/../../.git</git.directory>
   </properties>
 
   <packaging>jar</packaging>
@@ -75,33 +73,12 @@ the relevant Commercial Agreement.
     </license>
   </licenses>
 
-  <profiles>
-    <profile>
-      <id>neo4j-root</id>
-      <activation>
-        <property><name>neo4j-root</name></property>
-      </activation>
-      <properties>
-        <git.directory>${project.basedir}/../../../.git</git.directory>
-      </properties>
-    </profile>
-    <profile>
-      <id>git-windows</id>
-      <activation>
-        <os><family>Windows</family></os>
-      </activation>
-      <properties>
-        <git.executable>git.cmd</git.executable>
-      </properties>
-    </profile>
-  </profiles>
-
   <build>
     <plugins>
       <plugin>
         <artifactId>maven-failsafe-plugin</artifactId>
         <configuration>
-          <argLine>-Xmx300m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=target/test-data</argLine>
+          <argLine>-Xmx300m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=target/test-data -Dorg.neo4j.unsafe.impl.internal.dragons.UnsafeUtil.DIRTY_MEMORY=true -XX:-OmitStackTraceInFastThrow</argLine>
         </configuration>
       </plugin>
       <plugin>
@@ -127,13 +104,6 @@ the relevant Commercial Agreement.
         </executions>
       </plugin>
       <plugin>
-        <groupId>pl.project13.maven</groupId>
-        <artifactId>git-commit-id-plugin</artifactId>
-        <configuration>
-          <dotGitDirectory>${git.directory}</dotGitDirectory>
-        </configuration>
-      </plugin>
-      <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
           <archive>
@@ -141,8 +111,8 @@ the relevant Commercial Agreement.
               <packageName>org/neo4j/kernel</packageName>
             </manifest>
             <manifestEntries>
-              <!-- This becomes programmatically accessible from the org.neo4j.kernel Package instance -->
-              <Implementation-Version>${project.version},${git.commit.id.abbrev}</Implementation-Version>
+              <!-- This becomes programmatically accessible from the 'org.neo4j.kernel' java.lang.Package object -->
+              <Implementation-Version>${project.version},${git.commit}</Implementation-Version>
             </manifestEntries>
           </archive>
         </configuration>
@@ -328,29 +298,12 @@ the relevant Commercial Agreement.
     </dependency>
     <dependency>
       <groupId>org.neo4j</groupId>
-      <artifactId>neo4j-primitive-collections</artifactId>
-      <version>${project.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.neo4j</groupId>
       <artifactId>neo4j-logging</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
 
-    <dependency>
-      <groupId>com.google.code.gson</groupId>
-      <artifactId>gson</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.powermock</groupId>
-      <artifactId>powermock-module-junit4</artifactId>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.powermock</groupId>
       <artifactId>powermock-api-mockito</artifactId>
@@ -362,15 +315,20 @@ the relevant Commercial Agreement.
       <artifactId>geronimo-spec-j2ee</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-      <scope>test</scope>
-    </dependency>
+      <dependency>
+        <groupId>org.act</groupId>
+        <artifactId>temporal-property-store</artifactId>
+        <version>2.3.12-SNAPSHOT</version>
+        <!--<exclusions>-->
+          <!--<exclusion>-->
+            <!--<groupId>org.slf4j</groupId>-->
+            <!--<artifactId>slf4j-log4j12</artifactId>-->
+          <!--</exclusion>-->
+          <!--<exclusion>-->
+            <!--<groupId>log4j</groupId>-->
+            <!--<artifactId>log4j</artifactId>-->
+          <!--</exclusion>-->
+        <!--</exclusions>-->
+      </dependency>
   </dependencies>
 </project>

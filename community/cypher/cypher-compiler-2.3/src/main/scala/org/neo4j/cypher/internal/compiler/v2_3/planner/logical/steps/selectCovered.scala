@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,18 +20,18 @@
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.steps
 
 import org.neo4j.cypher.internal.compiler.v2_3.planner.QueryGraph
+import org.neo4j.cypher.internal.compiler.v2_3.planner.logical._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.LogicalPlan
-import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{LogicalPlanningContext, PlanTransformer}
 
-object selectCovered extends PlanTransformer[QueryGraph] {
-  def apply(plan: LogicalPlan, queryGraph: QueryGraph)(implicit context: LogicalPlanningContext): LogicalPlan = {
-    val unsolvedPredicates = queryGraph.selections
-      .scalarPredicatesGiven(plan.availableSymbols)
-      .filterNot(predicate => plan.solved.exists(_.graph.selections.contains(predicate)))
+case object selectCovered extends CandidateGenerator[LogicalPlan] {
+
+  def apply(plan: LogicalPlan, queryGraph: QueryGraph)(implicit context: LogicalPlanningContext): Seq[LogicalPlan] = {
+    val unsolvedPredicates = queryGraph.selections.unsolvedPredicates(plan)
     if (unsolvedPredicates.isEmpty)
-      plan
+      Seq()
     else {
-      context.logicalPlanProducer.planSelection(unsolvedPredicates, plan)
+      Seq(context.logicalPlanProducer.planSelection(unsolvedPredicates, plan))
     }
   }
 }
+

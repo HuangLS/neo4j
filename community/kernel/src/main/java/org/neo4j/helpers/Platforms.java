@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,17 @@
  */
 package org.neo4j.helpers;
 
+import org.apache.commons.lang3.SystemUtils;
+
+/**
+ * This class is going to be removed in the next major release.
+ * Please use {@link org.apache.commons.lang3.SystemUtils} instead.
+ */
+@Deprecated
 public class Platforms
 {
-    private static final String OS_NAME = System.getProperty("os.name").toLowerCase();
-
     public static boolean platformIsWindows()
     {
-        return OS_NAME.indexOf( "win" ) >= 0;
+        return SystemUtils.IS_OS_WINDOWS;
     }
-
 }

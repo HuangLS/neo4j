@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -67,6 +67,8 @@ public class ExecutionResult implements ResourceIterable<Map<String,Object>>, Re
      * Constructor used by the Cypher framework. End-users should not
      * create an ExecutionResult directly, but instead use the result
      * returned from calling {@link ExecutionEngine#execute(String)}.
+     * 
+     * @param   projection Execution result projection to use.
      */
     public ExecutionResult( org.neo4j.cypher.ExtendedExecutionResult projection )
     {

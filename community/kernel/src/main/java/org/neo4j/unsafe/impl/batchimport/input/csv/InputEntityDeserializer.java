@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,6 +29,7 @@ import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.collection.PrefetchingIterator;
 import org.neo4j.kernel.impl.util.Validator;
 import org.neo4j.unsafe.impl.batchimport.InputIterator;
+import org.neo4j.unsafe.impl.batchimport.input.Collector;
 import org.neo4j.unsafe.impl.batchimport.input.InputEntity;
 import org.neo4j.unsafe.impl.batchimport.input.InputException;
 import org.neo4j.unsafe.impl.batchimport.input.UnexpectedEndOfInputException;
@@ -49,10 +50,12 @@ public class InputEntityDeserializer<ENTITY extends InputEntity>
     private final Function<ENTITY,ENTITY> decorator;
     private final Deserialization<ENTITY> deserialization;
     private final Validator<ENTITY> validator;
+    private final Extractors.StringExtractor stringExtractor = new Extractors.StringExtractor( false );
+    private final Collector badCollector;
 
     InputEntityDeserializer( Header header, CharSeeker data, int delimiter,
             Deserialization<ENTITY> deserialization, Function<ENTITY,ENTITY> decorator,
-            Validator<ENTITY> validator )
+            Validator<ENTITY> validator, Collector badCollector )
     {
         this.header = header;
         this.data = data;
@@ -60,6 +63,7 @@ public class InputEntityDeserializer<ENTITY extends InputEntity>
         this.deserialization = deserialization;
         this.decorator = decorator;
         this.validator = validator;
+        this.badCollector = badCollector;
     }
 
     public void initialize()
@@ -81,15 +85,20 @@ public class InputEntityDeserializer<ENTITY extends InputEntity>
             // When we have everything, create an input entity out of it
             ENTITY entity = deserialization.materialize();
 
-            // If there are more values on this line, ignore them
-            // TODO perhaps log about them?
+            // Ignore additional values on this, but log it in case user doesn't realise that the header specifies
+            // less columns than the data. Prints in close() so it only happens once per file.
             while ( !mark.isEndOfLine() )
             {
+                long lineNumber = data.lineNumber();
                 data.seek( mark, delimiter );
+                data.tryExtract( mark, stringExtractor );
+                badCollector.collectExtraColumns(
+                        data.sourceDescription(), lineNumber, stringExtractor.value() );
             }
 
             entity = decorator.apply( entity );
             validator.validate( entity );
+
             return entity;
         }
         catch ( IOException e )

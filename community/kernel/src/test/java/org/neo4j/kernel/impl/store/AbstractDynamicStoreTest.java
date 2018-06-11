@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.kernel.impl.store;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -34,16 +35,18 @@ import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
-import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.test.EphemeralFileSystemRule;
 import org.neo4j.test.PageCacheRule;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class AbstractDynamicStoreTest
 {
+    private static final int BLOCK_SIZE = 60;
+
     @Rule
     public final EphemeralFileSystemRule fsr = new EphemeralFileSystemRule();
     @Rule
@@ -58,17 +61,12 @@ public class AbstractDynamicStoreTest
     {
         fs = fsr.get();
         pageCache = pageCacheRule.getPageCache( fsr.get() );
-        StoreChannel channel = fs.create( fileName );
-        try
+        try ( StoreChannel channel = fs.create( fileName ) )
         {
             ByteBuffer buffer = ByteBuffer.allocate( 4 );
-            buffer.putInt( 60 );
+            buffer.putInt( BLOCK_SIZE );
             buffer.flip();
             channel.write( buffer );
-        }
-        finally
-        {
-            channel.close();
         }
     }
 
@@ -76,8 +74,7 @@ public class AbstractDynamicStoreTest
     public void shouldRecognizeDesignatedInUseBit() throws Exception
     {
         // GIVEN
-        AbstractDynamicStore store = newTestableDynamicStore();
-        try
+        try ( AbstractDynamicStore store = newTestableDynamicStore() )
         {
             // WHEN
             byte otherBitsInTheInUseByte = 0;
@@ -89,10 +86,67 @@ public class AbstractDynamicStoreTest
                 otherBitsInTheInUseByte |= 1;
             }
         }
-        finally
+    }
+
+    @Test
+    public void dynamicRecordCursorReadsInUseRecords()
+    {
+        try ( AbstractDynamicStore store = newTestableDynamicStore() )
         {
-            store.close();
+            DynamicRecord first = createDynamicRecord( 1, store );
+            DynamicRecord second = createDynamicRecord( 2, store );
+            DynamicRecord third = createDynamicRecord( 3, store );
+
+            first.setNextBlock( second.getId() );
+            store.forceUpdateRecord( first );
+            second.setNextBlock( third.getId() );
+            store.forceUpdateRecord( second );
+
+            AbstractDynamicStore.DynamicRecordCursor recordsCursor = store.getRecordsCursor( 1 );
+            assertTrue( recordsCursor.next() );
+            assertEquals( first, recordsCursor.get() );
+            assertTrue( recordsCursor.next() );
+            assertEquals( second, recordsCursor.get() );
+            assertTrue( recordsCursor.next() );
+            assertEquals( third, recordsCursor.get() );
+            assertFalse( recordsCursor.next() );
         }
+    }
+
+    @Test
+    public void dynamicRecordCursorReadsNotInUseRecords()
+    {
+        try ( AbstractDynamicStore store = newTestableDynamicStore() )
+        {
+            DynamicRecord first = createDynamicRecord( 1, store );
+            DynamicRecord second = createDynamicRecord( 2, store );
+            DynamicRecord third = createDynamicRecord( 3, store );
+
+            first.setNextBlock( second.getId() );
+            store.forceUpdateRecord( first );
+            second.setNextBlock( third.getId() );
+            store.forceUpdateRecord( second );
+            second.setInUse( false );
+            store.forceUpdateRecord( second );
+
+            AbstractDynamicStore.DynamicRecordCursor recordsCursor = store.getRecordsCursor( 1 );
+            assertTrue( recordsCursor.next() );
+            assertEquals( first, recordsCursor.get() );
+            assertTrue( recordsCursor.next() );
+            assertEquals( second, recordsCursor.get() );
+            assertTrue( recordsCursor.next() );
+            assertEquals( third, recordsCursor.get() );
+            assertFalse( recordsCursor.next() );
+        }
+    }
+
+    private static DynamicRecord createDynamicRecord( long id, AbstractDynamicStore store )
+    {
+        DynamicRecord first = new DynamicRecord( id );
+        first.setInUse( true );
+        first.setData( RandomUtils.nextBytes( 10 ) );
+        store.forceUpdateRecord( first );
+        return first;
     }
 
     private void assertRecognizesByteAsInUse( AbstractDynamicStore store, byte inUseByte )
@@ -104,16 +158,8 @@ public class AbstractDynamicStoreTest
     private AbstractDynamicStore newTestableDynamicStore()
     {
         DefaultIdGeneratorFactory idGeneratorFactory = new DefaultIdGeneratorFactory( fs );
-        return new AbstractDynamicStore(
-                fileName,
-                new Config(),
-                IdType.ARRAY_BLOCK,
-                idGeneratorFactory,
-                pageCache,
-                fs,
-                NullLogProvider.getInstance(),
-                StoreVersionMismatchHandler.ALLOW_OLD_VERSION,
-                new Monitors() )
+        AbstractDynamicStore store = new AbstractDynamicStore( fileName, new Config(), IdType.ARRAY_BLOCK,
+                idGeneratorFactory, pageCache, NullLogProvider.getInstance(), BLOCK_SIZE )
         {
             @Override
             public void accept( Processor processor, DynamicRecord record )
@@ -126,5 +172,7 @@ public class AbstractDynamicStoreTest
                 return "TestDynamicStore";
             }
         };
+        store.initialise( true );
+        return store;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -181,5 +181,23 @@ public class RelationshipRecord extends PrimitiveRecord
     public void setIdTo( PropertyRecord property )
     {
         property.setRelId( getId() );
+    }
+
+    @Override
+    public RelationshipRecord clone()
+    {
+        RelationshipRecord record = new RelationshipRecord( getId() );
+        record.setInUse( inUse() );
+        record.setType( type );
+        record.setFirstInFirstChain( firstInFirstChain );
+        record.setFirstInSecondChain( firstInSecondChain );
+        record.setFirstNextRel( firstNextRel );
+        record.setFirstNode( firstNode );
+        record.setFirstPrevRel( firstPrevRel );
+        record.setNextProp( getNextProp() );
+        record.setSecondNextRel( secondNextRel );
+        record.setSecondNode( secondNode );
+        record.setSecondPrevRel( secondPrevRel );
+        return record;
     }
 }

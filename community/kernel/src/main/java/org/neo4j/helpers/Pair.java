@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -41,6 +41,8 @@ public abstract class Pair<T1, T2>
      *
      * @param first the first object in the pair.
      * @param other the other object in the pair.
+     * @param <T1> the type of the first object in the pair
+     * @param <T2> the type of the second object in the pair
      * @return a new pair of the two parameters.
      */
     public static <T1, T2> Pair<T1,T2> pair( final T1 first, final T2 other )
@@ -63,6 +65,11 @@ public abstract class Pair<T1, T2>
 
     /**
      * Alias of {@link #pair(Object, Object)}.
+     * @param first the first object in the pair.
+     * @param other the other object in the pair.
+     * @param <T1> the type of the first object in the pair
+     * @param <T2> the type of the second object in the pair
+     * @return a new pair of the two parameters.
      */
     public static <T1, T2> Pair<T1, T2> of( final T1 first, final T2 other )
     {

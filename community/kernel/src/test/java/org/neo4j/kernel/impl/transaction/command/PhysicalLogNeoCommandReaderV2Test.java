@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -41,7 +41,7 @@ public class PhysicalLogNeoCommandReaderV2Test
         // Number 12 will do just fine.
 
         // GIVEN
-        PhysicalLogNeoCommandReaderV2_2_4 reader = new PhysicalLogNeoCommandReaderV2_2_4();
+        PhysicalLogCommandReaderV2_2_4 reader = new PhysicalLogCommandReaderV2_2_4();
         InMemoryLogChannel data = new InMemoryLogChannel();
         CommandWriter writer = new CommandWriter( data );
         AddRelationshipCommand command = new AddRelationshipCommand();
@@ -78,7 +78,7 @@ public class PhysicalLogNeoCommandReaderV2Test
          */
 
         // GIVEN
-        PhysicalLogNeoCommandReaderV2_2_4 reader = new PhysicalLogNeoCommandReaderV2_2_4();
+        PhysicalLogCommandReaderV2_2_4 reader = new PhysicalLogCommandReaderV2_2_4();
         InMemoryLogChannel data = new InMemoryLogChannel();
         CommandWriter writer = new CommandWriter( data );
         // Here we take advantage of the fact that all index commands have the same header written out

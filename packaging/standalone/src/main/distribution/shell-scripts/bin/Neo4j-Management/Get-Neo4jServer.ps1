@@ -1,4 +1,4 @@
-# Copyright (c) 2002-2015 "Neo Technology,"
+# Copyright (c) 2002-2018 "Neo Technology,"
 # Network Engine for Objects in Lund AB [http://neotechnology.com]
 #
 # This file is part of Neo4j.
@@ -17,7 +17,39 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
+<#
+.SYNOPSIS
+Retrieves properties about a Neo4j installation
 
+.DESCRIPTION
+Retrieves properties about a Neo4j installation and outputs a Neo4j Server object.
+
+.PARAMETER Neo4jHome
+The full path to the Neo4j installation.  If an empty string is passed, the Neo4j Home is determied via Get-Neo4jHome
+
+.EXAMPLE
+Get-Neo4jServer -Neo4jHome 'C:\Neo4j'
+
+Retrieves information about the Neo4j installation at C:\Neo4j
+
+.EXAMPLE
+'C:\Neo4j' | Get-Neo4jServer
+
+Retrieves information about the Neo4j installation at C:\Neo4j
+
+.EXAMPLE
+Get-Neo4jServer
+
+Retrieves information about the Neo4j installation as determined by Get-Neo4jHome
+
+.OUTPUTS
+System.Management.Automation.PSCustomObject
+This is a Neo4j Server Object
+
+.LINK
+Get-Neo4jHome  
+
+#>
 Function Get-Neo4jServer
 {
   [cmdletBinding(SupportsShouldProcess=$false,ConfirmImpact='Low')]
@@ -41,12 +73,17 @@ Function Get-Neo4jServer
       Write-Error "Could not detect the Neo4j Home directory"
       return
     }
+       
     if (-not (Confirm-Neo4jHome -Neo4jHome $Neo4jHome))
     {
       Write-Error "$Neo4jHome is not a Neo4j Home directory"
       return
     }
-    
+
+    # Convert the path specified into an absolute path
+    $Neo4jDir = Get-Item $Neo4jHome
+    $Neo4jHome = $Neo4jDir.FullName.TrimEnd('\')
+
     # Get the information about the server
     $serverProperties = @{
       'Home' = $Neo4jHome;
@@ -65,7 +102,7 @@ Function Get-Neo4jServer
       if ($matches -ne $null) { $matches.Clear() }
       if ($_.Name -match '^neo4j-server-([\d.\-MRC]+)\.jar$') { $serverProperties.ServerVersion = $matches[1] }
     }
-    
+
     $serverObject = New-Object -TypeName PSCustomObject -Property $serverProperties
     if (-not (Confirm-Neo4jServerObject -Neo4jServer $serverObject))
     {

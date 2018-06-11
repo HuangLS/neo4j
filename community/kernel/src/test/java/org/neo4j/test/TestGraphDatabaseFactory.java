@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,6 +27,7 @@ import org.neo4j.graphdb.config.Setting;
 import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
+import org.neo4j.graphdb.security.URLAccessRule;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.GraphDatabaseDependencies;
 import org.neo4j.kernel.extension.KernelExtensionFactory;
@@ -38,6 +39,7 @@ import org.neo4j.kernel.impl.logging.LogService;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.logging.NullLogProvider;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 /**
  * Test factory for graph databases
@@ -136,6 +138,12 @@ public class TestGraphDatabaseFactory extends GraphDatabaseFactory
         return (TestGraphDatabaseFactory) super.addKernelExtension( newKernelExtension );
     }
 
+    @Override
+    public TestGraphDatabaseFactory addURLAccessRule( String protocol, URLAccessRule rule )
+    {
+        return (TestGraphDatabaseFactory) super.addURLAccessRule( protocol, rule );
+    }
+
     public GraphDatabaseBuilder newImpermanentDatabaseBuilder( final File storeDir )
     {
         final TestGraphDatabaseFactoryState state = getStateCopy();
@@ -164,7 +172,9 @@ public class TestGraphDatabaseFactory extends GraphDatabaseFactory
                 return new CommunityFacadeFactory()
                 {
                     @Override
-                    protected PlatformModule createPlatform( File storeDir, Map<String, String> params, Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade )
+                    protected PlatformModule createPlatform( File storeDir, Map<String, String> params,
+                            Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade,
+                            OperationalMode operationalMode )
                     {
                         return new ImpermanentGraphDatabase.ImpermanentPlatformModule( storeDir, params, dependencies, graphDatabaseFacade )
                         {

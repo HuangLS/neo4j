@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,9 @@
  */
 package org.neo4j.kernel.api;
 
+import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
+import org.neo4j.kernel.impl.api.Kernel;
 
 /**
  * Represents a transaction of changes to the underlying graph.
@@ -112,16 +114,32 @@ public interface KernelTransaction extends AutoCloseable
     boolean isOpen();
 
     /**
-     * @return {@code true} if {@link #markForTermination()} has been invoked, otherwise {@code false}.
+     * @return {@link Status} if {@link #markForTermination(Status)} has been invoked, otherwise {@code null}.
      */
-    boolean shouldBeTerminated();
+    Status getReasonIfTerminated();
 
     /**
      * Marks this transaction for termination, such that it cannot commit successfully and will try to be
      * terminated by having other methods throw a specific termination exception, as to sooner reach the assumed
      * point where {@link #close()} will be invoked.
      */
-    void markForTermination();
+    void markForTermination( Status reason );
+
+    /**
+     * @return The timestamp of the last transaction that was committed to the store when this transaction started.
+     */
+    long lastTransactionTimestampWhenStarted();
+
+    /**
+     * @return The id of the last transaction that was committed to the store when this transaction started.
+     */
+    long lastTransactionIdWhenStarted();
+
+    /**
+     * @return start time of this transaction, i.e. basically {@link System#currentTimeMillis()} when user called
+     * {@link Kernel#newTransaction()}.
+     */
+    long localStartTime();
 
     /**
      * Register a {@link CloseListener} to be invoked after commit, but before transaction events "after" hooks

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,32 +19,38 @@
  */
 package org.neo4j.consistency.checking.full;
 
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameter;
-import org.junit.runners.Parameterized.Parameters;
 import org.junit.runners.model.Statement;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.neo4j.collection.primitive.PrimitiveLongCollections;
 import org.neo4j.collection.primitive.PrimitiveLongSet;
 import org.neo4j.consistency.RecordType;
 import org.neo4j.consistency.checking.GraphStoreFixture;
+import org.neo4j.consistency.checking.GraphStoreFixture.IdGenerator;
+import org.neo4j.consistency.checking.GraphStoreFixture.TransactionDataBuilder;
+import org.neo4j.consistency.report.ConsistencyReport;
+import org.neo4j.consistency.report.ConsistencyReporter;
 import org.neo4j.consistency.report.ConsistencySummaryStatistics;
 import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.graphdb.Direction;
@@ -55,9 +61,12 @@ import org.neo4j.helpers.UTF8;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.api.ReadOperations;
+import org.neo4j.kernel.api.TokenWriteOperations;
 import org.neo4j.kernel.api.direct.DirectStoreAccess;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.api.exceptions.index.IndexCapacityExceededException;
+import org.neo4j.kernel.api.exceptions.schema.IllegalTokenNameException;
+import org.neo4j.kernel.api.exceptions.schema.TooManyLabelsException;
 import org.neo4j.kernel.api.index.IndexAccessor;
 import org.neo4j.kernel.api.index.IndexConfiguration;
 import org.neo4j.kernel.api.index.IndexDescriptor;
@@ -68,6 +77,8 @@ import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.api.labelscan.NodeLabelUpdate;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.api.KernelStatement;
+import org.neo4j.kernel.impl.annotations.Documented;
 import org.neo4j.kernel.impl.api.index.IndexUpdateMode;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge;
@@ -77,13 +88,13 @@ import org.neo4j.kernel.impl.store.PreAllocatedRecords;
 import org.neo4j.kernel.impl.store.PropertyType;
 import org.neo4j.kernel.impl.store.RecordStore;
 import org.neo4j.kernel.impl.store.SchemaStorage;
+import org.neo4j.kernel.impl.store.SchemaStore;
 import org.neo4j.kernel.impl.store.StoreAccess;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.IndexRule;
 import org.neo4j.kernel.impl.store.record.LabelTokenRecord;
-import org.neo4j.kernel.impl.store.record.MandatoryNodePropertyConstraintRule;
-import org.neo4j.kernel.impl.store.record.MandatoryRelationshipPropertyConstraintRule;
 import org.neo4j.kernel.impl.store.record.NeoStoreRecord;
+import org.neo4j.kernel.impl.store.record.UniquePropertyConstraintRule;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 import org.neo4j.kernel.impl.store.record.PropertyBlock;
 import org.neo4j.kernel.impl.store.record.PropertyRecord;
@@ -92,16 +103,18 @@ import org.neo4j.kernel.impl.store.record.RelationshipGroupRecord;
 import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 import org.neo4j.kernel.impl.store.record.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.store.record.SchemaRule;
-import org.neo4j.kernel.impl.store.record.UniquePropertyConstraintRule;
 import org.neo4j.kernel.impl.util.Bits;
 import org.neo4j.kernel.impl.util.MutableInteger;
 import org.neo4j.logging.FormattedLog;
 import org.neo4j.unsafe.batchinsert.LabelScanWriter;
 
-import static java.util.Arrays.asList;
-import static java.util.Collections.singleton;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static java.lang.String.format;
+import static java.util.Arrays.asList;
+import static java.util.Collections.singleton;
+
+import static org.neo4j.consistency.ConsistencyCheckService.defaultConsistencyCheckThreadsNumber;
 import static org.neo4j.consistency.checking.RecordCheckTestBase.inUse;
 import static org.neo4j.consistency.checking.RecordCheckTestBase.notInUse;
 import static org.neo4j.consistency.checking.full.ExecutionOrderIntegrationTest.config;
@@ -111,8 +124,8 @@ import static org.neo4j.graphdb.DynamicLabel.label;
 import static org.neo4j.graphdb.DynamicRelationshipType.withName;
 import static org.neo4j.helpers.collection.IteratorUtil.asIterable;
 import static org.neo4j.helpers.collection.IteratorUtil.iterator;
-import static org.neo4j.kernel.api.ReadOperations.ANY_LABEL;
-import static org.neo4j.kernel.api.ReadOperations.ANY_RELATIONSHIP_TYPE;
+import static org.neo4j.kernel.api.CountsRead.ANY_LABEL;
+import static org.neo4j.kernel.api.CountsRead.ANY_RELATIONSHIP_TYPE;
 import static org.neo4j.kernel.api.labelscan.NodeLabelUpdate.labelChanges;
 import static org.neo4j.kernel.impl.store.AbstractDynamicStore.readFullByteArrayFromHeavyRecords;
 import static org.neo4j.kernel.impl.store.DynamicArrayStore.allocateFromNumbers;
@@ -120,17 +133,16 @@ import static org.neo4j.kernel.impl.store.DynamicArrayStore.getRightArray;
 import static org.neo4j.kernel.impl.store.DynamicNodeLabels.dynamicPointer;
 import static org.neo4j.kernel.impl.store.LabelIdArray.prependNodeId;
 import static org.neo4j.kernel.impl.store.PropertyType.ARRAY;
-import static org.neo4j.kernel.impl.store.record.MandatoryNodePropertyConstraintRule.*;
-import static org.neo4j.kernel.impl.store.record.MandatoryRelationshipPropertyConstraintRule.*;
+import static org.neo4j.kernel.impl.store.record.NodePropertyExistenceConstraintRule.nodePropertyExistenceConstraintRule;
 import static org.neo4j.kernel.impl.store.record.Record.NO_LABELS_FIELD;
 import static org.neo4j.kernel.impl.store.record.Record.NO_NEXT_PROPERTY;
 import static org.neo4j.kernel.impl.store.record.Record.NO_NEXT_RELATIONSHIP;
 import static org.neo4j.kernel.impl.store.record.Record.NO_PREV_RELATIONSHIP;
+import static org.neo4j.kernel.impl.store.record.RelationshipPropertyExistenceConstraintRule.relPropertyExistenceConstraintRule;
 import static org.neo4j.kernel.impl.util.Bits.bits;
 import static org.neo4j.test.Property.property;
 import static org.neo4j.test.Property.set;
 
-@RunWith( Parameterized.class )
 public class FullCheckIntegrationTest
 {
     private static final SchemaIndexProvider.Descriptor DESCRIPTOR = new SchemaIndexProvider.Descriptor( "lucene", "1.0" );
@@ -142,8 +154,47 @@ public class FullCheckIntegrationTest
     private final ByteArrayOutputStream out = new ByteArrayOutputStream();
     private final List<Long> indexedNodes = new ArrayList<>();
 
-    @Parameter
-    public TaskExecutionOrder taskExecutionOrder;
+    private static final Map<Class<?>,Set<String>> allReports = new HashMap<>();
+
+    @BeforeClass
+    public static void collectAllDifferentInconsistencyTypes()
+    {
+        Class<?> reportClass = ConsistencyReport.class;
+        for ( Class<?> cls : reportClass.getDeclaredClasses() )
+        {
+            for ( Method method : cls.getDeclaredMethods() )
+            {
+                if ( method.getAnnotation( Documented.class ) != null )
+                {
+                    Set<String> types = allReports.get( cls );
+                    if ( types == null )
+                    {
+                        allReports.put( cls, types = new HashSet<>() );
+                    }
+                    types.add( method.getName() );
+                }
+            }
+        }
+    }
+
+    @AfterClass
+    public static void verifyThatWeHaveExercisedAllTypesOfInconsistenciesThatWeHave()
+    {
+        if ( !allReports.isEmpty() )
+        {
+            StringBuilder builder = new StringBuilder( "There are types of inconsistencies not covered by "
+                    + "this integration test, please add tests that tests for:" );
+            for ( Map.Entry<Class<?>,Set<String>> reporter : allReports.entrySet() )
+            {
+                builder.append( format( "%n%s:", reporter.getKey().getSimpleName() ) );
+                for ( String type : reporter.getValue() )
+                {
+                    builder.append( format( "%n  %s", type ) );
+                }
+            }
+            System.err.println( builder.toString() );
+        }
+    }
 
     @Rule
     public final GraphStoreFixture fixture = new GraphStoreFixture()
@@ -155,8 +206,6 @@ public class FullCheckIntegrationTest
             {
                 db.schema().indexFor( label( "label3" ) ).on( "key" ).create();
                 db.schema().constraintFor( label( "label4" ) ).assertPropertyIsUnique( "key" ).create();
-                db.schema().constraintFor( label( "draconian" ) ).assertPropertyExists( "mandatory" ).create();
-                db.schema().constraintFor( withName( "M" ) ).assertPropertyExists( "mandatory" ).create();
                 tx.success();
             }
 
@@ -175,12 +224,16 @@ public class FullCheckIntegrationTest
                 label2 = readOperationsOn( db ).labelGetForName( "label2" );
                 label3 = readOperationsOn( db ).labelGetForName( "label3" );
                 label4 = readOperationsOn( db ).labelGetForName( "label4" );
-                draconian = readOperationsOn( db ).labelGetForName( "draconian" );
+                draconian = tokenWriteOperationsOn( db ).labelGetOrCreateForName( "draconian" );
                 key = readOperationsOn( db ).propertyKeyGetForName( "key" );
-                mandatory = readOperationsOn( db ).propertyKeyGetForName( "mandatory" );
+                mandatory = tokenWriteOperationsOn( db ).propertyKeyGetOrCreateForName( "mandatory" );
                 C = readOperationsOn( db ).relationshipTypeGetForName( "C" );
                 T = readOperationsOn( db ).relationshipTypeGetForName( "T" );
-                M = readOperationsOn( db ).relationshipTypeGetForName( "M" );
+                M = tokenWriteOperationsOn( db ).relationshipTypeGetOrCreateForName( "M" );
+            }
+            catch ( IllegalTokenNameException | TooManyLabelsException e )
+            {
+                throw new RuntimeException( e );
             }
         }
     };
@@ -210,15 +263,6 @@ public class FullCheckIntegrationTest
         }
     };
 
-    @Parameters( name = "execution_order={0}" )
-    public static Iterable<Object[]> taskExecutions()
-    {
-        return Arrays.asList( new Object[][]{
-                {TaskExecutionOrder.SINGLE_THREADED},
-                {TaskExecutionOrder.MULTI_PASS}
-        } );
-    }
-
     @Test
     public void shouldCheckConsistencyOfAConsistentStore() throws Exception
     {
@@ -230,7 +274,7 @@ public class FullCheckIntegrationTest
     }
 
     @Test
-    @Ignore("Support for checking NeoStore needs to be added")
+    @Ignore("Support for checking MetaDataStore needs to be added")
     public void shouldReportNeoStoreInconsistencies() throws Exception
     {
         // given
@@ -626,6 +670,8 @@ public class FullCheckIntegrationTest
             }
         } );
 
+        createNodePropertyExistenceConstraint( draconian, mandatory );
+
         // when
         ConsistencySummaryStatistics stats = check();
 
@@ -674,6 +720,8 @@ public class FullCheckIntegrationTest
                 tx.incrementRelationshipCount( ANY_LABEL, M, ANY_LABEL, 1 );
             }
         } );
+
+        createRelationshipPropertyExistenceConstraint( M, mandatory );
 
         // when
         ConsistencySummaryStatistics stats = check();
@@ -861,6 +909,35 @@ public class FullCheckIntegrationTest
     }
 
     @Test
+    public void shouldReportRelationshipOtherNodeInconsistencies() throws Exception
+    {
+        // given
+        fixture.apply( new GraphStoreFixture.Transaction()
+        {
+            @Override
+            protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
+                    GraphStoreFixture.IdGenerator next )
+            {
+                long node1 = next.node();
+                long node2 = next.node();
+                long rel = next.relationship();
+                tx.create( inUse( new RelationshipRecord( rel, node1, node2, 0 ) ) );
+                tx.create( inUse( new NodeRecord( node1, false, rel + 1, -1 ) ) );
+                tx.create( inUse( new NodeRecord( node2, false, rel + 2, -1 ) ) );
+            }
+        } );
+
+        // when
+        ConsistencySummaryStatistics stats = check();
+
+        // then
+        on( stats ).verify( RecordType.RELATIONSHIP, 2 )
+                   .verify( RecordType.NODE, 2 )
+                   .verify( RecordType.COUNTS, 2 )
+                   .andThatsAllFolks();
+    }
+
+    @Test
     public void shouldReportPropertyInconsistencies() throws Exception
     {
         // given
@@ -870,11 +947,17 @@ public class FullCheckIntegrationTest
             protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
                                             GraphStoreFixture.IdGenerator next )
             {
+                NodeRecord node = new NodeRecord( next.node() );
                 PropertyRecord property = new PropertyRecord( next.property() );
-                property.setPrevProp( next.property() );
+                node.setNextProp( property.getId() );
+
+                // Mess up the prev/next pointers a bit
+                property.setNextProp( 1_000 );
+
                 PropertyBlock block = new PropertyBlock();
                 block.setSingleBlock( next.propertyKey() | (((long) PropertyType.INT.intValue()) << 24) | (666L << 28) );
                 property.addPropertyBlock( block );
+                tx.create( node );
                 tx.create( property );
             }
         } );
@@ -884,6 +967,7 @@ public class FullCheckIntegrationTest
 
         // then
         on( stats ).verify( RecordType.PROPERTY, 2 )
+                   .verify( RecordType.NODE, 1 )
                    .andThatsAllFolks();
     }
 
@@ -1118,7 +1202,7 @@ public class FullCheckIntegrationTest
         access.getRelationshipTypeNameStore().updateRecord( record );
 
         // when
-        ConsistencySummaryStatistics stats = check( fixture.directStoreAccess() );
+        ConsistencySummaryStatistics stats = check();
 
         // then
         on( stats ).verify( RecordType.RELATIONSHIP_TYPE_NAME, 1 )
@@ -1146,7 +1230,7 @@ public class FullCheckIntegrationTest
         access.getPropertyKeyNameStore().updateRecord( record );
 
         // when
-        ConsistencySummaryStatistics stats = check( fixture.directStoreAccess() );
+        ConsistencySummaryStatistics stats = check();
 
         // then
         on( stats ).verify( RecordType.PROPERTY_KEY_NAME, 1 )
@@ -1165,7 +1249,7 @@ public class FullCheckIntegrationTest
         relTypeStore.updateRecord( record );
 
         // when
-        ConsistencySummaryStatistics stats = check( fixture.directStoreAccess() );
+        ConsistencySummaryStatistics stats = check();
 
         // then
         access.close();
@@ -1184,7 +1268,7 @@ public class FullCheckIntegrationTest
         access.getLabelTokenStore().updateRecord( record );
 
         // when
-        ConsistencySummaryStatistics stats = check( fixture.directStoreAccess() );
+        ConsistencySummaryStatistics stats = check();
 
         // then
         on( stats ).verify( RecordType.LABEL, 1 )
@@ -1212,7 +1296,7 @@ public class FullCheckIntegrationTest
         access.getPropertyKeyNameStore().updateRecord( record );
 
         // when
-        ConsistencySummaryStatistics stats = check( fixture.directStoreAccess() );
+        ConsistencySummaryStatistics stats = check();
 
         // then
         on( stats ).verify( RecordType.PROPERTY_KEY, 1 )
@@ -1702,13 +1786,13 @@ public class FullCheckIntegrationTest
     }
 
     @Test
-    public void shouldReportDuplicatedMandatoryNodePropertyConstraintRules() throws Exception
+    public void shouldReportDuplicatedNodePropertyExistenceConstraintRules() throws Exception
     {
         // Given
         int labelId = createLabel();
         int propertyKeyId = createPropertyKey();
-        createMandatoryNodePropertyRule( labelId, propertyKeyId );
-        createMandatoryNodePropertyRule( labelId, propertyKeyId );
+        createNodePropertyExistenceConstraint( labelId, propertyKeyId );
+        createNodePropertyExistenceConstraint( labelId, propertyKeyId );
 
         // When
         ConsistencySummaryStatistics stats = check();
@@ -1718,13 +1802,13 @@ public class FullCheckIntegrationTest
     }
 
     @Test
-    public void shouldReportDuplicatedMandatoryRelationshipPropertyConstraintRules() throws Exception
+    public void shouldReportDuplicatedRelationshipPropertyExistenceConstraintRules() throws Exception
     {
         // Given
         int relTypeId = createRelType();
         int propertyKeyId = createPropertyKey();
-        createMandatoryRelationshipPropertyRule( relTypeId, propertyKeyId );
-        createMandatoryRelationshipPropertyRule( relTypeId, propertyKeyId );
+        createRelationshipPropertyExistenceConstraint( relTypeId, propertyKeyId );
+        createRelationshipPropertyExistenceConstraint( relTypeId, propertyKeyId );
 
         // When
         ConsistencySummaryStatistics stats = check();
@@ -1765,12 +1849,12 @@ public class FullCheckIntegrationTest
     }
 
     @Test
-    public void shouldReportInvalidLabelIdInMandatoryNodePropertyConstraintRule() throws Exception
+    public void shouldReportInvalidLabelIdInNodePropertyExistenceConstraintRule() throws Exception
     {
         // Given
         int labelId = fixture.idGenerator().label();
         int propertyKeyId = createPropertyKey();
-        createMandatoryNodePropertyRule( labelId, propertyKeyId );
+        createNodePropertyExistenceConstraint( labelId, propertyKeyId );
 
         // When
         ConsistencySummaryStatistics stats = check();
@@ -1811,12 +1895,12 @@ public class FullCheckIntegrationTest
     }
 
     @Test
-    public void shouldReportInvalidPropertyKeyIdInMandatoryNodePropertyConstraintRule() throws Exception
+    public void shouldReportInvalidPropertyKeyIdInNodePropertyExistenceConstraintRule() throws Exception
     {
         // Given
         int labelId = createLabel();
         int propertyKeyId = fixture.idGenerator().propertyKey();
-        createMandatoryNodePropertyRule( labelId, propertyKeyId );
+        createNodePropertyExistenceConstraint( labelId, propertyKeyId );
 
         // When
         ConsistencySummaryStatistics stats = check();
@@ -1826,12 +1910,12 @@ public class FullCheckIntegrationTest
     }
 
     @Test
-    public void shouldReportInvalidRelTypeIdInMandatoryRelationshipPropertyConstraintRule() throws Exception
+    public void shouldReportInvalidRelTypeIdInRelationshipPropertyExistenceConstraintRule() throws Exception
     {
         // Given
         int relTypeId = fixture.idGenerator().relationshipType();
         int propertyKeyId = createPropertyKey();
-        createMandatoryRelationshipPropertyRule( relTypeId, propertyKeyId );
+        createRelationshipPropertyExistenceConstraint( relTypeId, propertyKeyId );
 
         // When
         ConsistencySummaryStatistics stats = check();
@@ -1841,14 +1925,49 @@ public class FullCheckIntegrationTest
     }
 
     @Test
-    public void shouldReportNothingForUniquenessAndMandatoryPropertyConstraintOnSameLabelAndProperty() throws Exception
+    public void shouldReportNothingForUniquenessAndPropertyExistenceConstraintOnSameLabelAndProperty() throws Exception
     {
         // Given
         int labelId = createLabel();
         int propertyKeyId = createPropertyKey();
 
-        createMandatoryNodePropertyRule( labelId, propertyKeyId );
         createUniquenessConstraintRule( labelId, propertyKeyId );
+        createNodePropertyExistenceConstraint( labelId, propertyKeyId );
+
+        // When
+        ConsistencySummaryStatistics stats = check();
+
+        // Then
+        assertTrue( stats.isConsistent() );
+    }
+
+    @Test
+    public void shouldManageUnusedRecordsWithWeirdDataIn() throws Exception
+    {
+        // Given
+        final AtomicLong id = new AtomicLong();
+        fixture.apply( new GraphStoreFixture.Transaction()
+        {
+            @Override
+            protected void transactionData( TransactionDataBuilder tx, IdGenerator next )
+            {
+                id.set( next.relationship() );
+                RelationshipRecord relationship = new RelationshipRecord( id.get() );
+                relationship.setFirstNode( -1 );
+                relationship.setSecondNode( -1 );
+                relationship.setInUse( true );
+                tx.create( relationship );
+            }
+        } );
+        fixture.apply( new GraphStoreFixture.Transaction()
+        {
+            @Override
+            protected void transactionData( TransactionDataBuilder tx, IdGenerator next )
+            {
+                RelationshipRecord relationship = new RelationshipRecord( id.get() );
+                tx.delete( relationship );
+            }
+        } );
 
         // When
         ConsistencySummaryStatistics stats = check();
@@ -1864,9 +1983,19 @@ public class FullCheckIntegrationTest
 
     private ConsistencySummaryStatistics check( DirectStoreAccess stores ) throws ConsistencyCheckIncompleteException
     {
-        Config config = config( taskExecutionOrder );
-        FullCheck checker = new FullCheck( config, ProgressMonitorFactory.NONE );
-        return checker.execute( stores, FormattedLog.toOutputStream( out ) );
+        Config config = config();
+        FullCheck checker = new FullCheck( config, ProgressMonitorFactory.NONE, fixture.getAccessStatistics(),
+                defaultConsistencyCheckThreadsNumber() );
+        return checker.execute( stores, FormattedLog.toOutputStream( out ), new ConsistencyReporter.Monitor()
+        {
+            @Override
+            public void reported( Class<?> report, String method, String message )
+            {
+                Set<String> types = allReports.get( report );
+                assert types != null;
+                types.remove( method );
+            }
+        } );
     }
 
     protected static RelationshipGroupRecord withRelationships( RelationshipGroupRecord group, long out,
@@ -2031,56 +2160,43 @@ public class FullCheckIntegrationTest
         } );
     }
 
-    private void createMandatoryNodePropertyRule( final int labelId, final int propertyKeyId ) throws Exception
+    private void createNodePropertyExistenceConstraint( int labelId, int propertyKeyId )
     {
-        fixture.apply( new GraphStoreFixture.Transaction()
+        SchemaStore schemaStore = (SchemaStore) fixture.directStoreAccess().nativeStores().getSchemaStore();
+        SchemaRule rule = nodePropertyExistenceConstraintRule( schemaStore.nextId(), labelId, propertyKeyId );
+        Collection<DynamicRecord> records = schemaStore.allocateFrom( rule );
+        for ( DynamicRecord record : records )
         {
-            @Override
-            protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
-                    GraphStoreFixture.IdGenerator next )
-            {
-                int id = (int) next.schema();
-
-                DynamicRecord recordBefore = new DynamicRecord( id );
-                DynamicRecord recordAfter = recordBefore.clone();
-
-                MandatoryNodePropertyConstraintRule rule = mandatoryNodePropertyConstraintRule( id, labelId,
-                        propertyKeyId );
-                Collection<DynamicRecord> records = serializeRule( rule, recordAfter );
-
-                tx.createSchema( singleton( recordBefore ), records, rule );
-            }
-        } );
+            schemaStore.updateRecord( record );
+        }
     }
 
-    private void createMandatoryRelationshipPropertyRule( final int relTypeId, final int propertyKeyId )
-            throws Exception
+    private void createRelationshipPropertyExistenceConstraint( int relTypeId, int propertyKeyId )
     {
-        fixture.apply( new GraphStoreFixture.Transaction()
+        SchemaStore schemaStore = (SchemaStore) fixture.directStoreAccess().nativeStores().getSchemaStore();
+        SchemaRule rule = relPropertyExistenceConstraintRule( schemaStore.nextId(), relTypeId, propertyKeyId );
+        Collection<DynamicRecord> records = schemaStore.allocateFrom( rule );
+        for ( DynamicRecord record : records )
         {
-            @Override
-            protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
-                    GraphStoreFixture.IdGenerator next )
-            {
-                int id = (int) next.schema();
-
-                DynamicRecord recordBefore = new DynamicRecord( id );
-                DynamicRecord recordAfter = recordBefore.clone();
-
-                MandatoryRelationshipPropertyConstraintRule rule = mandatoryRelPropertyConstraintRule( id, relTypeId,
-                        propertyKeyId );
-                Collection<DynamicRecord> records = serializeRule( rule, recordAfter );
-
-                tx.createSchema( singleton( recordBefore ), records, rule );
-            }
-        } );
+            schemaStore.updateRecord( record );
+        }
     }
 
     private static ReadOperations readOperationsOn( GraphDatabaseService db )
     {
+        return statementOn( db ).readOperations();
+    }
+
+    private static TokenWriteOperations tokenWriteOperationsOn( GraphDatabaseService db )
+    {
+        return statementOn( db ).tokenWriteOperations();
+    }
+
+    private static KernelStatement statementOn( GraphDatabaseService db )
+    {
         DependencyResolver resolver = ((GraphDatabaseAPI) db).getDependencyResolver();
         ThreadToStatementContextBridge bridge = resolver.resolveDependency( ThreadToStatementContextBridge.class );
-        return bridge.get().readOperations();
+        return (KernelStatement) bridge.get();
     }
 
     private static class Reference<T>

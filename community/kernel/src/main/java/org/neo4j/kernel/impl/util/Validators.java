@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import org.neo4j.io.fs.DefaultFileSystemAbstraction;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.MetaDataStore;
 import org.neo4j.kernel.impl.storemigration.StoreFileType;
 
 public class Validators
@@ -95,7 +95,7 @@ public class Validators
         public void validate( File value )
         {
             if ( new DefaultFileSystemAbstraction()
-                    .fileExists( new File( value, StoreFileType.STORE.augment( NeoStore.DEFAULT_NAME ) ) ) )
+                    .fileExists( new File( value, StoreFileType.STORE.augment( MetaDataStore.DEFAULT_NAME ) ) ) )
             {
                 throw new IllegalArgumentException( "Directory '" + value + "' already contains a database" );
             }
@@ -112,8 +112,8 @@ public class Validators
                 if ( value.length < length )
                 {
                     throw new IllegalArgumentException( "Expected '" + key + "' to have at least " +
-                            length + " item" + (length == 1 ? "" : "s") + ", but had " + value.length +
-                            " (" + Arrays.toString( value ) + ")" );
+                            length + " valid item" + (length == 1 ? "" : "s") + ", but had " + value.length +
+                            " " + Arrays.toString( value ) );
                 }
             }
         };

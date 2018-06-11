@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -51,8 +51,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+
 import static org.neo4j.helpers.Exceptions.contains;
 import static org.neo4j.kernel.impl.api.TransactionApplicationMode.INTERNAL;
+import static org.neo4j.kernel.impl.transaction.log.TransactionIdStore.*;
 
 public class TransactionRepresentationCommitProcessTest
 {
@@ -84,7 +86,7 @@ public class TransactionRepresentationCommitProcessTest
             assertTrue( contains( e, rootCause.getMessage(), rootCause.getClass() ) );
         }
 
-        verify( transactionIdStore, times( 0 ) ).transactionCommitted( txId, 0 );
+        verify( transactionIdStore, times( 0 ) ).transactionCommitted( txId, 0, BASE_TX_COMMIT_TIMESTAMP );
     }
 
     @Test
@@ -127,8 +129,7 @@ public class TransactionRepresentationCommitProcessTest
         // Given
         IndexUpdatesValidator indexUpdatesValidator = mock( IndexUpdatesValidator.class );
         RuntimeException error = new UnderlyingStorageException( new IndexCapacityExceededException( 10, 10 ) );
-        when( indexUpdatesValidator.validate( any( TransactionRepresentation.class ), eq( INTERNAL ) ) )
-                .thenThrow( error );
+        when( indexUpdatesValidator.validate( any( TransactionRepresentation.class ) ) ).thenThrow( error );
 
         TransactionRepresentationCommitProcess commitProcess = new TransactionRepresentationCommitProcess(
                 mock( TransactionAppender.class ), mock( TransactionRepresentationStoreApplier.class ),
@@ -157,8 +158,7 @@ public class TransactionRepresentationCommitProcessTest
     private static IndexUpdatesValidator mockedIndexUpdatesValidator() throws IOException
     {
         IndexUpdatesValidator validator = mock( IndexUpdatesValidator.class );
-        when( validator.validate( any( TransactionRepresentation.class ), any( TransactionApplicationMode.class ) ) )
-                .thenReturn( ValidatedIndexUpdates.NONE );
+        when( validator.validate( any( TransactionRepresentation.class ) ) ).thenReturn( ValidatedIndexUpdates.NONE );
         return validator;
     }
 }

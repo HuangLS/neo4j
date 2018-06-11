@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,6 +22,7 @@ package org.neo4j.function;
 /**
  * Represents an operation upon two long-valued operands and producing a long-valued result. This is the primitive type specialization of {@link BinaryOperator}
  * for long.
+ * @deprecated Usages will be replaced by corresponding {@code java.util.function} interface and classes in 3.0.
  */
 public interface LongBinaryOperator extends ThrowingLongBinaryOperator<RuntimeException>
 {

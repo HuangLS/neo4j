@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -124,7 +124,7 @@ public class Paths
      */
     public static String defaultPathToString( Path path )
     {
-        return pathToString( path, new DefaultPathDescriptor<Path>() );
+        return pathToString( path, new DefaultPathDescriptor<>() );
     }
 
     /**
@@ -153,6 +153,7 @@ public class Paths
      * node representation instead of the node id. If that property doesn't
      * exist, the id is used.
      * @param path the {@link Path} to build a string representation of.
+     * @param nodePropertyKey the key of the property value to display
      * @return a quite simple representation of a {@link Path}.
      */
     public static String simplePathToString( Path path, final String nodePropertyKey )
@@ -180,6 +181,7 @@ public class Paths
      * @param nodeId            true if node id should be included.
      * @param relId             true if relationship id should be included.
      * @param propertyKeys      all property keys that should be included.
+     * @param <T>               the type of the {@link Path}
      * @return                  a new {@link Paths.PathDescriptor}
      */
     public static <T extends Path> PathDescriptor<T> descriptorForIdAndProperties( final boolean nodeId,

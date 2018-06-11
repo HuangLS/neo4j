@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -60,7 +60,7 @@ public class UpdatePullingTransactionObligationFulfiller extends LifecycleAdapte
     @Override
     public void fulfill( final long toTxId ) throws InterruptedException
     {
-        updatePuller.await( new Condition()
+        updatePuller.pullUpdates( new Condition()
         {
             @Override
             public boolean evaluate( int currentTicket, int targetTicket )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.steps
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
 import org.neo4j.cypher.internal.compiler.v2_3.planner._
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.plans.{Aggregation, LogicalPlan, Projection}
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class AggregationTest extends CypherFunSuite with LogicalPlanningTestSupport {
   val aggregatingMap: Map[String, Expression] = Map("count(*)" -> CountStar()(pos))
@@ -44,10 +44,10 @@ class AggregationTest extends CypherFunSuite with LogicalPlanningTestSupport {
       planContext = newMockedPlanContext
     )
 
-    val startPlan = Projection(newMockedLogicalPlan(), Map("count(*)" -> CountStar()_))(solved)
+    val startPlan = newMockedLogicalPlan()
 
     aggregation(startPlan, projection)(context) should equal(
-      Aggregation(Projection(startPlan, Map.empty)(solved), Map(), aggregatingMap)(solved)
+      Aggregation(startPlan, Map(), aggregatingMap)(solved)
     )
   }
 
@@ -92,7 +92,7 @@ class AggregationTest extends CypherFunSuite with LogicalPlanningTestSupport {
     val result = aggregation(projectionPlan, projection)(context)
     // Then
     result should equal(
-      Aggregation(Projection(projectionPlan, groupingKeyMap)(solved), groupingKeyMap, aggregatingMap)(solved)
+      Aggregation(projectionPlan, groupingKeyMap, aggregatingMap)(solved)
     )
   }
 }

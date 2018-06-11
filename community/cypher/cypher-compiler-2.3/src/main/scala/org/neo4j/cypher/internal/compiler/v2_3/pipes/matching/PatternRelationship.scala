@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,10 +23,10 @@ import org.neo4j.cypher.internal.compiler.v2_3.ExecutionContext
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Expression
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.KeyToken
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.{LazyTypes, QueryState}
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
-import org.neo4j.graphdb._
-import org.neo4j.graphdb.traversal.{Evaluators, TraversalDescription}
-import org.neo4j.kernel.{Traversal, Uniqueness}
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection.{BOTH, INCOMING, OUTGOING}
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.graphdb.{Node, Path, Relationship}
 
 import scala.collection.JavaConverters._
 
@@ -35,7 +35,7 @@ class PatternRelationship(key: String,
                           val endNode: PatternNode,
                           val relTypes: Seq[String],
                           val properties: Map[KeyToken, Expression] = Map.empty,
-                          val dir: Direction)
+                          val dir: SemanticDirection)
   extends PatternElement(key) {
   private val types = LazyTypes(relTypes)
 
@@ -57,11 +57,11 @@ class PatternRelationship(key: String,
       result.toSeq
   }
 
-  protected def getDirection(node: PatternNode): Direction = {
+  protected def getDirection(node: PatternNode): SemanticDirection = {
     dir match {
-      case Direction.OUTGOING => if (node == startNode) Direction.OUTGOING else Direction.INCOMING
-      case Direction.INCOMING => if (node == endNode) Direction.OUTGOING else Direction.INCOMING
-      case Direction.BOTH     => Direction.BOTH
+      case OUTGOING => if (node == startNode) OUTGOING else INCOMING
+      case INCOMING => if (node == endNode) OUTGOING else INCOMING
+      case BOTH     => BOTH
     }
   }
 
@@ -128,7 +128,7 @@ class VariableLengthPatternRelationship(pathName: String,
                                         maxHops: Option[Int],
                                         relType: Seq[String],
                                         properties: Map[KeyToken, Expression] = Map.empty,
-                                        dir: Direction)
+                                        dir: SemanticDirection)
   extends PatternRelationship(pathName, start, end, relType, properties, dir) {
 
 
@@ -138,30 +138,7 @@ class VariableLengthPatternRelationship(pathName: String,
       key -> CTCollection(CTRelationship)) ++ relIterable.map(_ -> CTCollection(CTRelationship)).toMap
 
   override def getGraphRelationships(node: PatternNode, realNode: Node, state: QueryState, f: => ExecutionContext): Seq[GraphRelationship] = {
-
-    val depthEval = (minHops, maxHops) match {
-      case (None, None)           => Evaluators.fromDepth(1)
-      case (Some(min), None)      => Evaluators.fromDepth(min)
-      case (None, Some(max))      => Evaluators.includingDepths(1, max)
-      case (Some(min), Some(max)) => Evaluators.includingDepths(min, max)
-    }
-
-    val baseTraversalDescription: TraversalDescription = Traversal.description()
-      .evaluator(depthEval)
-      .uniqueness(Uniqueness.RELATIONSHIP_PATH)
-
-    val traversalDescription = if (relType.isEmpty) {
-      baseTraversalDescription.expand(Traversal.expanderForAllTypes(getDirection(node)))
-    } else {
-      val emptyExpander = Traversal.emptyExpander()
-      val dir = getDirection(node)
-      val expander = relType.foldLeft(emptyExpander) {
-        case (e, t) => e.add(DynamicRelationshipType.withName(t), dir)
-      }
-      baseTraversalDescription.expand(expander)
-    }
-
-    val matchedPaths = traversalDescription.traverse(realNode).asScala
+    val matchedPaths: Iterator[Path] = state.query.variableLengthPathExpand(node, realNode, minHops, maxHops, getDirection(node), relType)
 
     val filteredPaths = if (properties.isEmpty) {
       matchedPaths

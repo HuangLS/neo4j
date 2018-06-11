@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -75,8 +75,7 @@ public class Dependencies extends DependencyResolver.Adapter implements Dependen
         }
 
         // Out of options
-        throw new IllegalArgumentException(
-                "Weird exception nesting here, but anyways, I couldn't find any dependency for " + type );
+        throw new UnsatisfiedDependencyException( type );
     }
 
     public <T> Supplier<T> provideDependency( final Class<T> type, final SelectionStrategy selector)

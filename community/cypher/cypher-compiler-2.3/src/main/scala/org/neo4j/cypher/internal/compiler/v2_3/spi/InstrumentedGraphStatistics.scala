@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,9 +20,11 @@
 package org.neo4j.cypher.internal.compiler.v2_3.spi
 
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.{Cardinality, Selectivity}
-import org.neo4j.cypher.internal.compiler.v2_3.{LabelId, PropertyKeyId, RelTypeId}
+import org.neo4j.cypher.internal.frontend.v2_3.{PropertyKeyId, RelTypeId, LabelId}
 
 import scala.collection.mutable
+import java.lang.Math.abs
+import java.lang.Math.max
 
 sealed trait StatisticsKey
 case class NodesWithLabelCardinality(labelId: Option[LabelId]) extends StatisticsKey
@@ -30,15 +32,15 @@ case class CardinalityByLabelsAndRelationshipType(lhs: Option[LabelId], relType:
 case class IndexSelectivity(labelId: LabelId, propertyKeyId: PropertyKeyId) extends StatisticsKey
 case class IndexPropertyExistsSelectivity(labelId: LabelId, propertyKeyId: PropertyKeyId) extends StatisticsKey
 
-case class MutableGraphStatisticsSnapshot(map: mutable.Map[StatisticsKey, Double] = mutable.Map.empty) {
+class MutableGraphStatisticsSnapshot(val map: mutable.Map[StatisticsKey, Double] = mutable.Map.empty) {
   def freeze: GraphStatisticsSnapshot = GraphStatisticsSnapshot(map.toMap)
 }
 
-case class GraphStatisticsSnapshot(map: Map[StatisticsKey, Double] = Map.empty) {
+case class GraphStatisticsSnapshot(statsValues: Map[StatisticsKey, Double] = Map.empty) {
   def recompute(statistics: GraphStatistics): GraphStatisticsSnapshot = {
-    val snapshot = MutableGraphStatisticsSnapshot()
+    val snapshot = new MutableGraphStatisticsSnapshot()
     val instrumented = InstrumentedGraphStatistics(statistics, snapshot)
-    map.keys.foreach {
+    statsValues.keys.foreach {
       case NodesWithLabelCardinality(labelId) =>
         instrumented.nodesWithLabelCardinality(labelId)
       case CardinalityByLabelsAndRelationshipType(lhs, relType, rhs) =>
@@ -54,12 +56,14 @@ case class GraphStatisticsSnapshot(map: Map[StatisticsKey, Double] = Map.empty) 
   //A plan has diverged if there is a relative change in any of the
   //statistics that is bigger than the threshold
   def diverges(snapshot: GraphStatisticsSnapshot, minThreshold: Double): Boolean = {
-    assert(map.keySet == snapshot.map.keySet)
-    val v1 = map.values
-    val v2 = snapshot.map.values
+    assert(statsValues.keySet == snapshot.statsValues.keySet)
     //find the maximum relative difference (|e1 - e2| / max(e1, e2))
-    val relativeDiff = v1.zip(v2).map(e => Math.abs(e._1 - e._2) / Math.max(e._1, e._2)).max
-    relativeDiff >= minThreshold
+    val divergedStats = (statsValues map {
+      case (k, e1) =>
+        val e2 = snapshot.statsValues(k)
+        abs(e1 - e2) / max(e1, e2)
+    }).max
+    divergedStats > minThreshold
   }
 }
 

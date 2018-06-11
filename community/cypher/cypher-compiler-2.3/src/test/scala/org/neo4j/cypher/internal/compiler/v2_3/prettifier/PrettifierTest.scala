@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.prettifier
 
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class PrettifierTest extends CypherFunSuite {
 
@@ -42,6 +42,18 @@ class PrettifierTest extends CypherFunSuite {
   test("should not break CREATE in complex FOREACH") {
     actual("match p=n foreach(x in p | create x--() set x.foo = 'bar') return distinct p;") should equal(
       expected("MATCH p=n%nFOREACH (x IN p | CREATE x--()%nSET x.foo = 'bar')%nRETURN DISTINCT p;")
+    )
+  }
+
+  test("should not break STARTS WITH ") {
+    actual("return 'apartment' starts with 'apa' as x") should equal(
+      expected("RETURN 'apartment' STARTS WITH 'apa' AS x")
+    )
+  }
+
+  test("should not break ENDS WITH ") {
+    actual("return 'apartment' ends with 'apa' as x") should equal(
+      expected("RETURN 'apartment' ENDS WITH 'apa' AS x")
     )
   }
 
@@ -110,6 +122,12 @@ class PrettifierTest extends CypherFunSuite {
   test("should prettify and break LOAD CSV") {
     actual("MATCH (n) LOAD CSV FROM \"f\" AS line return (n)") should equal(
       expected("MATCH (n)%nLOAD CSV FROM \"f\" AS line%nRETURN (n)")
+    )
+  }
+
+  test("should not break after DETACH in DETACH DELETE") {
+    actual("MATCH (n) DETACH DELETE (n)") should equal(
+      expected("MATCH (n)%nDETACH DELETE (n)")
     )
   }
 

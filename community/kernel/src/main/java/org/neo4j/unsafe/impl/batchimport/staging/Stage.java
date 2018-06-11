@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,8 +27,6 @@ import static org.neo4j.helpers.Exceptions.launderedException;
 /**
  * A stage of processing, mainly consisting of one or more {@link Step steps} that batches of data to
  * process flows through.
- *
- * @param <INPUT> type of input data to the first {@link Step}.
  */
 public class Stage
 {

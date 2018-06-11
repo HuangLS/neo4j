@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,12 +23,13 @@ import java.util.Iterator;
 
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.StatementTokenNameLookup;
-import org.neo4j.kernel.api.constraints.MandatoryNodePropertyConstraint;
-import org.neo4j.kernel.api.constraints.MandatoryRelationshipPropertyConstraint;
+import org.neo4j.kernel.api.constraints.NodePropertyExistenceConstraint;
+import org.neo4j.kernel.api.constraints.RelationshipPropertyExistenceConstraint;
 import org.neo4j.kernel.api.constraints.NodePropertyConstraint;
 import org.neo4j.kernel.api.constraints.PropertyConstraint;
 import org.neo4j.kernel.api.constraints.RelationshipPropertyConstraint;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
+import org.neo4j.kernel.api.exceptions.ProcedureException;
 import org.neo4j.kernel.api.exceptions.schema.AlreadyConstrainedException;
 import org.neo4j.kernel.api.exceptions.schema.AlreadyIndexedException;
 import org.neo4j.kernel.api.exceptions.schema.CreateConstraintFailureException;
@@ -40,7 +41,9 @@ import org.neo4j.kernel.api.exceptions.schema.NoSuchConstraintException;
 import org.neo4j.kernel.api.exceptions.schema.NoSuchIndexException;
 import org.neo4j.kernel.api.exceptions.schema.SchemaKernelException.OperationContext;
 import org.neo4j.kernel.api.exceptions.schema.TooManyLabelsException;
+import org.neo4j.kernel.api.exceptions.schema.ProcedureConstraintViolation;
 import org.neo4j.kernel.api.index.IndexDescriptor;
+import org.neo4j.kernel.api.procedures.ProcedureSignature;
 import org.neo4j.kernel.impl.api.operations.KeyWriteOperations;
 import org.neo4j.kernel.impl.api.operations.SchemaReadOperations;
 import org.neo4j.kernel.impl.api.operations.SchemaWriteOperations;
@@ -159,7 +162,7 @@ public class DataIntegrityValidatingStatementOperations implements
     }
 
     @Override
-    public MandatoryNodePropertyConstraint mandatoryNodePropertyConstraintCreate( KernelStatement state, int labelId,
+    public NodePropertyExistenceConstraint nodePropertyExistenceConstraintCreate( KernelStatement state, int labelId,
             int propertyKey ) throws AlreadyConstrainedException, CreateConstraintFailureException
     {
         Iterator<NodePropertyConstraint> constraints = schemaReadDelegate.constraintsGetForLabelAndPropertyKey(
@@ -167,18 +170,18 @@ public class DataIntegrityValidatingStatementOperations implements
         while ( constraints.hasNext() )
         {
             NodePropertyConstraint constraint = constraints.next();
-            if ( constraint instanceof MandatoryNodePropertyConstraint )
+            if ( constraint instanceof NodePropertyExistenceConstraint )
             {
                 throw new AlreadyConstrainedException( constraint, OperationContext.CONSTRAINT_CREATION,
                         new StatementTokenNameLookup( state.readOperations() ) );
             }
         }
 
-        return schemaWriteDelegate.mandatoryNodePropertyConstraintCreate( state, labelId, propertyKey );
+        return schemaWriteDelegate.nodePropertyExistenceConstraintCreate( state, labelId, propertyKey );
     }
 
     @Override
-    public MandatoryRelationshipPropertyConstraint mandatoryRelationshipPropertyConstraintCreate( KernelStatement state,
+    public RelationshipPropertyExistenceConstraint relationshipPropertyExistenceConstraintCreate( KernelStatement state,
             int relTypeId, int propertyKeyId ) throws AlreadyConstrainedException, CreateConstraintFailureException
     {
         Iterator<RelationshipPropertyConstraint> constraints = schemaReadDelegate.constraintsGetForRelationshipTypeAndPropertyKey(
@@ -186,14 +189,14 @@ public class DataIntegrityValidatingStatementOperations implements
         while ( constraints.hasNext() )
         {
             RelationshipPropertyConstraint constraint = constraints.next();
-            if ( constraint instanceof MandatoryRelationshipPropertyConstraint )
+            if ( constraint instanceof RelationshipPropertyExistenceConstraint )
             {
                 throw new AlreadyConstrainedException( constraint, OperationContext.CONSTRAINT_CREATION,
                         new StatementTokenNameLookup( state.readOperations() ) );
             }
         }
 
-        return schemaWriteDelegate.mandatoryRelationshipPropertyConstraintCreate( state, relTypeId, propertyKeyId );
+        return schemaWriteDelegate.relationshipPropertyExistenceConstraintCreate( state, relTypeId, propertyKeyId );
     }
 
     @Override
@@ -225,6 +228,28 @@ public class DataIntegrityValidatingStatementOperations implements
             throw new DropConstraintFailureException( constraint, e );
         }
         schemaWriteDelegate.constraintDrop( state, constraint );
+    }
+
+    @Override
+    public void procedureCreate( KernelStatement state, ProcedureSignature signature, String language, String code )
+            throws ProcedureException, ProcedureConstraintViolation
+    {
+        if( schemaReadDelegate.procedureGet( state, signature.name() ) != null )
+        {
+            throw new ProcedureConstraintViolation("%s cannot be created because there is already a procedure with the same " +
+                                                                  "name in the graph.",  signature.toString() );
+        }
+        schemaWriteDelegate.procedureCreate( state, signature, language, code );
+    }
+
+    @Override
+    public void procedureDrop( KernelStatement statement, ProcedureSignature.ProcedureName name ) throws ProcedureException, ProcedureConstraintViolation
+    {
+        if( schemaReadDelegate.procedureGet( statement, name ) == null )
+        {
+            throw new ProcedureConstraintViolation("%s cannot be dropped because there is no such procedure in the graph.",  name );
+        }
+        schemaWriteDelegate.procedureDrop( statement, name );
     }
 
     private void checkIndexExistence( KernelStatement state, OperationContext context, int labelId, int propertyKey )

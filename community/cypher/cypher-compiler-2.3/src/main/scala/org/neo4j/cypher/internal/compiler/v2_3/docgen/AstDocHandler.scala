@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,9 +19,9 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.docgen
 
-import org.neo4j.cypher.internal.compiler.v2_3.ast.ASTNode
-import org.neo4j.cypher.internal.compiler.v2_3.perty.{DocRecipe, ExtractorSeq, DocHandler}
-import org.neo4j.cypher.internal.compiler.v2_3.perty.handler.DefaultDocHandler
+import org.neo4j.cypher.internal.frontend.v2_3.ast.ASTNode
+import org.neo4j.cypher.internal.frontend.v2_3.perty.{DocRecipe, ExtractorSeq, DocHandler}
+import org.neo4j.cypher.internal.frontend.v2_3.perty.handler.DefaultDocHandler
 
 // Doc gen for printing any kind of ast node
 case object AstDocHandler extends DocHandler[ASTNode] {

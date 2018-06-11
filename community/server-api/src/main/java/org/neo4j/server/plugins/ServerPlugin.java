@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -81,7 +81,6 @@ import org.neo4j.helpers.Service;
  * exception, in that case the exception is treated as a bad request and
  * propagated to the invoking client.
  *
- * @author Tobias Ivarsson <tobias.ivarsson@neotechnology.com>
  * @see java.util.ServiceLoader
  */
 public abstract class ServerPlugin

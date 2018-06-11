@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,13 @@
  */
 package org.neo4j.kernel.impl.transaction.log;
 
+import static org.neo4j.kernel.impl.transaction.log.TransactionIdStore.BASE_TX_COMMIT_TIMESTAMP;
+
 public class FakeCommitment implements Commitment
 {
     private final long id;
     private final TransactionIdStore transactionIdStore;
+    private boolean committed;
 
     public FakeCommitment( long id, TransactionIdStore transactionIdStore )
     {
@@ -33,7 +36,8 @@ public class FakeCommitment implements Commitment
     @Override
     public void publishAsCommitted()
     {
-        transactionIdStore.transactionCommitted( id, 3 );
+        committed = true;
+        transactionIdStore.transactionCommitted( id, 3, BASE_TX_COMMIT_TIMESTAMP );
     }
 
     @Override
@@ -46,5 +50,11 @@ public class FakeCommitment implements Commitment
     public long transactionId()
     {
         return id;
+    }
+
+    @Override
+    public boolean markedAsCommitted()
+    {
+        return committed;
     }
 }

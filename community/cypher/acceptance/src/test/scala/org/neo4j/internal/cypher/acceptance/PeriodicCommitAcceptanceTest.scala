@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,9 +22,9 @@ package org.neo4j.internal.cypher.acceptance
 import java.io.PrintWriter
 
 import org.neo4j.cypher._
-import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.StringHelper.RichString
 import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CreateTempFileTestSupport
 import org.neo4j.cypher.internal.helpers.TxCounts
+import org.neo4j.cypher.internal.frontend.v2_3.helpers.StringHelper.RichString
 import org.neo4j.graphdb.Node
 
 class PeriodicCommitAcceptanceTest extends ExecutionEngineFunSuite
@@ -122,7 +122,7 @@ class PeriodicCommitAcceptanceTest extends ExecutionEngineFunSuite
     val (_, txCounts) = executeAndTrackTxCounts(queryText)
 
     // then
-    txCounts should equal(TxCounts(commits = 3, rollbacks = 0))
+    txCounts should equal(TxCounts(commits = 2, rollbacks = 0))
   }
 
   test("should commit first tx and abort second tx when failing on second batch during periodic commit") {

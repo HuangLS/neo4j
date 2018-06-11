@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,7 +28,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.neo4j.helpers.ThisShouldNotHappenError;
 import org.neo4j.kernel.KernelHealth;
 import org.neo4j.kernel.impl.transaction.TransactionRepresentation;
 import org.neo4j.kernel.impl.transaction.log.entry.LogEntryWriter;
@@ -169,9 +168,11 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
             long transactionId = transactionIdStore.nextCommittingTransactionId();
             if ( transactionId != expectedTransactionId )
             {
-                throw new ThisShouldNotHappenError( "Zhen Li and Mattias Persson",
+                IllegalStateException illegalStateException = new IllegalStateException(
                         "Received " + transaction + " with txId:" + expectedTransactionId +
                         " to be applied, but appending it ended up generating an unexpected txId:" + transactionId );
+                kernelHealth.panic( illegalStateException );
+                throw illegalStateException;
             }
             return appendToLog( transaction, transactionId );
         }
@@ -202,15 +203,18 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
         private final boolean hasLegacyIndexChanges;
         private final long transactionId;
         private final long transactionChecksum;
+        private final long transactionCommitTimestamp;
         private final LogPosition logPosition;
         private final TransactionIdStore transactionIdStore;
+        private boolean markedAsCommitted;
 
         TransactionCommitment( boolean hasLegacyIndexChanges, long transactionId, long transactionChecksum,
-                LogPosition logPosition, TransactionIdStore transactionIdStore )
+                long transactionCommitTimestamp, LogPosition logPosition, TransactionIdStore transactionIdStore )
         {
             this.hasLegacyIndexChanges = hasLegacyIndexChanges;
             this.transactionId = transactionId;
             this.transactionChecksum = transactionChecksum;
+            this.transactionCommitTimestamp = transactionCommitTimestamp;
             this.logPosition = logPosition;
             this.transactionIdStore = transactionIdStore;
         }
@@ -218,7 +222,8 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
         @Override
         public void publishAsCommitted()
         {
-            transactionIdStore.transactionCommitted( transactionId, transactionChecksum );
+            markedAsCommitted = true;
+            transactionIdStore.transactionCommitted( transactionId, transactionChecksum, transactionCommitTimestamp );
         }
 
         @Override
@@ -232,6 +237,12 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
         public long transactionId()
         {
             return transactionId;
+        }
+
+        @Override
+        public boolean markedAsCommitted()
+        {
+            return markedAsCommitted;
         }
     }
 
@@ -262,7 +273,7 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
                     transaction.additionalHeader(), transaction.getMasterId(), transaction.getAuthorId() );
             transactionMetadataCache.cacheTransactionMetadata(
                     transactionId, logPositionBeforeCommit, transaction.getMasterId(), transaction.getAuthorId(),
-                    transactionChecksum );
+                    transactionChecksum, transaction.getTimeCommitted() );
 
             boolean hasLegacyIndexChanges = indexCommandDetector.hasWrittenAnyLegacyIndexCommand();
             if ( hasLegacyIndexChanges )
@@ -271,8 +282,8 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
                 legacyIndexTransactionOrdering.offer( transactionId );
             }
             return new TransactionCommitment(
-                    hasLegacyIndexChanges, transactionId, transactionChecksum, logPositionAfterCommit,
-                    transactionIdStore );
+                    hasLegacyIndexChanges, transactionId, transactionChecksum, transaction.getTimeCommitted(),
+                    logPositionAfterCommit, transactionIdStore );
         }
         catch ( final Throwable panic )
         {
@@ -307,6 +318,7 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
         // This is okay, however, because unparkAll() spins when it sees a null next pointer.
         ThreadLink threadLink = new ThreadLink( Thread.currentThread() );
         threadLink.next = threadLinkHead.getAndSet( threadLink );
+        boolean attemptedForce = false;
 
         try ( LogForceWaitEvent logForceWaitEvent = logForceEvents.beginLogForceWait() )
         {
@@ -314,9 +326,11 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
             {
                 if ( forceLock.tryLock() )
                 {
+                    attemptedForce = true;
                     try
                     {
                         forceLog( logForceEvents );
+                        // In the event of any failure a kernel panic will be raised and thrown here
                     }
                     finally
                     {
@@ -336,6 +350,14 @@ public class BatchingTransactionAppender extends LifecycleAdapter implements Tra
                 }
             }
             while ( !threadLink.done );
+
+            // If there were many threads committing simultaneously and I wasn't the lucky one
+            // actually doing the forcing (where failure would throw panic exception) I need to
+            // explicitly check if everything is OK before considering this transaction committed.
+            if ( !attemptedForce )
+            {
+                kernelHealth.assertHealthy( IOException.class );
+            }
         }
     }
 

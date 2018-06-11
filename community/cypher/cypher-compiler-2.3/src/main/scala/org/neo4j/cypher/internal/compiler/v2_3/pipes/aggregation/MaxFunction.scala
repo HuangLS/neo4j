@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,12 +20,14 @@
 package org.neo4j.cypher.internal.compiler.v2_3.pipes.aggregation
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import commands.expressions.Expression
-import pipes.QueryState
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Expression
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
+import org.neo4j.cypher.internal.frontend.v2_3.SyntaxException
 
 trait MinMax extends AggregationFunction with Comparer {
   def value: Expression
   def keep(comparisonResult: Int): Boolean
+  def name: String
 
   private var biggestSeen: Any = null
 
@@ -42,7 +44,7 @@ trait MinMax extends AggregationFunction with Comparer {
   private def checkIfLargest(value: Any)(implicit qtx: QueryState) {
     if (biggestSeen == null) {
       biggestSeen = value
-    } else if (keep(compare(biggestSeen, value))) {
+    } else if (keep(compare(Some(name), biggestSeen, value))) {
       biggestSeen = value
     }
   }
@@ -50,8 +52,10 @@ trait MinMax extends AggregationFunction with Comparer {
 
 class MaxFunction(val value: Expression) extends AggregationFunction with MinMax {
   def keep(comparisonResult: Int) = comparisonResult < 0
+  override def name: String = "MAX"
 }
 
 class MinFunction(val value: Expression) extends AggregationFunction with MinMax {
   def keep(comparisonResult: Int) = comparisonResult > 0
+  override def name: String = "MIN"
 }

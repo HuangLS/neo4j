@@ -14,6 +14,8 @@ Apache Software License, Version 2.0
   ConcurrentLinkedHashMap
   Data Mapper for Jackson
   ExplorerCanvas
+  Ganglia Integration for Metrics
+  Graphite Integration for Metrics
   Jackson
   JAX-RS provider for JSON content type
   Jetty :: Http Utility
@@ -25,12 +27,13 @@ Apache Software License, Version 2.0
   Jetty :: Webapp Application Support
   Jetty :: XML utilities
   Lucene Core
+  Metrics Core
+  Netty
   Netty/All-in-One
   opencsv
   parboiled-core
   parboiled-scala
   RRD4J
-  The Netty Project
 ------------------------------------------------------------------------------
 
                                  Apache License
@@ -279,7 +282,7 @@ SUCH DAMAGE.
 
 
 ------------------------------------------------------------------------------
-BSD - seedrandom.js
+BSD - seedrandom.js License
   seedrandom.js
 ------------------------------------------------------------------------------
 
@@ -317,10 +320,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------------
 BSD License
   ASM Core
-  Commons Compiler
   D3.js
   Easing Equations (in easing.js)
-  Janino
   JLine
   JQuery Easing Plugin
   Scala Compiler
@@ -355,6 +356,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
 Bouncy Castle License
+  Bouncy Castle PKIX, CMS, EAC, TSP, PKCS, OCSP, CMP, and CRMF APIs
   Bouncy Castle Provider
 ------------------------------------------------------------------------------
 
@@ -1396,6 +1398,7 @@ GNU Lesser General Public License, Version 2.1
   Logback Access Module
   Logback Classic Module
   Logback Core Module
+  Remote Tea Runtime
   Yet Another Java Service Wrapper
 ------------------------------------------------------------------------------
 
@@ -1929,6 +1932,7 @@ MIT License
   Date Format
   es5-shim
   FileSaver.js
+  gmetric4j
   JQuery
   jquery-ui
   jquery.colorhelpers.js

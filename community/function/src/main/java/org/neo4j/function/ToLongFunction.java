@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ package org.neo4j.function;
  * Represents a function that produces a long-valued result. This is the long-producing primitive specialization for {@link Function}.
  *
  * @param <T> the type of the input to the function
+ * @deprecated Usages will be replaced by corresponding {@code java.util.function} interface and classes in 3.0.
  */
 public interface ToLongFunction<T> extends ThrowingToLongFunction<T,RuntimeException>
 {

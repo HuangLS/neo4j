@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,20 +19,20 @@
  */
 package org.neo4j.kernel.impl.api.constraints;
 
+import org.junit.Test;
+
 import java.util.ArrayList;
 import java.util.List;
-
-import org.junit.Test;
 
 import org.neo4j.function.Suppliers;
 import org.neo4j.kernel.api.KernelAPI;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.TransactionHook;
+import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.api.exceptions.index.IndexPopulationFailedKernelException;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintVerificationFailedKernelException;
-import org.neo4j.kernel.api.heuristics.StatisticsData;
 import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.PreexistingIndexEntryConflictException;
 import org.neo4j.kernel.api.txstate.TransactionState;
@@ -50,7 +50,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
-
 import static org.neo4j.kernel.impl.api.StatementOperationsTestHelper.mockedParts;
 import static org.neo4j.kernel.impl.api.StatementOperationsTestHelper.mockedState;
 import static org.neo4j.kernel.impl.store.SchemaStorage.IndexRuleKind.CONSTRAINT;
@@ -199,19 +198,37 @@ public class ConstraintIndexCreatorTest
                 }
 
                 @Override
-                public boolean shouldBeTerminated()
+                public Status getReasonIfTerminated()
                 {
-                    return false;
+                    return null;
                 }
 
                 @Override
-                public void markForTermination()
+                public void markForTermination( Status reason )
                 {
+                }
+
+                @Override
+                public long lastTransactionTimestampWhenStarted()
+                {
+                    return 0;
                 }
 
                 @Override
                 public void registerCloseListener( CloseListener listener )
                 {
+                }
+
+                @Override
+                public long lastTransactionIdWhenStarted()
+                {
+                    return 0;
+                }
+
+                @Override
+                public long localStartTime()
+                {
+                    return 0;
                 }
             };
         }
@@ -224,12 +241,6 @@ public class ConstraintIndexCreatorTest
 
         @Override
         public void unregisterTransactionHook( TransactionHook hook )
-        {
-            throw new UnsupportedOperationException( "Please implement" );
-        }
-
-        @Override
-        public StatisticsData heuristics()
         {
             throw new UnsupportedOperationException( "Please implement" );
         }

@@ -1,5 +1,5 @@
 @echo off
-rem Copyright (c) 2002-2015 "Neo Technology,"
+rem Copyright (c) 2002-2018 "Neo Technology,"
 rem Network Engine for Objects in Lund AB [http://neotechnology.com]
 rem
 rem This file is part of Neo4j.
@@ -16,6 +16,8 @@ rem GNU Affero General Public License for more details.
 rem
 rem You should have received a copy of the GNU Affero General Public License
 rem along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+ECHO WARNING! This batch script has been deprecated. Please use the provided PowerShell scripts instead: http://neo4j.com/docs/stable/powershell.html 1>&2
 
 set ERROR_CODE=0
 

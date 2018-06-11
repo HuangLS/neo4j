@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -78,8 +78,7 @@ class HashBasedIndex extends InMemoryIndexImplementation
     }
 
     @Override
-    public PrimitiveLongIterator rangeSeekByNumber( Number lower, boolean includeLower,
-                                                    Number upper, boolean includeUpper )
+    public PrimitiveLongIterator rangeSeekByNumberInclusive( Number lower, Number upper )
     {
         Set<Long> nodeIds = new HashSet<>();
         for ( Map.Entry<Object,Set<Long>> entry : data.entrySet() )
@@ -87,28 +86,8 @@ class HashBasedIndex extends InMemoryIndexImplementation
             Object key = entry.getKey();
             if ( NUMBER.isSuperTypeOf( key ) )
             {
-                boolean lowerFilter = false;
-                boolean upperFilter = false;
-
-                if ( lower == null )
-                {
-                    lowerFilter = true;
-                }
-                else
-                {
-                    int cmp = COMPARE_VALUES.compare( key, lower );
-                    lowerFilter = (includeLower && cmp >= 0) || (cmp > 0);
-                }
-
-                if ( upper == null )
-                {
-                    upperFilter = true;
-                }
-                else
-                {
-                    int cmp = COMPARE_VALUES.compare( key, upper );
-                    upperFilter = (includeUpper && cmp <= 0) || (cmp < 0);
-                }
+                boolean lowerFilter = lower == null || COMPARE_VALUES.compare( key, lower ) >= 0;
+                boolean upperFilter = upper == null || COMPARE_VALUES.compare( key, upper ) <= 0;
 
                 if ( lowerFilter && upperFilter )
                 {

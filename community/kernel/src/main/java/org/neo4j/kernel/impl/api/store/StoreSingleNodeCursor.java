@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,8 @@ package org.neo4j.kernel.impl.api.store;
 
 import org.neo4j.function.Consumer;
 import org.neo4j.kernel.api.StatementConstants;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.locking.LockService;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
 
 /**
@@ -30,14 +31,15 @@ import org.neo4j.kernel.impl.store.record.NodeRecord;
 public class StoreSingleNodeCursor extends StoreAbstractNodeCursor
 {
     private long nodeId;
-    private Consumer<StoreSingleNodeCursor> instanceCache;
+    private final Consumer<StoreSingleNodeCursor> instanceCache;
 
     public StoreSingleNodeCursor( NodeRecord nodeRecord,
-            NeoStore neoStore,
+            NeoStores neoStores,
             StoreStatement storeStatement,
-            Consumer<StoreSingleNodeCursor> instanceCache )
+            Consumer<StoreSingleNodeCursor> instanceCache,
+            LockService lockService )
     {
-        super( nodeRecord, neoStore, storeStatement );
+        super( nodeRecord, neoStores, storeStatement, lockService );
         this.instanceCache = instanceCache;
     }
 
@@ -55,7 +57,7 @@ public class StoreSingleNodeCursor extends StoreAbstractNodeCursor
             try
             {
                 nodeRecord.setId( nodeId );
-                NodeRecord record = neoStore.getNodeStore().loadRecord( nodeId, this.nodeRecord );
+                NodeRecord record = nodeStore.loadRecord( nodeId, this.nodeRecord );
                 return record != null && record.inUse();
             }
             finally

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -98,9 +98,8 @@ public class LuceneIndexIT
     public void before() throws Exception
     {
         dirFactory = DirectoryFactory.PERSISTENT;
-        accessor = new NonUniqueLuceneIndexAccessor(
-                documentLogic, reserving(), dirFactory, testDir.directory(), 100_000
-        );
+        accessor = new NonUniqueLuceneIndexAccessor( documentLogic, false, reserving(),
+                dirFactory, testDir.directory(), 100_000 );
     }
 
     @After

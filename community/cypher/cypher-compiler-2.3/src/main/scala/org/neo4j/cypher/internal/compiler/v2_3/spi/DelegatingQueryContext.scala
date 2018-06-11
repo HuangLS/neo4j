@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,19 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.spi
 
-import org.neo4j.graphdb.{Relationship, PropertyContainer, Direction, Node}
-import org.neo4j.kernel.api.index.IndexDescriptor
+import java.net.URL
+
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expander, KernelPredicate}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.PatternNode
+import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
+import org.neo4j.graphdb.{Node, Path, PropertyContainer, Relationship}
 
 class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
   protected def singleDbHit[A](value: A): A = value
   protected def manyDbHits[A](value: Iterator[A]): Iterator[A] = value
+  protected def manyDbHits(count: Int): Int = count
 
   def isOpen: Boolean = inner.isOpen
 
@@ -42,6 +48,8 @@ class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
   def createRelationship(start: Node, end: Node, relType: String): Relationship = singleDbHit(inner.createRelationship(start, end, relType))
 
+  override def createRelationship(start: Long, end: Long, relType: Int): Relationship = singleDbHit(inner.createRelationship(start, end, relType))
+
   def getOrCreateRelTypeId(relTypeName: String): Int = singleDbHit(inner.getOrCreateRelTypeId(relTypeName))
 
   def getLabelsForNode(node: Long): Iterator[Int] = singleDbHit(inner.getLabelsForNode(node))
@@ -54,7 +62,7 @@ class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
   def getOrCreateLabelId(labelName: String): Int = singleDbHit(inner.getOrCreateLabelId(labelName))
 
-  def getRelationshipsForIds(node: Node, dir: Direction, types: Option[Seq[Int]]): Iterator[Relationship] = manyDbHits(inner.getRelationshipsForIds(node, dir, types))
+  def getRelationshipsForIds(node: Node, dir: SemanticDirection, types: Option[Seq[Int]]): Iterator[Relationship] = manyDbHits(inner.getRelationshipsForIds(node, dir, types))
 
   def nodeOps = inner.nodeOps
 
@@ -66,6 +74,8 @@ class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
   def getPropertiesForNode(node: Long): Iterator[Int] = singleDbHit(inner.getPropertiesForNode(node))
 
   def getPropertiesForRelationship(relId: Long): Iterator[Int] = singleDbHit(inner.getPropertiesForRelationship(relId))
+
+  def detachDeleteNode(obj: Node): Int = manyDbHits(inner.detachDeleteNode(obj))
 
   def getPropertyKeyName(propertyKeyId: Int): String = singleDbHit(inner.getPropertyKeyName(propertyKeyId))
 
@@ -95,17 +105,17 @@ class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
   def dropUniqueConstraint(labelId: Int, propertyKeyId: Int) = singleDbHit(inner.dropUniqueConstraint(labelId, propertyKeyId))
 
-  def createNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int) = singleDbHit(inner.createNodeMandatoryConstraint(labelId, propertyKeyId))
+  def createNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int) = singleDbHit(inner.createNodePropertyExistenceConstraint(labelId, propertyKeyId))
 
-  def dropNodeMandatoryConstraint(labelId: Int, propertyKeyId: Int) = singleDbHit(inner.dropNodeMandatoryConstraint(labelId, propertyKeyId))
+  def dropNodePropertyExistenceConstraint(labelId: Int, propertyKeyId: Int) = singleDbHit(inner.dropNodePropertyExistenceConstraint(labelId, propertyKeyId))
 
-  def createRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int) = singleDbHit(inner.createRelationshipMandatoryConstraint(relTypeId, propertyKeyId))
+  def createRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int) = singleDbHit(inner.createRelationshipPropertyExistenceConstraint(relTypeId, propertyKeyId))
 
-  def dropRelationshipMandatoryConstraint(relTypeId: Int, propertyKeyId: Int) = singleDbHit(inner.dropRelationshipMandatoryConstraint(relTypeId, propertyKeyId))
+  def dropRelationshipPropertyExistenceConstraint(relTypeId: Int, propertyKeyId: Int) = singleDbHit(inner.dropRelationshipPropertyExistenceConstraint(relTypeId, propertyKeyId))
 
   def withAnyOpenQueryContext[T](work: (QueryContext) => T): T = inner.withAnyOpenQueryContext(work)
 
-  def uniqueIndexSeek(index: IndexDescriptor, value: Any): Option[Node] = singleDbHit(inner.uniqueIndexSeek(index, value))
+  def lockingExactUniqueIndexSearch(index: IndexDescriptor, value: Any): Option[Node] = singleDbHit(inner.lockingExactUniqueIndexSearch(index, value))
 
   override def commitAndRestartTx() {
     inner.commitAndRestartTx()
@@ -117,15 +127,37 @@ class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
   def getRelTypeName(id: Int): String = singleDbHit(inner.getRelTypeName(id))
 
-  override def hasLocalFileAccess: Boolean = inner.hasLocalFileAccess
+  def getImportURL(url: URL): Either[String,URL] = inner.getImportURL(url)
 
   def relationshipStartNode(rel: Relationship) = inner.relationshipStartNode(rel)
 
   def relationshipEndNode(rel: Relationship) = inner.relationshipEndNode(rel)
 
-  def nodeGetDegree(node: Long, dir: Direction): Int = singleDbHit(inner.nodeGetDegree(node, dir))
+  def nodeGetDegree(node: Long, dir: SemanticDirection): Int = singleDbHit(inner.nodeGetDegree(node, dir))
 
-  def nodeGetDegree(node: Long, dir: Direction, relTypeId: Int): Int = singleDbHit(inner.nodeGetDegree(node, dir, relTypeId))
+  def nodeGetDegree(node: Long, dir: SemanticDirection, relTypeId: Int): Int = singleDbHit(inner.nodeGetDegree(node, dir, relTypeId))
+
+  def nodeIsDense(node: Long): Boolean = singleDbHit(inner.nodeIsDense(node))
+
+  override def variableLengthPathExpand(node: PatternNode,
+                                        realNode: Node,
+                                        minHops: Option[Int],
+                                        maxHops: Option[Int],
+                                        direction: SemanticDirection,
+                                        relTypes: Seq[String]): Iterator[Path] =
+    manyDbHits(inner.variableLengthPathExpand(node, realNode, minHops, maxHops, direction, relTypes))
+
+  override def isLabelSetOnNode(label: Int, node: Long): Boolean = getLabelsForNode(node).contains(label)
+
+  override def singleShortestPath(left: Node, right: Node, depth: Int, expander: Expander,
+                                  pathPredicate: KernelPredicate[Path],
+                                  filters: Seq[KernelPredicate[PropertyContainer]]): Option[Path] =
+    singleDbHit(inner.singleShortestPath(left, right, depth, expander, pathPredicate, filters))
+
+  override def allShortestPath(left: Node, right: Node, depth: Int, expander: Expander,
+                               pathPredicate: KernelPredicate[Path],
+                               filters: Seq[KernelPredicate[PropertyContainer]]): Iterator[Path] =
+    manyDbHits(inner.allShortestPath(left, right, depth, expander, pathPredicate, filters))
 }
 
 class DelegatingOperations[T <: PropertyContainer](protected val inner: Operations[T]) extends Operations[T] {

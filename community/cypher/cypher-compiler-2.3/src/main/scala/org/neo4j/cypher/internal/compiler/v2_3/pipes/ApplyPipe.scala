@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,7 +31,7 @@ case class ApplyPipe(source: Pipe, inner: Pipe)(val estimatedCardinality: Option
     input.flatMap {
       (outerContext) =>
         val original = outerContext.clone()
-        val innerState = state.copy(initialContext = Some(outerContext))
+        val innerState = state.withInitialContext(outerContext)
         val innerResults = inner.createResults(innerState)
         innerResults.map { context => context ++ original }
     }

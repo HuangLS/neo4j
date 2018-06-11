@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,12 +20,12 @@
 package org.neo4j.kernel.impl.transaction.state;
 
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
 
-import org.neo4j.kernel.api.properties.DefinedProperty;
-import org.neo4j.kernel.impl.locking.Locks.Client;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.core.RelationshipTypeToken;
+import org.neo4j.kernel.impl.core.Token;
+import org.neo4j.kernel.impl.locking.Locks;
+import org.neo4j.kernel.impl.store.NeoStores;
+import org.neo4j.kernel.impl.store.RelationshipGroupStore;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.LabelTokenRecord;
 import org.neo4j.kernel.impl.store.record.NodeRecord;
@@ -38,52 +38,38 @@ import org.neo4j.kernel.impl.store.record.RelationshipRecord;
 import org.neo4j.kernel.impl.store.record.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.store.record.SchemaRule;
 import org.neo4j.kernel.impl.transaction.state.RecordAccess.RecordProxy;
-import org.neo4j.kernel.impl.util.ArrayMap;
 
 public class NeoStoreTransactionContext
 {
-    private final RelationshipCreator relationshipCreator;
-    private final RelationshipDeleter relationshipDeleter;
-    private final NeoStoreTransactionContextSupplier supplier;
-    private final PropertyTraverser propertyTraverser;
+    private RelationshipCreator relationshipCreator;
+    private RelationshipDeleter relationshipDeleter;
     private final PropertyCreator propertyCreator;
     private final PropertyDeleter propertyDeleter;
-    private final TransactionalRelationshipLocker locker;
-    private final RelationshipGroupGetter relationshipGroupGetter;
-
     private final RecordAccessSet recordChangeSet;
-    private final NeoStore neoStore;
+    private final NeoStores neoStores;
 
-    public NeoStoreTransactionContext( NeoStoreTransactionContextSupplier supplier, NeoStore neoStore )
+    public NeoStoreTransactionContext( NeoStores neoStores )
     {
-        this( supplier, neoStore, new RecordChangeSet( neoStore ) );
+        this.neoStores = neoStores;
+
+        recordChangeSet = new RecordChangeSet( neoStores );
+        PropertyTraverser propertyTraverser = new PropertyTraverser();
+        propertyCreator = new PropertyCreator( neoStores.getPropertyStore(), propertyTraverser );
+        propertyDeleter = new PropertyDeleter( neoStores.getPropertyStore(), propertyTraverser );
     }
 
-    public NeoStoreTransactionContext( NeoStoreTransactionContextSupplier supplier, NeoStore neoStore,
-            RecordAccessSet recordAccessSet )
+    public void init( Locks.Client locksClient )
     {
-        this.supplier = supplier;
-        this.neoStore = neoStore;
-
-        this.recordChangeSet = recordAccessSet;
-
-        locker = new TransactionalRelationshipLocker();
-        relationshipGroupGetter = new RelationshipGroupGetter( neoStore.getRelationshipGroupStore() );
-        propertyTraverser = new PropertyTraverser();
-        propertyCreator = new PropertyCreator( neoStore.getPropertyStore(), propertyTraverser );
-        propertyDeleter = new PropertyDeleter( neoStore.getPropertyStore(), propertyTraverser );
-        relationshipCreator = new RelationshipCreator( locker, relationshipGroupGetter, neoStore.getDenseNodeThreshold() );
-        relationshipDeleter = new RelationshipDeleter( locker, relationshipGroupGetter, propertyDeleter );
+        RelationshipGroupStore relationshipGroupStore = neoStores.getRelationshipGroupStore();
+        RelationshipGroupGetter relGroupGetter = new RelationshipGroupGetter( relationshipGroupStore );
+        relationshipCreator =
+                new RelationshipCreator( locksClient, relGroupGetter, relationshipGroupStore.getDenseNodeThreshold() );
+        relationshipDeleter = new RelationshipDeleter( locksClient, relGroupGetter, propertyDeleter );
     }
 
-    public RecordAccessSet getRecordChangeSet()
+    public void relationshipDelete( long relId )
     {
-        return recordChangeSet;
-    }
-
-    public ArrayMap<Integer, DefinedProperty> relationshipDelete( long relId )
-    {
-        return relationshipDeleter.relDelete( relId, recordChangeSet );
+        relationshipDeleter.relDelete( relId, recordChangeSet );
     }
 
     public void relationshipCreate( long id, int typeId, long startNodeId, long endNodeId )
@@ -91,10 +77,9 @@ public class NeoStoreTransactionContext
         relationshipCreator.relationshipCreate( id, typeId, startNodeId, endNodeId, recordChangeSet );
     }
 
-    public ArrayMap<Integer, DefinedProperty> getAndDeletePropertyChain( NodeRecord nodeRecord )
+    public void getAndDeletePropertyChain( NodeRecord nodeRecord )
     {
-        return propertyDeleter.getAndDeletePropertyChain( nodeRecord,
-                recordChangeSet.getPropertyRecords() );
+        propertyDeleter.deletePropertyChain( nodeRecord, recordChangeSet.getPropertyRecords() );
     }
 
     public <T extends PrimitiveRecord> void removeProperty( RecordProxy<Long,T,Void> primitiveProxy, int propertyKey )
@@ -102,55 +87,38 @@ public class NeoStoreTransactionContext
         propertyDeleter.removeProperty( primitiveProxy, propertyKey, getPropertyRecords() );
     }
 
-    public <P extends PrimitiveRecord> void primitiveChangeProperty( RecordProxy<Long, P, Void> primitive,
+    public <P extends PrimitiveRecord> void primitiveSetProperty( RecordProxy<Long, P, Void> primitive,
             int propertyKey, Object value )
     {
-        propertyCreator.primitiveChangeProperty( primitive, propertyKey, value, getPropertyRecords() );
-    }
-
-    public <P extends PrimitiveRecord> void primitiveAddProperty( RecordProxy<Long, P, Void> primitive,
-            int propertyKey, Object value )
-    {
-        propertyCreator.primitiveAddProperty( primitive, propertyKey, value, getPropertyRecords() );
+        propertyCreator.primitiveSetProperty( primitive, propertyKey, value, getPropertyRecords() );
     }
 
     public void createPropertyKeyToken( String name, int id )
     {
-        TokenCreator<PropertyKeyTokenRecord> creator =
-                new TokenCreator<>( neoStore.getPropertyKeyTokenStore() );
+        TokenCreator<PropertyKeyTokenRecord, Token> creator =
+                new TokenCreator<>( neoStores.getPropertyKeyTokenStore() );
         creator.createToken( name, id, getPropertyKeyTokenRecords() );
     }
 
     public void createLabelToken( String name, int id )
     {
-        TokenCreator<LabelTokenRecord> creator =
-                new TokenCreator<>( neoStore.getLabelTokenStore() );
+        TokenCreator<LabelTokenRecord, Token> creator =
+                new TokenCreator<>( neoStores.getLabelTokenStore() );
         creator.createToken( name, id, getLabelTokenRecords() );
     }
 
     public void createRelationshipTypeToken( String name, int id )
     {
-        TokenCreator<RelationshipTypeTokenRecord> creator =
-                new TokenCreator<>( neoStore.getRelationshipTypeTokenStore() );
+        TokenCreator<RelationshipTypeTokenRecord, RelationshipTypeToken> creator =
+                new TokenCreator<>( neoStores.getRelationshipTypeTokenStore() );
         creator.createToken( name, id, getRelationshipTypeTokenRecords() );
     }
 
-    public void bind( Client locksClient )
-    {
-        locker.setLockClient( locksClient );
-    }
-
-    public void initialize()
+    public void clear()
     {
         recordChangeSet.close();
-    }
-
-    public void close()
-    {
-        recordChangeSet.close();
-
-        locker.setLockClient( null );
-        supplier.release( this );
+        relationshipCreator = null;
+        relationshipDeleter = null;
     }
 
     public RecordAccess<Long, NodeRecord, Void> getNodeRecords()
@@ -197,14 +165,12 @@ public class NeoStoreTransactionContext
     {
         long groupId = node.getNextRel();
         long previousGroupId = Record.NO_NEXT_RELATIONSHIP.intValue();
-        Set<Integer> allTypes = new HashSet<>();
         while ( groupId != Record.NO_NEXT_RELATIONSHIP.intValue() )
         {
             RecordProxy<Long, RelationshipGroupRecord, Integer> change =
                     recordChangeSet.getRelGroupRecords().getOrLoad( groupId, type );
             RelationshipGroupRecord record = change.forReadingData();
             record.setPrev( previousGroupId ); // not persistent so not a "change"
-            allTypes.add( record.getType() );
             if ( record.getType() == type )
             {
                 return change;

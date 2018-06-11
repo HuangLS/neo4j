@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -81,8 +81,9 @@ import static org.neo4j.unsafe.impl.batchimport.AdditionalInitialIds.EMPTY;
 import static org.neo4j.unsafe.impl.batchimport.cache.NumberArrayFactory.AUTO;
 import static org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdGenerators.fromInput;
 import static org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdGenerators.startingFromTheBeginning;
-import static org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMappers.actual;
+import static org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMappers.longs;
 import static org.neo4j.unsafe.impl.batchimport.cache.idmapping.IdMappers.strings;
+import static org.neo4j.unsafe.impl.batchimport.input.Collectors.silentBadCollector;
 import static org.neo4j.unsafe.impl.batchimport.staging.ProcessorAssignmentStrategies.eagerRandomSaturation;
 
 @RunWith( Parameterized.class )
@@ -125,14 +126,13 @@ public class ParallelBatchImporterTest
         return Arrays.<Object[]>asList(
 
                 // synchronous I/O, actual node id input
-                new Object[]{new LongInputIdGenerator(), actual(), fromInput(), true},
+                new Object[]{new LongInputIdGenerator(), longs( AUTO ), fromInput(), true},
                 // synchronous I/O, string id input
                 new Object[]{new StringInputIdGenerator(), strings( AUTO ), startingFromTheBeginning(), true},
                 // synchronous I/O, string id input
                 new Object[]{new StringInputIdGenerator(), strings( AUTO ), startingFromTheBeginning(), false},
                 // extra slow parallel I/O, actual node id input
-                new Object[]{new LongInputIdGenerator(), actual(), fromInput(), false}
-
+                new Object[]{new LongInputIdGenerator(), longs( AUTO ), fromInput(), false}
         );
     }
 
@@ -152,7 +152,7 @@ public class ParallelBatchImporterTest
         ExecutionMonitor processorAssigner = eagerRandomSaturation( config.maxNumberOfProcessors() );
         final BatchImporter inserter = new ParallelBatchImporter( directory.graphDbDir(),
                 new DefaultFileSystemAbstraction(), config, NullLogService.getInstance(),
-                processorAssigner, EMPTY );
+                processorAssigner, EMPTY, new Config() );
 
         boolean successful = false;
         IdGroupDistribution groups = new IdGroupDistribution( NODE_COUNT, 5, random.random() );
@@ -164,7 +164,8 @@ public class ParallelBatchImporterTest
                     nodes( nodeRandomSeed, NODE_COUNT, inputIdGenerator, groups ),
                     relationships( relationshipRandomSeed, RELATIONSHIP_COUNT, inputIdGenerator, groups ),
                     idMapper, idGenerator, false,
-                    RELATIONSHIP_COUNT/*insanely high bad tolerance, but it will actually never be that many*/ ) );
+                    /*insanely high bad tolerance, but it will actually never  be that many*/
+                    silentBadCollector( RELATIONSHIP_COUNT ) ) );
 
             // THEN
             GraphDatabaseService db = new TestGraphDatabaseFactory().newEmbeddedDatabase( directory.graphDbDir() );
@@ -216,7 +217,7 @@ public class ParallelBatchImporterTest
         Result result = consistencyChecker.runFullConsistencyCheck( storeDir,
                 new Config( stringMap( GraphDatabaseSettings.pagecache_memory.name(), "8m" ) ),
                 ProgressMonitorFactory.NONE,
-                NullLogProvider.getInstance() );
+                NullLogProvider.getInstance(), false );
         assertTrue( "Database contains inconsistencies, there should be a report in " + storeDir,
                 result.isSuccessful() );
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,7 @@ package org.neo4j.helpers;
 
 import java.util.concurrent.TimeUnit;
 
+import org.neo4j.function.Consumer;
 import org.neo4j.function.Function;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Transaction;
@@ -40,7 +41,7 @@ import static org.neo4j.function.Predicates.not;
  * invoke execute which will begin/commit transactions in a loop for the specified number of times.
  * <p>
  * By default all exceptions (except Errors and TransactionTerminatedException) cause a retry,
- * and the monitor does nothing, but these can be overridden with custom behaviour.
+ * and the monitor does nothing, but these can be overridden with custom behavior.
  * A bit more narrow and typical exception to retry on is {@link TransientFailureException},
  * which aims to represent exceptions that are most likely to succeed after a retry.
  */
@@ -48,14 +49,13 @@ public class TransactionTemplate
 {
     public interface Monitor
     {
-        public void failure( Throwable ex );
+        void failure( Throwable ex );
 
-        public void failed( Throwable ex );
+        void failed( Throwable ex );
 
-        public void retrying();
+        void retrying();
 
-        public class Adapter
-                implements Monitor
+        class Adapter implements Monitor
         {
             @Override
             public void failure( Throwable ex )
@@ -125,6 +125,8 @@ public class TransactionTemplate
 
     /**
      * @deprecated use {@link #retryOn(org.neo4j.function.Predicate)} instead
+     * @param retryPredicate a predicate for deciding whether to retry
+     * @return a new {@link TransactionTemplate}
      */
     @Deprecated
     public TransactionTemplate retryOn( Predicate<Throwable> retryPredicate )
@@ -135,6 +137,19 @@ public class TransactionTemplate
     public TransactionTemplate retryOn( org.neo4j.function.Predicate<Throwable> retryPredicate )
     {
         return new TransactionTemplate( gds, monitor, retries, backoff, retryPredicate );
+    }
+
+    public void execute( final Consumer<Transaction> txConsumer )
+    {
+        execute( new Function<Transaction, Object>()
+        {
+            @Override
+            public Object apply( Transaction transaction )
+            {
+                txConsumer.accept( transaction );
+                return null;
+            }
+        } );
     }
 
     public <T> T execute( Function<Transaction, T> txFunction )

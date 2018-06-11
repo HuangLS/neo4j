@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -58,14 +58,13 @@ import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.extension.KernelExtensionFactory;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge;
-import org.neo4j.kernel.impl.storemigration.UpgradableDatabase;
 import org.neo4j.kernel.impl.transaction.log.checkpoint.CheckPointer;
+import org.neo4j.kernel.impl.transaction.log.checkpoint.SimpleTriggerInfo;
 import org.neo4j.kernel.impl.transaction.log.rotation.LogRotation;
+import org.neo4j.register.Register.DoubleLong;
 import org.neo4j.test.EphemeralFileSystemRule;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
-import static java.util.concurrent.Executors.newSingleThreadExecutor;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -75,6 +74,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 import static org.neo4j.graphdb.DynamicLabel.label;
 import static org.neo4j.graphdb.Neo4jMatchers.getIndexes;
 import static org.neo4j.graphdb.Neo4jMatchers.hasSize;
@@ -82,7 +85,6 @@ import static org.neo4j.graphdb.Neo4jMatchers.haveState;
 import static org.neo4j.graphdb.Neo4jMatchers.inTx;
 import static org.neo4j.kernel.impl.api.index.SchemaIndexTestHelper.singleInstanceSchemaIndexProviderFactory;
 import static org.neo4j.kernel.impl.storemigration.StoreMigrationParticipant.NOT_PARTICIPATING;
-import static org.neo4j.register.Register.DoubleLong;
 
 public class IndexRecoveryIT
 {
@@ -137,7 +139,7 @@ public class IndexRecoveryIT
                         any( IndexSamplingConfig.class ) ) )
                 .thenReturn( indexPopulatorWithControlledCompletionTiming( latch ) );
         createIndex( myLabel );
-        rotateLogs();
+        rotateLogsAndCheckPoint();
 
         // And Given
         Future<Void> killFuture = killDbInSeparateThread();
@@ -193,7 +195,7 @@ public class IndexRecoveryIT
         ).thenReturn( mockedAccessor );
         createIndexAndAwaitPopulation( myLabel );
         // rotate logs
-        rotateLogs();
+        rotateLogsAndCheckPoint();
         // make updates
         Set<NodePropertyUpdate> expectedUpdates = createSomeBananas( myLabel );
 
@@ -217,8 +219,8 @@ public class IndexRecoveryIT
         int onlineAccessorInvocationCount = 2; // once when we create the index, and once when we restart the db
         verify( mockedIndexProvider, times( onlineAccessorInvocationCount ) )
                 .getOnlineAccessor( anyLong(), any( IndexConfiguration.class ), any( IndexSamplingConfig.class ) );
-        assertEquals( expectedUpdates, writer.recoveredUpdates );
-        for ( NodePropertyUpdate update : writer.recoveredUpdates )
+        assertEquals( expectedUpdates, writer.batchedUpdates );
+        for ( NodePropertyUpdate update : writer.batchedUpdates )
         {
             assertTrue( writer.recoveredNodes.contains( update.getNodeId() ) );
         }
@@ -237,7 +239,7 @@ public class IndexRecoveryIT
         ).thenReturn( mock( IndexAccessor.class ) );
         startDb();
         createIndex( myLabel );
-        rotateLogs();
+        rotateLogsAndCheckPoint();
 
         // And Given
         killDb();
@@ -271,8 +273,7 @@ public class IndexRecoveryIT
         when( mockedIndexProvider.compareTo( any( SchemaIndexProvider.class ) ) )
                 .thenReturn( 1 ); // always pretend to have highest priority
         when( mockedIndexProvider.storeMigrationParticipant(
-                any( FileSystemAbstraction.class), any( PageCache.class ), any( UpgradableDatabase.class)) )
-                .thenReturn( NOT_PARTICIPATING );
+                any( FileSystemAbstraction.class), any( PageCache.class ) ) ).thenReturn( NOT_PARTICIPATING );
     }
 
     @SuppressWarnings("deprecation")
@@ -330,10 +331,12 @@ public class IndexRecoveryIT
         }
     }
 
-    private void rotateLogs() throws IOException
+    private void rotateLogsAndCheckPoint() throws IOException
     {
         db.getDependencyResolver().resolveDependency( LogRotation.class ).rotateLogFile();
-        db.getDependencyResolver().resolveDependency( CheckPointer.class ).forceCheckPoint();
+        db.getDependencyResolver().resolveDependency( CheckPointer.class ).forceCheckPoint(
+                new SimpleTriggerInfo( "test" )
+        );
     }
 
     private void createIndexAndAwaitPopulation( Label label )
@@ -382,7 +385,7 @@ public class IndexRecoveryIT
     public static class GatheringIndexWriter extends IndexAccessor.Adapter
     {
         private final Set<NodePropertyUpdate> regularUpdates = new HashSet<>();
-        private final Set<NodePropertyUpdate> recoveredUpdates = new HashSet<>();
+        private final Set<NodePropertyUpdate> batchedUpdates = new HashSet<>();
         private final Set<Long> recoveredNodes = new HashSet<>();
 
         @Override
@@ -399,8 +402,8 @@ public class IndexRecoveryIT
                             regularUpdates.addAll( updates );
                             break;
 
-                        case RECOVERY:
-                            recoveredUpdates.addAll( updates );
+                        case BATCHED:
+                            batchedUpdates.addAll( updates );
                             break;
 
                         default:

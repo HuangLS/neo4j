@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,7 @@
  */
 package org.neo4j.kernel.impl.locking;
 
+import org.neo4j.kernel.impl.locking.community.LockResourceId;
 import org.neo4j.logging.Log;
 
 public class DumpLocksVisitor implements Locks.Visitor
@@ -31,8 +32,8 @@ public class DumpLocksVisitor implements Locks.Visitor
     }
 
     @Override
-    public void visit( Locks.ResourceType resourceType, long resourceId, String description, long estimatedWaitTime,
-            long lockIdentityHashCode )
+    public void visit(Locks.ResourceType resourceType, LockResourceId resourceId, String description, long estimatedWaitTime,
+                      long lockIdentityHashCode )
     {
         log.info( "%s{id=%d, waitTime=%d, description=%s, lockHash=%d}", resourceType, resourceId, estimatedWaitTime,
                 description, lockIdentityHashCode );

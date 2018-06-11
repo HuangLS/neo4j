@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -55,12 +55,22 @@ public class GraphDatabaseShellServer extends AbstractAppServer
     protected final Map<Serializable, TopLevelTransaction> clients = new ConcurrentHashMap<>();
 
     /**
+     * @param path the path to the directory where the database should be created
+     * @param readOnly make the instance read-only
+     * @param configFileOrNull path to a configuration file or <code>null</code>
      * @throws RemoteException if an RMI error occurs.
      */
     public GraphDatabaseShellServer( String path, boolean readOnly, String configFileOrNull )
             throws RemoteException
     {
-        this( instantiateGraphDb( path, readOnly, configFileOrNull ), readOnly );
+        this( instantiateGraphDb( new GraphDatabaseFactory(), path, readOnly, configFileOrNull ), readOnly );
+        this.graphDbCreatedHere = true;
+    }
+
+    public GraphDatabaseShellServer( GraphDatabaseFactory factory, String path, boolean readOnly, String configFileOrNull )
+            throws RemoteException
+    {
+        this( instantiateGraphDb(  factory, path, readOnly, configFileOrNull ), readOnly );
         this.graphDbCreatedHere = true;
     }
 
@@ -187,10 +197,10 @@ public class GraphDatabaseShellServer extends AbstractAppServer
         }
     }
 
-    private static GraphDatabaseAPI instantiateGraphDb( String path, boolean readOnly,
-                                                        String configFileOrNull )
+    private static GraphDatabaseAPI instantiateGraphDb( GraphDatabaseFactory factory, String path, boolean readOnly,
+            String configFileOrNull )
     {
-        GraphDatabaseBuilder builder = new GraphDatabaseFactory().
+        GraphDatabaseBuilder builder = factory.
                 newEmbeddedDatabaseBuilder( path ).
                 setConfig( GraphDatabaseSettings.read_only, Boolean.toString( readOnly ) );
         if ( configFileOrNull != null )

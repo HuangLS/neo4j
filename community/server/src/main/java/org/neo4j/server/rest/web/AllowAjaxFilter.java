@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,9 +27,6 @@ import com.sun.jersey.spi.container.ContainerResponseFilter;
  * This filter adds the header "Access-Control-Allow-Origin : *" to all
  * responses that goes through it. This allows modern browsers to do cross-site
  * requests to us via javascript.
- * 
- * @author Jacob Hansson <jacob@voltvoodoo.com>
- * 
  */
 public class AllowAjaxFilter implements ContainerResponseFilter
 {

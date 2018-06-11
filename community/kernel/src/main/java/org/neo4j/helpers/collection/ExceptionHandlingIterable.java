@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,7 +25,7 @@ import java.util.Iterator;
  * allows to catch, analyze and react on exceptions that are thrown by the delegate iterable
  * useful for exception conversion on iterator methods
  * Uses sun.misc.Unsafe internally to rethrow original exceptions !
- * @param <T>
+ * @param <T> the type of elements
  */
 public class ExceptionHandlingIterable<T> implements Iterable<T> {
     private final Iterable<T> source;

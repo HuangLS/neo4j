@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -30,7 +30,7 @@ import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.StoreLockException;
 import org.neo4j.kernel.StoreLocker;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.test.ReflectionUtil;
 import org.neo4j.test.TargetDirectory;
 
@@ -49,13 +49,13 @@ public class BatchInserterImplTest
     public void testHonorsPassedInParams() throws Exception
     {
         BatchInserter inserter = BatchInserters.inserter( testDirectory.graphDbDir(), stringMap(
-                GraphDatabaseSettings.pagecache_memory.name(), "16K",
+                GraphDatabaseSettings.pagecache_memory.name(), "280K",
                 GraphDatabaseSettings.mapped_memory_page_size.name(), "1K" ) );
-        NeoStore neoStore = ReflectionUtil.getPrivateField( inserter, "neoStore", NeoStore.class );
-        PageCache pageCache = ReflectionUtil.getPrivateField( neoStore, "pageCache", PageCache.class );
+        NeoStores neoStores = ReflectionUtil.getPrivateField( inserter, "neoStores", NeoStores.class );
+        PageCache pageCache = ReflectionUtil.getPrivateField( neoStores, "pageCache", PageCache.class );
         inserter.shutdown();
         int mappedMemoryTotalSize = pageCache.maxCachedPages() * pageCache.pageSize();
-        assertThat( "memory mapped config is active", mappedMemoryTotalSize, is( 16 * 1024 ) );
+        assertThat( "memory mapped config is active", mappedMemoryTotalSize, is( 280 * 1024 ) );
     }
 
     @Test

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,16 +19,16 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
-import org.neo4j.cypher.internal.compiler.v2_3._
-import ast._
-import org.neo4j.cypher
+import org.neo4j.cypher.internal.frontend.v2_3
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.frontend.v2_3.{Rewriter, bottomUp}
 
 case object foldConstants extends Rewriter {
   def apply(that: AnyRef): AnyRef =
   try {
     bottomUp(instance).apply(that)
   } catch {
-    case e: java.lang.ArithmeticException => throw new ArithmeticException(e.getMessage, e)
+    case e: java.lang.ArithmeticException => throw new v2_3.ArithmeticException(e.getMessage, e)
   }
   private val instance: Rewriter = Rewriter.lift {
     case e@Add(lhs: SignedIntegerLiteral, rhs: SignedIntegerLiteral) =>

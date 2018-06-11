@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,10 +22,11 @@ package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions._
+import org.neo4j.cypher.internal.compiler.v2_3.commands.predicates._
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan._
-import org.neo4j.cypher.internal.compiler.v2_3.parser.{MatchText, ParsedLikePattern, WildcardLikePatternOp}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.PipeMonitor
 import org.neo4j.cypher.internal.compiler.v2_3.spi.PlanContext
+import org.neo4j.cypher.internal.frontend.v2_3.{ExclusiveBound, InclusiveBound, IndexHintException}
 
 class IndexLookupBuilder extends PlanBuilder {
   def canWorkWith(plan: ExecutionPlanInProgress, ctx: PlanContext)(implicit pipeMonitor: PipeMonitor) =
@@ -36,12 +37,13 @@ class IndexLookupBuilder extends PlanBuilder {
     val hint: SchemaIndex = querylessHint.token
 
     val propertyPredicates: Seq[(QueryToken[Predicate], QueryExpression[Expression])] =
-      findPropertyPredicates(plan, hint) ++ findLikePredicates(plan, hint) ++ findInequalityPredicates(plan, hint)
+      findPropertyPredicates(plan, hint) ++ findStartsWithPredicates(plan, hint) ++ findInequalityPredicates(plan, hint)
     val labelPredicates = findLabelPredicates(plan, hint)
 
     if (propertyPredicates.isEmpty || labelPredicates.isEmpty)
-      throw IndexHintException(hint, "No useful predicate was found for your index hint. Make sure the" +
-        " property expression is alone either side of the equality sign.")
+      throw new IndexHintException(hint.identifier, hint.label, hint.property,
+        "No useful predicate was found for your index hint. Make sure the" +
+          " property expression is alone either side of the equality sign.")
 
     val (predicate, expression) = propertyPredicates.head
 
@@ -55,6 +57,7 @@ class IndexLookupBuilder extends PlanBuilder {
 
     plan.copy(query = newQuery)
   }
+
 
   private def findLabelPredicates(plan: ExecutionPlanInProgress, hint: SchemaIndex) =
     plan.query.where.collect {
@@ -77,15 +80,11 @@ class IndexLookupBuilder extends PlanBuilder {
         if id == hint.identifier && prop.name == hint.property => (predicate, ScanQueryExpression(expr))
     }
 
-  private def findLikePredicates(plan: ExecutionPlanInProgress, hint: SchemaIndex) =
+  private def findStartsWithPredicates(plan: ExecutionPlanInProgress, hint: SchemaIndex) =
     plan.query.where.collect {
-      case predicate@QueryToken(LiteralLikePattern(
-        LiteralRegularExpression(Property(Identifier(id), prop), _),
-        ParsedLikePattern(MatchText(prefix) :: (_: WildcardLikePatternOp) :: tl),
-        caseInsensitive)
-      ) if !caseInsensitive && id == hint.identifier && prop.name == hint.property =>
-        val range = PrefixSeekRangeExpression(PrefixRange(prefix))
-        (predicate, RangeQueryExpression(range))
+      case predicate@QueryToken(StartsWith(Property(Identifier(id), prop), rhs))
+       if id == hint.identifier && prop.name == hint.property =>
+        (predicate, RangeQueryExpression(PrefixSeekRangeExpression(PrefixRange(rhs))))
     }
 
   private def findInequalityPredicates(plan: ExecutionPlanInProgress, hint: SchemaIndex) =

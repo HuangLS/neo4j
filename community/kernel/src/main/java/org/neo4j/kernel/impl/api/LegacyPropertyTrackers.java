@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.kernel.impl.api;
 
 import java.util.List;
+import java.util.Map;
 
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
@@ -142,14 +143,12 @@ public class LegacyPropertyTrackers
         if ( !nodeTrackers.isEmpty() )
         {
             Node node = entityFactory.newNodeProxyById( nodeId );
-            Iterable<String> propertyKeys = node.getPropertyKeys();
-
-            for ( String key : propertyKeys )
+            for ( Map.Entry<String, Object> property : node.getAllProperties().entrySet() )
             {
-                Object value = node.getProperty( key );
+                Object value = property.getValue();
                 for ( PropertyTracker<Node> tracker : nodeTrackers )
                 {
-                    tracker.propertyRemoved( node, key, value );
+                    tracker.propertyRemoved( node, property.getKey(), value );
                 }
             }
         }
@@ -160,14 +159,13 @@ public class LegacyPropertyTrackers
         if ( !relationshipTrackers.isEmpty() )
         {
             Relationship relationship = entityFactory.newRelationshipProxyById( relationshipId );
-            Iterable<String> propertyKeys = relationship.getPropertyKeys();
 
-            for ( String key : propertyKeys )
+            for ( Map.Entry<String, Object> property : relationship.getAllProperties().entrySet() )
             {
-                Object value = relationship.getProperty( key );
+                Object value = property.getValue();
                 for ( PropertyTracker<Relationship> tracker : relationshipTrackers )
                 {
-                    tracker.propertyRemoved( relationship, key, value );
+                    tracker.propertyRemoved( relationship, property.getKey(), value );
                 }
             }
         }

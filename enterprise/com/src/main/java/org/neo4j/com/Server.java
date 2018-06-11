@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -40,14 +40,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.neo4j.com.monitor.RequestMonitor;
 import org.neo4j.helpers.Clock;
@@ -341,7 +339,7 @@ public abstract class Server<T, R> extends SimpleChannelHandler implements Chann
     {
         try
         {
-            cleanConversation( slave );
+            stopConversation( slave );
             unmapSlave( channel );
         }
         catch ( Throwable failure ) // Unknown error trying to finish off the tx
@@ -376,7 +374,7 @@ public abstract class Server<T, R> extends SimpleChannelHandler implements Chann
             {
                 try
                 {
-                    cleanConversation( slave );
+                    stopConversation( slave );
                 }
                 catch ( Throwable e )
                 {
@@ -450,7 +448,7 @@ public abstract class Server<T, R> extends SimpleChannelHandler implements Chann
             }
 
             bufferToWriteTo.clear();
-            final ChunkingChannelBuffer chunkingBuffer = new ChunkingChannelBuffer( bufferToWriteTo, channel, chunkSize,
+            ChunkingChannelBuffer chunkingBuffer = newChunkingBuffer( bufferToWriteTo, channel, chunkSize,
                     getInternalProtocolVersion(), applicationProtocolVersion );
             submitSilent( targetCallExecutor, new TargetCaller( type, channel, context, chunkingBuffer,
                     bufferToReadFrom ) );
@@ -543,13 +541,19 @@ public abstract class Server<T, R> extends SimpleChannelHandler implements Chann
         return requestTarget;
     }
 
-    protected abstract void cleanConversation( RequestContext context );
+    protected abstract void stopConversation( RequestContext context );
 
     private ChunkingChannelBuffer newChunkingBuffer( Channel channel )
     {
-        return new ChunkingChannelBuffer( ChannelBuffers.dynamicBuffer(),
-                channel,
-                chunkSize, getInternalProtocolVersion(), applicationProtocolVersion );
+        return newChunkingBuffer( ChannelBuffers.dynamicBuffer(), channel, chunkSize, getInternalProtocolVersion(),
+                applicationProtocolVersion );
+    }
+
+    protected ChunkingChannelBuffer newChunkingBuffer( ChannelBuffer bufferToWriteTo, Channel channel, int capacity,
+            byte internalProtocolVersion, byte applicationProtocolVersion )
+    {
+        return new ChunkingChannelBuffer( bufferToWriteTo, channel, capacity, internalProtocolVersion,
+                applicationProtocolVersion );
     }
 
     private class TargetCaller implements Response.Handler, Runnable

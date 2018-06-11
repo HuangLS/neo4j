@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,10 +22,11 @@ package org.neo4j.kernel.impl.core;
 import org.neo4j.function.Supplier;
 import org.neo4j.graphdb.DatabaseShutdownException;
 import org.neo4j.graphdb.NotInTransactionException;
-import org.neo4j.kernel.TopLevelTransaction;
 import org.neo4j.graphdb.TransactionTerminatedException;
+import org.neo4j.kernel.TopLevelTransaction;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.Statement;
+import org.neo4j.kernel.api.exceptions.Status;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
 /**
@@ -70,9 +71,10 @@ public class ThreadToStatementContextBridge extends LifecycleAdapter implements 
         {
             throw new NotInTransactionException();
         }
-        if ( transaction.getTransaction().shouldBeTerminated() )
+        Status terminationReason = transaction.getTransaction().getReasonIfTerminated();
+        if ( terminationReason != null )
         {
-            throw new TransactionTerminatedException();
+            throw new TransactionTerminatedException( terminationReason );
         }
     }
 

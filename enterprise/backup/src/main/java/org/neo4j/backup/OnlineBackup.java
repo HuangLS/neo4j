@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,13 +19,13 @@
  */
 package org.neo4j.backup;
 
+import java.io.File;
+
 import org.neo4j.backup.BackupService.BackupOutcome;
 import org.neo4j.consistency.ConsistencyCheckSettings;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.configuration.Config;
-
-import java.io.File;
 
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 
@@ -34,7 +34,7 @@ import static org.neo4j.helpers.collection.MapUtil.stringMap;
  * configured to act as a backup server. This class is not instantiable, instead factory methods are used to get
  * instances configured to contact a specific backup server against which all possible backup operations can be
  * performed.
- *
+ * <p/>
  * All backup methods return the same instance, allowing for chaining calls.
  */
 public class OnlineBackup
@@ -77,6 +77,8 @@ public class OnlineBackup
     }
 
     /**
+     * @param targetDirectory A directory holding a complete database previously obtained from the backup server.
+     * @return The same OnlineBackup instance, possible to use for a new backup operation
      * @deprecated use {@link #backup(File)} instead
      */
     @Deprecated
@@ -89,24 +91,26 @@ public class OnlineBackup
      * Performs a backup into targetDirectory. The server contacted is the one configured in the factory method used to
      * obtain this instance. After the backup is complete, a verification phase will take place, checking
      * the database for consistency. If any errors are found, they will be printed in stderr.
-     *
+     * <p/>
      * If the target directory does not contain a database, a full backup will be performed, otherwise an incremental
      * backup mechanism is used.
-     *
+     * <p/>
      * If the backup has become too far out of date for an incremental backup to succeed, a full backup is performed.
-     *
      *
      * @param targetDirectory A directory holding a complete database previously obtained from the backup server.
      * @return The same OnlineBackup instance, possible to use for a new backup operation
      */
     public OnlineBackup backup( File targetDirectory )
     {
-        outcome = new BackupService().doIncrementalBackupOrFallbackToFull( hostNameOrIp, port, targetDirectory, true,
-                defaultConfig(), timeoutMillis, forensics );
+        outcome = new BackupService().doIncrementalBackupOrFallbackToFull( hostNameOrIp, port, targetDirectory,
+                getConsistencyCheck( true ), defaultConfig(), timeoutMillis, forensics );
         return this;
     }
 
     /**
+     * @param targetDirectory A directory holding a complete database previously obtained from the backup server.
+     * @param verification If true, the verification phase will be run.
+     * @return The same OnlineBackup instance, possible to use for a new backup operation
      * @deprecated use {@link #backup(File, boolean)} instead
      */
     @Deprecated
@@ -120,12 +124,11 @@ public class OnlineBackup
      * obtain this instance. After the backup is complete, and if the verification parameter is set to true,
      * a verification phase will take place, checking the database for consistency. If any errors are found, they will
      * be printed in stderr.
-     *
+     * <p/>
      * If the target directory does not contain a database, a full backup will be performed, otherwise an incremental
      * backup mechanism is used.
-     *
+     * <p/>
      * If the backup has become too far out of date for an incremental backup to succeed, a full backup is performed.
-     *
      *
      * @param targetDirectory A directory holding a complete database previously obtained from the backup server.
      * @param verification If true, the verification phase will be run.
@@ -134,11 +137,14 @@ public class OnlineBackup
     public OnlineBackup backup( File targetDirectory, boolean verification )
     {
         outcome = new BackupService().doIncrementalBackupOrFallbackToFull( hostNameOrIp, port, targetDirectory,
-                verification, defaultConfig(), timeoutMillis, forensics );
+                getConsistencyCheck( verification ), defaultConfig(), timeoutMillis, forensics );
         return this;
     }
 
     /**
+     * @param targetDirectory A directory holding a complete database previously obtained from the backup server.
+     * @param tuningConfiguration The {@link Config} to use when running the consistency check
+     * @return The same OnlineBackup instance, possible to use for a new backup operation
      * @deprecated use {@link #backup(File, Config)} instead
      */
     @Deprecated
@@ -151,10 +157,10 @@ public class OnlineBackup
      * Performs a backup into targetDirectory. The server contacted is the one configured in the factory method used to
      * obtain this instance. After the backup is complete, a verification phase will take place, checking
      * the database for consistency. If any errors are found, they will be printed in stderr.
-     *
+     * <p/>
      * If the target directory does not contain a database, a full backup will be performed, otherwise an incremental
      * backup mechanism is used.
-     *
+     * <p/>
      * If the backup has become too far out of date for an incremental backup to succeed, a full backup is performed.
      *
      * @param targetDirectory A directory holding a complete database previously obtained from the backup server.
@@ -163,17 +169,20 @@ public class OnlineBackup
      */
     public OnlineBackup backup( File targetDirectory, Config tuningConfiguration )
     {
-        outcome = new BackupService().doIncrementalBackupOrFallbackToFull( hostNameOrIp, port, targetDirectory, true,
-                tuningConfiguration, timeoutMillis, forensics );
+        outcome = new BackupService().doIncrementalBackupOrFallbackToFull( hostNameOrIp, port, targetDirectory,
+                getConsistencyCheck( true ), tuningConfiguration, timeoutMillis, forensics );
         return this;
     }
 
     /**
+     * @param targetDirectory A directory holding a complete database previously obtained from the backup server.
+     * @param tuningConfiguration The {@link Config} to use when running the consistency check
+     * @param verification If true, the verification phase will be run.
+     * @return The same OnlineBackup instance, possible to use for a new backup operation.
      * @deprecated use {@link #backup(File, Config, boolean)} instead
      */
     @Deprecated
-    public OnlineBackup backup( String targetDirectory, Config tuningConfiguration,
-                                boolean verification )
+    public OnlineBackup backup( String targetDirectory, Config tuningConfiguration, boolean verification )
     {
         return backup( new File( targetDirectory ), tuningConfiguration, verification );
     }
@@ -183,10 +192,10 @@ public class OnlineBackup
      * obtain this instance. After the backup is complete, and if the verification parameter is set to true,
      * a verification phase will take place, checking the database for consistency. If any errors are found, they will
      * be printed in stderr.
-     *
+     * <p/>
      * If the target directory does not contain a database, a full backup will be performed, otherwise an incremental
      * backup mechanism is used.
-     *
+     * <p/>
      * If the backup has become too far out of date for an incremental backup to succeed, a full backup is performed.
      *
      * @param targetDirectory A directory holding a complete database previously obtained from the backup server.
@@ -194,11 +203,10 @@ public class OnlineBackup
      * @param verification If true, the verification phase will be run.
      * @return The same OnlineBackup instance, possible to use for a new backup operation.
      */
-    public OnlineBackup backup( File targetDirectory, Config tuningConfiguration,
-                                boolean verification )
+    public OnlineBackup backup( File targetDirectory, Config tuningConfiguration, boolean verification )
     {
         outcome = new BackupService().doIncrementalBackupOrFallbackToFull( hostNameOrIp, port, targetDirectory,
-                verification, tuningConfiguration, timeoutMillis, forensics );
+                getConsistencyCheck( verification ), tuningConfiguration, timeoutMillis, forensics );
         return this;
     }
 
@@ -207,7 +215,8 @@ public class OnlineBackup
      * doing online backup. Once the value is changed, then every time when doing online backup, the timeout will be
      * reused until this method is called again and a new value is assigned.
      *
-     * @param timeoutMillis The time duration in millisecond that keeps the client waiting for each reply from the server.
+     * @param timeoutMillis The time duration in millisecond that keeps the client waiting for each reply from the
+     * server.
      * @return The same OnlineBackup instance, possible to use for a new backup operation.
      */
     public OnlineBackup withTimeout( long timeoutMillis )
@@ -221,7 +230,7 @@ public class OnlineBackup
      * configured in the factory method used to obtain this instance. At the end of the backup, a verification phase
      * will take place, running over the resulting database ensuring it is consistent. If the check fails, the fact
      * will be printed in stderr.
-     *
+     * <p/>
      * If the target directory already contains a database, a RuntimeException denoting the fact will be thrown.
      *
      * @param targetDirectory The directory in which to store the database
@@ -231,8 +240,8 @@ public class OnlineBackup
     @Deprecated
     public OnlineBackup full( String targetDirectory )
     {
-        outcome = new BackupService().doFullBackup( hostNameOrIp, port, new File( targetDirectory ), true, defaultConfig(),
-                timeoutMillis, forensics );
+        outcome = new BackupService().doFullBackup( hostNameOrIp, port, new File( targetDirectory ),
+                getConsistencyCheck( true ), defaultConfig(), timeoutMillis, forensics );
         return this;
     }
 
@@ -241,7 +250,7 @@ public class OnlineBackup
      * configured in the factory method used to obtain this instance. If the verification flag is set, at the end of
      * the backup, a verification phase will take place, running over the resulting database ensuring it is consistent.
      * If the check fails, the fact will be printed in stderr.
-     *
+     * <p/>
      * If the target directory already contains a database, a RuntimeException denoting the fact will be thrown.
      *
      * @param targetDirectory The directory in which to store the database
@@ -252,8 +261,8 @@ public class OnlineBackup
     @Deprecated
     public OnlineBackup full( String targetDirectory, boolean verification )
     {
-        outcome = new BackupService().doFullBackup( hostNameOrIp, port, new File( targetDirectory ), verification,
-                defaultConfig(), timeoutMillis, forensics );
+        outcome = new BackupService().doFullBackup( hostNameOrIp, port, new File( targetDirectory ),
+                getConsistencyCheck( verification ), defaultConfig(), timeoutMillis, forensics );
         return this;
     }
 
@@ -263,7 +272,7 @@ public class OnlineBackup
      * the backup, a verification phase will take place, running over the resulting database ensuring it is consistent.
      * If the check fails, the fact will be printed in stderr. The consistency check will run with the provided
      * tuning configuration.
-     *
+     * <p/>
      * If the target directory already contains a database, a RuntimeException denoting the fact will be thrown.
      *
      * @param targetDirectory The directory in which to store the database
@@ -275,8 +284,8 @@ public class OnlineBackup
     @Deprecated
     public OnlineBackup full( String targetDirectory, boolean verification, Config tuningConfiguration )
     {
-        outcome = new BackupService().doFullBackup( hostNameOrIp, port, new File( targetDirectory ), verification,
-                tuningConfiguration, timeoutMillis, forensics );
+        outcome = new BackupService().doFullBackup( hostNameOrIp, port, new File( targetDirectory ),
+                getConsistencyCheck( verification ), tuningConfiguration, timeoutMillis, forensics );
         return this;
     }
 
@@ -285,7 +294,7 @@ public class OnlineBackup
      * configured in the factory method used to obtain this instance. After the incremental backup is complete, a
      * verification phase will take place, checking the database for consistency. If any errors are found, they will
      * be printed in stderr.
-     *
+     * <p/>
      * If the target directory does not contain a database or it is not compatible with the one present in the
      * configured backup server a RuntimeException will be thrown denoting the fact.
      *
@@ -296,7 +305,7 @@ public class OnlineBackup
     @Deprecated
     public OnlineBackup incremental( String targetDirectory )
     {
-        outcome = new BackupService().doIncrementalBackup( hostNameOrIp, port, new File( targetDirectory ), true,
+        outcome = new BackupService().doIncrementalBackup( hostNameOrIp, port, new File( targetDirectory ),
                 timeoutMillis, defaultConfig() );
         return this;
     }
@@ -306,7 +315,7 @@ public class OnlineBackup
      * configured in the factory method used to obtain this instance. After the incremental backup is complete, and if
      * the verification parameter is set to true, a  verification phase will take place, checking the database for
      * consistency. If any errors are found, they will be printed in stderr.
-     *
+     * <p/>
      * If the target directory does not contain a database or it is not compatible with the one present in the
      * configured backup server a RuntimeException will be thrown denoting the fact.
      *
@@ -318,7 +327,7 @@ public class OnlineBackup
     @Deprecated
     public OnlineBackup incremental( String targetDirectory, boolean verification )
     {
-        outcome = new BackupService().doIncrementalBackup( hostNameOrIp, port, new File( targetDirectory ), verification,
+        outcome = new BackupService().doIncrementalBackup( hostNameOrIp, port, new File( targetDirectory ),
                 timeoutMillis, defaultConfig() );
         return this;
     }
@@ -328,7 +337,7 @@ public class OnlineBackup
      * configured in the factory method used to obtain this instance. After the incremental backup is complete
      * a verification phase will take place, checking the database for consistency. If any errors are found, they will
      * be printed in stderr.
-     *
+     * <p/>
      * If the target database is not compatible with the one present in the target backup server, a RuntimeException
      * will be thrown denoting the fact.
      *
@@ -348,6 +357,7 @@ public class OnlineBackup
      * operation performed by this OnlineBackup.
      * In particular, it returns a map where the keys are the names of the data sources and the values the longs that
      * are the last committed transaction id for that data source.
+     *
      * @return A map from data source name to last committed transaction id.
      */
     public long getLastCommittedTx()
@@ -385,5 +395,10 @@ public class OnlineBackup
     {
         this.forensics = forensics;
         return this;
+    }
+
+    private static ConsistencyCheck getConsistencyCheck( boolean verification )
+    {
+        return verification ? ConsistencyCheck.DEFAULT : ConsistencyCheck.NONE;
     }
 }

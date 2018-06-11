@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -48,11 +48,12 @@ import org.neo4j.io.fs.DefaultFileSystemAbstraction;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.api.ReadOperations;
+import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.logging.NullLogService;
-import org.neo4j.kernel.impl.store.NeoStore;
+import org.neo4j.kernel.impl.store.NeoStores;
 import org.neo4j.kernel.impl.store.TokenStore;
-import org.neo4j.kernel.impl.transaction.state.NeoStoreSupplier;
+import org.neo4j.kernel.impl.transaction.state.NeoStoresSupplier;
 import org.neo4j.kernel.impl.util.AutoCreatingHashMap;
 import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.TargetDirectory.TestDirectory;
@@ -74,6 +75,7 @@ import static org.neo4j.helpers.collection.IteratorUtil.asSet;
 import static org.neo4j.kernel.impl.util.AutoCreatingHashMap.nested;
 import static org.neo4j.kernel.impl.util.AutoCreatingHashMap.values;
 import static org.neo4j.register.Registers.newDoubleLongRegister;
+import static org.neo4j.unsafe.impl.batchimport.input.Collectors.silentBadCollector;
 import static org.neo4j.unsafe.impl.batchimport.input.InputEntity.NO_PROPERTIES;
 import static org.neo4j.unsafe.impl.batchimport.input.Inputs.csv;
 import static org.neo4j.unsafe.impl.batchimport.input.csv.Configuration.COMMAS;
@@ -86,7 +88,7 @@ public class CsvInputBatchImportIT
     {
         // GIVEN
         BatchImporter importer = new ParallelBatchImporter( directory.graphDbDir(),
-                smallBatchSizeConfig(), NullLogService.getInstance(), invisible() );
+                smallBatchSizeConfig(), NullLogService.getInstance(), invisible(), new Config() );
         List<InputNode> nodeData = randomNodeData();
         List<InputRelationship> relationshipData = randomRelationshipData( nodeData );
 
@@ -95,7 +97,7 @@ public class CsvInputBatchImportIT
         try
         {
             importer.doImport( csv( nodeDataAsFile( nodeData ), relationshipDataAsFile( relationshipData ),
-                    IdType.STRING, lowBufferSize( COMMAS ) ) );
+                    IdType.STRING, lowBufferSize( COMMAS ), silentBadCollector( 0 ) ) );
             // THEN
             verifyImportedData( nodeData, relationshipData );
             success = true;
@@ -293,28 +295,28 @@ public class CsvInputBatchImportIT
             assertEquals( 0, expectedRelationships.size() );
 
             // Verify counts, TODO how to get counts store other than this way?
-            NeoStore neoStore = ((GraphDatabaseAPI)db).getDependencyResolver().resolveDependency(
-                    NeoStoreSupplier.class ).get();
+            NeoStores neoStores = ((GraphDatabaseAPI)db).getDependencyResolver().resolveDependency(
+                    NeoStoresSupplier.class ).get();
             Function<String, Integer> labelTranslationTable =
-                    translationTable( neoStore.getLabelTokenStore(), ReadOperations.ANY_LABEL );
+                    translationTable( neoStores.getLabelTokenStore(), ReadOperations.ANY_LABEL );
             for ( Pair<Integer,Long> count : allNodeCounts( labelTranslationTable, expectedNodeCounts ) )
             {
                 assertEquals( "Label count mismatch for label " + count.first(),
                         count.other().longValue(),
-                        neoStore.getCounts()
+                        neoStores.getCounts()
                                 .nodeCount( count.first().intValue(), newDoubleLongRegister() )
                                 .readSecond() );
             }
 
             Function<String, Integer> relationshipTypeTranslationTable =
-                    translationTable( neoStore.getRelationshipTypeTokenStore(), ReadOperations.ANY_RELATIONSHIP_TYPE );
+                    translationTable( neoStores.getRelationshipTypeTokenStore(), ReadOperations.ANY_RELATIONSHIP_TYPE );
             for ( Pair<RelationshipCountKey,Long> count : allRelationshipCounts( labelTranslationTable,
                     relationshipTypeTranslationTable, expectedRelationshipCounts ) )
             {
                 RelationshipCountKey key = count.first();
                 assertEquals( "Label count mismatch for label " + key,
                         count.other().longValue(),
-                        neoStore.getCounts()
+                        neoStores.getCounts()
                                 .relationshipCount( key.startLabel, key.type, key.endLabel, newDoubleLongRegister() )
                                 .readSecond() );
             }
@@ -382,7 +384,7 @@ public class CsvInputBatchImportIT
         return result;
     }
 
-    private Function<String, Integer> translationTable( TokenStore<?> tokenStore, final int anyValue )
+    private Function<String, Integer> translationTable( TokenStore<?, ?> tokenStore, final int anyValue )
     {
         final Map<String, Integer> translationTable = new HashMap<>();
         for ( Token token : tokenStore.getTokens( Integer.MAX_VALUE ) )

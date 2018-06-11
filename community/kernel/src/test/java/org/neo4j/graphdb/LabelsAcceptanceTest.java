@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,9 +35,12 @@ import org.neo4j.function.Consumer;
 import org.neo4j.function.Function;
 import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.io.fs.FileSystemAbstraction;
+import org.neo4j.kernel.CommunityIdTypeConfigurationProvider;
 import org.neo4j.kernel.GraphDatabaseDependencies;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
+import org.neo4j.kernel.IdTypeConfiguration;
+import org.neo4j.kernel.IdTypeConfigurationProvider;
 import org.neo4j.kernel.TopLevelTransaction;
 import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.cursor.LabelItem;
@@ -57,6 +60,7 @@ import org.neo4j.test.TestGraphDatabaseFactory;
 import org.neo4j.test.TestGraphDatabaseFactoryState;
 import org.neo4j.test.impl.EphemeralIdGenerator;
 import org.neo4j.tooling.GlobalGraphOperations;
+import org.neo4j.udc.UsageDataKeys.OperationalMode;
 
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.not;
@@ -615,6 +619,9 @@ public class LabelsAcceptanceTest
     {
         final EphemeralIdGenerator.Factory idFactory = new EphemeralIdGenerator.Factory()
         {
+            private IdTypeConfigurationProvider
+                    idTypeConfigurationProvider = new CommunityIdTypeConfigurationProvider();
+
             @Override
             public IdGenerator open( File fileName, int grabSize, IdType idType, long highId )
             {
@@ -623,7 +630,8 @@ public class LabelsAcceptanceTest
                     IdGenerator generator = generators.get( idType );
                     if ( generator == null )
                     {
-                        generator = new EphemeralIdGenerator( idType )
+                        IdTypeConfiguration idTypeConfiguration = idTypeConfigurationProvider.getIdTypeConfiguration( idType );
+                        generator = new EphemeralIdGenerator( idType, idTypeConfiguration )
                         {
                             @Override
                             public long nextId()
@@ -665,15 +673,20 @@ public class LabelsAcceptanceTest
                                         return new CommunityEditionModule( platformModule )
                                         {
                                             @Override
-                                            protected IdGeneratorFactory createIdGeneratorFactory( FileSystemAbstraction fs )
+                                            protected IdGeneratorFactory createIdGeneratorFactory(
+                                                    FileSystemAbstraction fs,
+                                                    IdTypeConfigurationProvider idTypeConfigurationProvider )
                                             {
                                                 return idFactory;
                                             }
+
                                         };
                                     }
 
                                     @Override
-                                    protected PlatformModule createPlatform( File storeDir, Map<String, String> params, Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade )
+                                    protected PlatformModule createPlatform( File storeDir, Map<String, String> params,
+                                            Dependencies dependencies, GraphDatabaseFacade graphDatabaseFacade,
+                                            OperationalMode operationalMode )
                                     {
                                         return new ImpermanentPlatformModule( storeDir, params, dependencies, graphDatabaseFacade );
                                     }

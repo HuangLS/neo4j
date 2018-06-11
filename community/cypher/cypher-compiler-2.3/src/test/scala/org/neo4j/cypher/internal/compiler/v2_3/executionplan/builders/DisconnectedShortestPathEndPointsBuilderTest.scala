@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,8 +21,8 @@ package org.neo4j.cypher.internal.compiler.v2_3.executionplan.builders
 
 import org.neo4j.cypher.internal.compiler.v2_3.commands._
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.FakePipe
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
-import org.neo4j.graphdb.Direction
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 import org.scalatest.mock.MockitoSugar
 
 class DisconnectedShortestPathEndPointsBuilderTest extends BuilderTest with MockitoSugar {
@@ -31,7 +31,7 @@ class DisconnectedShortestPathEndPointsBuilderTest extends BuilderTest with Mock
   val identifier = "n"
   val otherIdentifier = "p"
   val shortestPath = ShortestPath("p",
-    SingleNode(identifier), SingleNode(otherIdentifier), Seq.empty, Direction.OUTGOING, false, None, single = true, None)
+    SingleNode(identifier), SingleNode(otherIdentifier), Seq.empty, SemanticDirection.OUTGOING, false, None, single = true, None)
 
   test("should_add_nodes_for_shortest_path") {
     // Given

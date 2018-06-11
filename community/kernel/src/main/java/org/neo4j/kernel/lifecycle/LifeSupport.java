@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.neo4j.function.Consumer;
 import org.neo4j.function.Function;
+import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.logging.Logger;
 
@@ -38,9 +39,9 @@ import org.neo4j.logging.Logger;
 public class LifeSupport
         implements Lifecycle
 {
-    private volatile List<LifecycleInstance> instances = new ArrayList<LifecycleInstance>();
+    private volatile List<LifecycleInstance> instances = new ArrayList<>();
     private volatile LifecycleStatus status = LifecycleStatus.NONE;
-    private final List<LifecycleListener> listeners = new ArrayList<LifecycleListener>();
+    private final List<LifecycleListener> listeners = new ArrayList<>();
     
     public LifeSupport()
     {
@@ -67,14 +68,16 @@ public class LifeSupport
                 catch ( LifecycleException e )
                 {
                     status = changedStatus( this, status, LifecycleStatus.STOPPED );
+
                     try
                     {
                         shutdown();
                     }
-                    catch ( LifecycleException e1 )
+                    catch ( LifecycleException shutdownErr )
                     {
-                        throw causedBy( e1, e );
+                        e.addSuppressed( shutdownErr );
                     }
+
                     throw e;
                 }
             }
@@ -114,11 +117,13 @@ public class LifeSupport
                     try
                     {
                         stop();
+
                     }
-                    catch ( LifecycleException e1 )
+                    catch ( LifecycleException stopErr )
                     {
-                        throw causedBy( e1, e );
+                        e.addSuppressed( stopErr );
                     }
+
                     throw e;
                 }
             }
@@ -139,20 +144,7 @@ public class LifeSupport
         if ( status == LifecycleStatus.STARTED )
         {
             status = changedStatus( this, status, LifecycleStatus.STOPPING );
-            LifecycleException ex = null;
-            for ( int i = instances.size() - 1; i >= 0; i-- )
-            {
-                LifecycleInstance lifecycleInstance = instances.get( i );
-                try
-                {
-                    lifecycleInstance.stop();
-                }
-                catch ( LifecycleException e )
-                {
-                    ex = causedBy( e, ex );
-                }
-            }
-
+            LifecycleException ex = stopInstances(instances);
             status = changedStatus( this, status, LifecycleStatus.STOPPED );
 
             if ( ex != null )
@@ -160,6 +152,24 @@ public class LifeSupport
                 throw ex;
             }
         }
+    }
+
+    private LifecycleException stopInstances(List<LifecycleInstance> instances)
+    {
+        LifecycleException ex = null;
+        for ( int i = instances.size() - 1; i >= 0; i-- )
+        {
+            LifecycleInstance lifecycleInstance = instances.get( i );
+            try
+            {
+                lifecycleInstance.stop();
+            }
+            catch ( LifecycleException e )
+            {
+                ex = ex == null ? e : Exceptions.withSuppressed( ex, e );
+            }
+        }
+        return ex;
     }
 
     /**
@@ -194,7 +204,7 @@ public class LifeSupport
                 }
                 catch ( LifecycleException e )
                 {
-                    ex = causedBy( e, ex );
+                    ex = ex == null ? e : Exceptions.withSuppressed( ex, e );
                 }
             }
 
@@ -208,117 +218,37 @@ public class LifeSupport
     }
 
     /**
-     * Restart an individual instance. All instances "after" the instance will be stopped first,
-     * so that they don't try to use it during the restart. A restart is effectively a stop followed
-     * by a start.
-     *
-     * @throws LifecycleException       if any start or stop fails
-     * @throws IllegalArgumentException if instance is not registered
-     */
-    public synchronized void restart( Lifecycle instance )
-            throws LifecycleException, IllegalArgumentException
-    {
-        if ( status == LifecycleStatus.STARTED )
-        {
-            boolean foundRestartingInstance = false;
-            List<LifecycleInstance> restartingInstances = new ArrayList<LifecycleInstance>();
-            for ( LifecycleInstance lifecycleInstance : instances )
-            {
-                if ( lifecycleInstance.instance == instance )
-                {
-                    foundRestartingInstance = true;
-                }
-
-                if ( foundRestartingInstance )
-                {
-                    restartingInstances.add( lifecycleInstance );
-                }
-            }
-
-            if ( !foundRestartingInstance )
-            {
-                throw new IllegalArgumentException( "Instance is not registered" );
-            }
-
-            // Stop instances
-            status = changedStatus( this, status, LifecycleStatus.STOPPING );
-            LifecycleException ex = null;
-            for ( int i = restartingInstances.size() - 1; i >= 0; i-- )
-            {
-                LifecycleInstance lifecycleInstance = restartingInstances.get( i );
-                try
-                {
-                    lifecycleInstance.stop();
-                }
-                catch ( LifecycleException e )
-                {
-                    ex = causedBy( e, ex );
-                }
-            }
-
-            // Failed stop - stop the whole thing to be safe
-            if ( ex != null )
-            {
-                status = changedStatus( this, status, LifecycleStatus.STARTED );
-                try
-                {
-                    stop();
-                    throw ex;
-                }
-                catch ( LifecycleException e )
-                {
-                    throw causedBy( e, ex );
-                }
-            }
-
-            // Start instances
-            try
-            {
-                for ( int i = 0; i < restartingInstances.size(); i++ )
-                {
-                    LifecycleInstance lifecycle = restartingInstances.get( i );
-                    lifecycle.start();
-                }
-                status = changedStatus( this, status, LifecycleStatus.STARTED );
-            }
-            catch ( LifecycleException e )
-            {
-                // Failed restart - stop the whole thing to be safe
-                status = changedStatus( this, status, LifecycleStatus.STARTED );
-                try
-                {
-                    stop();
-                    throw e;
-                }
-                catch ( LifecycleException e1 )
-                {
-                    throw causedBy( e1, e );
-                }
-            }
-        }
-    }
-
-    /**
      * Add a new Lifecycle instance. It will immediately be transitioned
      * to the state of this LifeSupport.
      *
      * @param instance the Lifecycle instance to add
-     * @param <T>      type of the instance
+     * @param <T> type of the instance
      * @return the instance itself
      * @throws LifecycleException if the instance could not be transitioned properly
      */
-    public synchronized <T> T add( T instance )
+    public synchronized <T extends Lifecycle> T add( T instance )
             throws LifecycleException
     {
-        if ( instance instanceof Lifecycle )
-        {
-            LifecycleInstance newInstance = new LifecycleInstance( (Lifecycle) instance );
-            List<LifecycleInstance> tmp = new ArrayList<>( instances );
-            tmp.add(newInstance);
-            instances = tmp;
-            bringToState( newInstance );
-        }
+        assert instance != null;
+        assert notAlreadyAdded( instance );
+        LifecycleInstance newInstance = new LifecycleInstance( instance );
+        List<LifecycleInstance> tmp = new ArrayList<>( instances );
+        tmp.add( newInstance );
+        instances = tmp;
+        bringToState( newInstance );
         return instance;
+    }
+
+    private boolean notAlreadyAdded( Lifecycle instance )
+    {
+        for ( LifecycleInstance candidate : instances )
+        {
+            if ( candidate.instance == instance )
+            {
+                throw new IllegalStateException( instance + " already added", candidate.addedWhere );
+            }
+        }
+        return true;
     }
 
     public synchronized boolean remove( Object instance )
@@ -386,13 +316,13 @@ public class LifeSupport
             @Override
             public void accept( Logger bulkLogger )
             {
-                bulkLogger.log( "Lifecycle status: %s", status.name() );
+                bulkLogger.log("Lifecycle status: %s", status.name());
                 for ( LifecycleInstance instance : instances )
                 {
-                    bulkLogger.log( instance.toString() );
+                    bulkLogger.log(instance.toString());
                 }
             }
-        } );
+        });
     }
 
     private void bringToState( LifecycleInstance instance )
@@ -409,23 +339,6 @@ public class LifeSupport
             case SHUTDOWN:
                 break;
         }
-    }
-
-    private LifecycleException causedBy( LifecycleException exception, LifecycleException chainedLifecycleException )
-    {
-        if ( chainedLifecycleException == null )
-        {
-            return exception;
-        }
-        
-        Throwable current = exception;
-        while ( current.getCause() != null )
-        {
-            current = current.getCause();
-        }
-
-        current.initCause( chainedLifecycleException );
-        return exception;
     }
 
     private LifecycleStatus changedStatus( Lifecycle instance,
@@ -485,10 +398,18 @@ public class LifeSupport
     {
         Lifecycle instance;
         LifecycleStatus currentStatus = LifecycleStatus.NONE;
+        Exception addedWhere;
 
         private LifecycleInstance( Lifecycle instance )
         {
             this.instance = instance;
+            assert trackInstantiationStackTrace();
+        }
+
+        private boolean trackInstantiationStackTrace()
+        {
+            addedWhere = new Exception();
+            return true;
         }
 
         @Override
@@ -506,6 +427,10 @@ public class LifeSupport
                 catch ( Throwable e )
                 {
                     currentStatus = changedStatus( instance, currentStatus, LifecycleStatus.NONE );
+                    if( e instanceof LifecycleException )
+                    {
+                        throw (LifecycleException)e;
+                    }
                     throw new LifecycleException( instance, LifecycleStatus.NONE, LifecycleStatus.STOPPED, e );
                 }
             }
@@ -530,6 +455,10 @@ public class LifeSupport
                 catch ( Throwable e )
                 {
                     currentStatus = changedStatus( instance, currentStatus, LifecycleStatus.STOPPED );
+                    if( e instanceof LifecycleException )
+                    {
+                        throw (LifecycleException)e;
+                    }
                     throw new LifecycleException( instance, LifecycleStatus.STOPPED, LifecycleStatus.STARTED, e );
                 }
             }
@@ -545,6 +474,10 @@ public class LifeSupport
                 try
                 {
                     instance.stop();
+                }
+                catch ( LifecycleException e )
+                {
+                    throw e;
                 }
                 catch ( Throwable e )
                 {
@@ -572,6 +505,10 @@ public class LifeSupport
                 try
                 {
                     instance.shutdown();
+                }
+                catch ( LifecycleException e )
+                {
+                    throw e;
                 }
                 catch ( Throwable e )
                 {

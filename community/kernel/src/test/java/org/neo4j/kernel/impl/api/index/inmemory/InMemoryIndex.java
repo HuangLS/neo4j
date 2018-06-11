@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -39,9 +39,9 @@ import org.neo4j.kernel.api.index.NodePropertyUpdate;
 import org.neo4j.kernel.api.index.PropertyAccessor;
 import org.neo4j.kernel.api.index.Reservation;
 import org.neo4j.kernel.impl.api.index.IndexUpdateMode;
+import org.neo4j.register.Register.DoubleLong;
 
 import static org.neo4j.helpers.collection.IteratorUtil.emptyIterator;
-import static org.neo4j.register.Register.DoubleLong;
 
 class InMemoryIndex
 {
@@ -191,12 +191,17 @@ class InMemoryIndex
     private class OnlineAccessor implements IndexAccessor
     {
         @Override
-        public void force() throws IOException
+        public void force()
         {
         }
 
         @Override
-        public void drop() throws IOException
+        public void flush()
+        {
+        }
+
+        @Override
+        public void drop()
         {
             indexData.drop();
         }
@@ -208,7 +213,7 @@ class InMemoryIndex
         }
 
         @Override
-        public void close() throws IOException
+        public void close()
         {
         }
 

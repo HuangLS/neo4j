@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,6 +25,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.neo4j.cluster.ClusterSettings;
 import org.neo4j.cluster.client.ClusterClient;
@@ -69,10 +71,12 @@ import static org.neo4j.server.configuration.Configurator.NEO_SERVER_CONFIG_FILE
 public class StandaloneClusterClient
 {
     private final LifeSupport life;
+    private final Timer timer;
 
     private StandaloneClusterClient( LifeSupport life )
     {
         this.life = life;
+        timer = new Timer( true );
         addShutdownHook();
         life.start();
     }
@@ -84,6 +88,18 @@ public class StandaloneClusterClient
             @Override
             public void run()
             {
+                // ClusterJoin will block on a Future.get(), which will prevent it to shutdown.
+                // Adding a timer here in case a shutdown is requested before cluster join has succeeded. Otherwise
+                // the deadlock will prevent the shutdown from finishing.
+                timer.schedule( new TimerTask()
+                {
+                    @Override
+                    public void run()
+                    {
+                        System.err.println( "Failed to stop in a reasonable time, terminating..." );
+                        Runtime.getRuntime().halt( 1 );
+                    }
+                },  4_000L);
                 life.shutdown();
             }
         } );

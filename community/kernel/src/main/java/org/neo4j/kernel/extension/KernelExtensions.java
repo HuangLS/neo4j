@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -47,10 +47,10 @@ public class KernelExtensions extends DependencyResolver.Adapter implements Life
     private final UnsatisfiedDependencyStrategy unsatisfiedDepencyStrategy;
 
     public KernelExtensions( KernelContext kernelContext, Iterable<KernelExtensionFactory<?>> kernelExtensionFactories,
-                             Dependencies dependencies, UnsatisfiedDependencyStrategy unsatisfiedDepencyStrategy )
+                             Dependencies dependencies, UnsatisfiedDependencyStrategy unsatisfiedDependencyStrategy )
     {
         this.kernelContext = kernelContext;
-        this.unsatisfiedDepencyStrategy = unsatisfiedDepencyStrategy;
+        this.unsatisfiedDepencyStrategy = unsatisfiedDependencyStrategy;
         this.kernelExtensionFactories = Iterables.addAll( new ArrayList<KernelExtensionFactory<?>>(),
                 kernelExtensionFactories );
         this.dependencies = dependencies;

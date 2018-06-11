@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,14 @@
  */
 package org.neo4j.helpers.collection;
 
+import java.util.Iterator;
+
 import org.neo4j.function.Predicate;
 import org.neo4j.function.Predicates;
 
-import java.util.Iterator;
-
 /**
  * An iterator which filters another iterator, only letting items with certain
- * criterias pass through. All iteration/filtering is done lazily.
+ * criteria pass through. All iteration/filtering is done lazily.
  * 
  * @param <T> the type of items in the iteration.
  */
@@ -36,8 +36,10 @@ public class FilteringIterator<T> extends PrefetchingIterator<T>
 	private final Predicate<T> predicate;
 
 	/**
-	 * @deprecated use {@link #FilteringIterator( Iterator, Predicate )} instead
-	 */
+     * @deprecated use {@link #FilteringIterator( Iterator, Predicate )} instead
+     * @param source the iterator to fetch items from
+     * @param predicate the filter to use
+     */
 	@Deprecated
 	public FilteringIterator( Iterator<T> source, org.neo4j.helpers.Predicate<T> predicate )
 	{

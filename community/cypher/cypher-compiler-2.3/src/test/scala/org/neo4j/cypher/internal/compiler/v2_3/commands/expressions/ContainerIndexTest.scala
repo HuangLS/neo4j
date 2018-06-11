@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -25,16 +25,17 @@ import org.mockito.stubbing.Answer
 import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryStateHelper
 import org.neo4j.cypher.internal.compiler.v2_3.spi.{Operations, QueryContext}
-import org.neo4j.cypher.internal.compiler.v2_3.symbols._
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
-import org.neo4j.graphdb.{Relationship, Node}
+import org.neo4j.cypher.internal.compiler.v2_3.symbols.{FakeExpression, SymbolTable}
+import org.neo4j.cypher.internal.frontend.v2_3.symbols._
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.graphdb.{Node, Relationship}
 
 import scala.collection.JavaConverters._
 
 class ContainerIndexTest extends CypherFunSuite {
 
   val qtx = mock[QueryContext]
-  implicit val state = QueryStateHelper.empty.copy(query = qtx)
+  implicit val state = QueryStateHelper.empty.withQueryContext(qtx)
   val ctx = ExecutionContext.empty
   val expectedNull: Any = null
 

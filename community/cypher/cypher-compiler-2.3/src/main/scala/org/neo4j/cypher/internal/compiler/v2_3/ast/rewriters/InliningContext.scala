@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters
 
-import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.ast._
-import org.neo4j.cypher.internal.compiler.v2_3.bottomUp.BottomUpRewriter
-import InliningContext._
+import org.neo4j.cypher.internal.frontend.v2_3.ast._
+import org.neo4j.cypher.internal.compiler.v2_3.ast.rewriters.InliningContext._
+import org.neo4j.cypher.internal.frontend.v2_3.{Rewriter, bottomUp, TypedRewriter}
+import org.neo4j.cypher.internal.frontend.v2_3.bottomUp.BottomUpRewriter
 
 case class InliningContext(projections: Map[Identifier, Expression] = Map.empty,
                            seenIdentifiers: Set[Identifier] = Set.empty,

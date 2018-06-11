@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -57,9 +57,7 @@ public class ConfigureEnabledManagementConsolesDocIT extends ExclusiveServerTest
     @Test
     public void shellConsoleShouldBeEnabledByDefault() throws Exception
     {
-        server = server()
-                .usingDatabaseDir( folder.directory( name.getMethodName() ).getAbsolutePath() )
-                .build();
+        server = server().usingDatabaseDir( folder.directory( name.getMethodName() ).getAbsolutePath() ).build();
         server.start();
 
         assertThat( exec( "ls", "shell" ).getStatus(), is( 200 ) );

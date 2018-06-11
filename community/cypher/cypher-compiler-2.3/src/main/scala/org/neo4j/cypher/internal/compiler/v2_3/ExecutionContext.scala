@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,10 +19,10 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3
 
-import mutation.UpdateAction
-import pipes.MutableMaps
-import collection.{immutable, Iterator}
-import collection.mutable.{Queue, Map => MutableMap}
+import org.neo4j.cypher.internal.compiler.v2_3.pipes.MutableMaps
+
+import scala.collection.mutable.{Map => MutableMap}
+import scala.collection.{Iterator, immutable}
 
 object ExecutionContext {
   def empty = new ExecutionContext()
@@ -30,8 +30,7 @@ object ExecutionContext {
   def from(x: (String, Any)*) = new ExecutionContext().newWith(x)
 }
 
-case class ExecutionContext(m: MutableMap[String, Any] = MutableMaps.empty,
-                            mutationCommands: Queue[UpdateAction] = Queue.empty)
+case class ExecutionContext(m: MutableMap[String, Any] = MutableMaps.empty)
   extends MutableMap[String, Any] {
 
   def get(key: String): Option[Any] = m.get(key)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -78,7 +78,7 @@ public enum ElectionState
                 )
                         throws Throwable
                 {
-                    Log log = context.getInternalLog( ElectionState.class );
+                    Log log = context.getLog( ElectionState.class );
                     switch ( message.getMessageType() )
                     {
                         case demote:
@@ -160,7 +160,7 @@ public enum ElectionState
                                         String roleName = role.getName();
                                         if ( !context.isElectionProcessInProgress( roleName ) )
                                         {
-                                            context.getInternalLog(ElectionState.class).debug(
+                                            context.getLog( ElectionState.class ).debug(
                                                     "Starting election process for role " + roleName );
 
                                             context.startElectionProcess( roleName );

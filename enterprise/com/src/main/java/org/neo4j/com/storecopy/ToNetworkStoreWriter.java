@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -19,11 +19,11 @@
  */
 package org.neo4j.com.storecopy;
 
+import org.jboss.netty.buffer.ChannelBuffer;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
-
-import org.jboss.netty.buffer.ChannelBuffer;
 
 import org.neo4j.com.BlockLogBuffer;
 import org.neo4j.com.Protocol;
@@ -32,13 +32,15 @@ import org.neo4j.kernel.monitoring.Monitors;
 
 public class ToNetworkStoreWriter implements StoreWriter
 {
+    public static final String STORE_COPIER_MONITOR_TAG = "storeCopier";
+
     private final ChannelBuffer targetBuffer;
     private final ByteCounterMonitor bufferMonitor;
 
     public ToNetworkStoreWriter( ChannelBuffer targetBuffer, Monitors monitors )
     {
         this.targetBuffer = targetBuffer;
-        bufferMonitor = monitors.newMonitor( ByteCounterMonitor.class, getClass(), "storeCopier" );
+        bufferMonitor = monitors.newMonitor( ByteCounterMonitor.class, getClass(), STORE_COPIER_MONITOR_TAG );
     }
 
     @Override

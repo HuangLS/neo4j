@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -20,32 +20,34 @@
 package org.neo4j.cypher.internal.compiler.v2_3.planner.logical.cardinality
 
 import org.neo4j.cypher.internal.compiler.v2_3.planner.logical.Selectivity
-import org.neo4j.cypher.internal.compiler.v2_3.test_helpers.CypherFunSuite
+import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 
 class SelectivityCombinerTest extends CypherFunSuite {
 
   test("should not lose precision for intermediate numbers") {
-    val selectivities = Seq(Selectivity(1e-10), Selectivity(2e-10))
+    val selectivities = Seq(Selectivity.of(1e-10).get, Selectivity.of(2e-10).get)
 
-    IndependenceCombiner.orTogetherSelectivities(selectivities).get should not equal Selectivity(0)
+    IndependenceCombiner.orTogetherSelectivities(selectivities).get should not equal Selectivity.ZERO
   }
 
   test("should not lose precision for small numbers") {
-    val selectivities = Seq(Selectivity(1e-100), Selectivity(2e-100), Selectivity(1e-300))
+    val selectivities = Seq(Selectivity.of(1e-100).get, Selectivity.of(2e-100).get, Selectivity.of(1e-300).get)
 
-    IndependenceCombiner.orTogetherSelectivities(selectivities).get should not equal Selectivity(0)
+    IndependenceCombiner.orTogetherSelectivities(selectivities).get should not equal Selectivity.ZERO
   }
 
   test("ANDing together works as expected") {
-    val selectivities = Seq(Selectivity(.1), Selectivity(.2), Selectivity.ONE)
+    val selectivities = Seq(Selectivity.of(.1).get, Selectivity.of(.2).get, Selectivity.ONE)
 
-    IndependenceCombiner.andTogetherSelectivities(selectivities).get should equal(Selectivity(0.02))
+    val selectivity = IndependenceCombiner.andTogetherSelectivities(selectivities).get.factor
+    assert( selectivity === 0.02 +- 0.000000000000000002 )
   }
 
   test("ORing together works as expected") {
-    val selectivities = Seq(Selectivity(.1), Selectivity(.2))
+    val selectivities = Seq(Selectivity.of(.1).get, Selectivity.of(.2).get)
 
-    IndependenceCombiner.orTogetherSelectivities(selectivities).get should equal(Selectivity(0.28))
+    val selectivity = IndependenceCombiner.orTogetherSelectivities(selectivities).get.factor
+    assert( selectivity === 0.28 +- 0.000000000000000028 )
   }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2015 "Neo Technology,"
+ * Copyright (c) 2002-2018 "Neo Technology,"
  * Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -39,13 +39,13 @@ import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.logging.FormattedLogProvider;
 import org.neo4j.kernel.impl.logging.SimpleLogService;
 import org.neo4j.kernel.impl.store.MismatchingStoreIdException;
 import org.neo4j.kernel.impl.storemigration.LogFiles;
 import org.neo4j.kernel.impl.storemigration.StoreFile;
 import org.neo4j.kernel.impl.storemigration.StoreFileType;
 import org.neo4j.kernel.impl.storemigration.UpgradeNotAllowedByConfigurationException;
+import org.neo4j.logging.FormattedLogProvider;
 import org.neo4j.logging.NullLogProvider;
 
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
@@ -63,6 +63,7 @@ public class BackupTool
     private static final String VERIFY = "verify";
     private static final String CONFIG = "config";
 
+    private static final String CONSISTENCY_CHECKER = "consistency-checker";
 
     private static final String TIMEOUT = "timeout";
     private static final String FORENSICS = "gather-forensics";
@@ -95,11 +96,7 @@ public class BackupTool
         }
         catch ( ToolFailureException e )
         {
-            if ( e.getCause() != null )
-            {
-                e.getCause().printStackTrace( System.out );
-            }
-
+            System.out.println( "Backup failed." );
             exitFailure( e.getMessage() );
         }
     }
@@ -142,17 +139,29 @@ public class BackupTool
     {
         String from = args.get( FROM ).trim();
         String to = args.get( TO ).trim();
-        boolean verify = args.getBoolean( VERIFY, true, true );
         Config tuningConfiguration = readTuningConfiguration( args );
         boolean forensics = args.getBoolean( FORENSICS, false, true );
+        ConsistencyCheck consistencyCheck = parseConsistencyChecker( args );
 
-        long timeout = args.getDuration(TIMEOUT, BackupClient.BIG_READ_TIMEOUT);
+        long timeout = args.getDuration( TIMEOUT, BackupClient.BIG_READ_TIMEOUT );
 
         URI backupURI = resolveBackupUri( from, args, tuningConfiguration );
 
         HostnamePort hostnamePort = newHostnamePort( backupURI );
 
-        return executeBackup( hostnamePort, new File( to ), verify, tuningConfiguration, timeout, forensics );
+        return executeBackup( hostnamePort, new File( to ), consistencyCheck, tuningConfiguration, timeout, forensics );
+    }
+
+    private static ConsistencyCheck parseConsistencyChecker( Args args )
+    {
+        boolean verify = args.getBoolean( VERIFY, true, true );
+        if ( verify )
+        {
+            String consistencyCheckerName = args.get( CONSISTENCY_CHECKER, ConsistencyCheck.DEFAULT.toString(),
+                    ConsistencyCheck.DEFAULT.toString() );
+            return ConsistencyCheck.fromString( consistencyCheckerName );
+        }
+        return ConsistencyCheck.NONE;
     }
 
     private BackupOutcome runBackup( Args args ) throws ToolFailureException
@@ -160,9 +169,9 @@ public class BackupTool
         String host = args.get( HOST ).trim();
         int port = args.getNumber( PORT, BackupServer.DEFAULT_PORT ).intValue();
         String to = args.get( TO ).trim();
-        boolean verify = args.getBoolean( VERIFY, true, true );
         Config tuningConfiguration = readTuningConfiguration( args );
         boolean forensics = args.getBoolean( FORENSICS, false, true );
+        ConsistencyCheck consistencyCheck = parseConsistencyChecker( args );
 
         if ( host.contains( ":" ) )
         {
@@ -176,22 +185,22 @@ public class BackupTool
             }
         }
 
-        long timeout = args.getDuration(TIMEOUT, BackupClient.BIG_READ_TIMEOUT);
+        long timeout = args.getDuration( TIMEOUT, BackupClient.BIG_READ_TIMEOUT );
 
         URI backupURI = newURI( DEFAULT_SCHEME + "://" + host + ":" + port ); // a bit of validation
 
         HostnamePort hostnamePort = newHostnamePort( backupURI );
 
-        return executeBackup( hostnamePort, new File( to ), verify, tuningConfiguration, timeout, forensics );
+        return executeBackup( hostnamePort, new File( to ), consistencyCheck, tuningConfiguration, timeout, forensics );
     }
 
-    private BackupOutcome executeBackup( HostnamePort hostnamePort, File to, boolean verify,
-                                Config tuningConfiguration, long timeout, boolean forensics ) throws ToolFailureException
+    private BackupOutcome executeBackup( HostnamePort hostnamePort, File to, ConsistencyCheck consistencyCheck,
+            Config tuningConfiguration, long timeout, boolean forensics ) throws ToolFailureException
     {
         try
         {
             systemOut.println( "Performing backup from '" + hostnamePort + "'" );
-            return doBackup( hostnamePort, to, verify, tuningConfiguration, timeout, forensics );
+            return doBackup( hostnamePort, to, consistencyCheck, tuningConfiguration, timeout, forensics );
         }
         catch ( TransactionFailureException tfe )
         {
@@ -210,7 +219,7 @@ public class BackupTool
                             " - cannot continue, aborting.", e );
                 }
 
-                return doBackup( hostnamePort, to, verify, tuningConfiguration, timeout, forensics );
+                return doBackup( hostnamePort, to, consistencyCheck, tuningConfiguration, timeout, forensics );
             }
             else
             {
@@ -220,34 +229,36 @@ public class BackupTool
         }
     }
 
-    private BackupOutcome doBackup( HostnamePort hostnamePort, File to, boolean checkConsistency,
-                           Config config, long timeout, boolean forensics ) throws ToolFailureException
+    private BackupOutcome doBackup( HostnamePort hostnamePort, File to, ConsistencyCheck consistencyCheck,
+            Config config, long timeout, boolean forensics ) throws ToolFailureException
     {
         try
         {
             String host = hostnamePort.getHost();
             int port = hostnamePort.getPort();
 
-            BackupOutcome outcome =
-                    backupService.doIncrementalBackupOrFallbackToFull( host, port, to,
-                            checkConsistency, config, timeout, forensics );
+            BackupOutcome outcome = backupService.doIncrementalBackupOrFallbackToFull( host, port, to, consistencyCheck,
+                    config, timeout, forensics );
             systemOut.println( "Done" );
             return outcome;
         }
         catch ( MismatchingStoreIdException e )
         {
-            systemOut.println( "Backup failed." );
             throw new ToolFailureException( String.format( MISMATCHED_STORE_ID, e.getExpected(), e.getEncountered() ) );
         }
         catch ( ComException e )
         {
             throw new ToolFailureException( "Couldn't connect to '" + hostnamePort + "'", e );
         }
+        catch ( IncrementalBackupNotPossibleException e )
+        {
+            throw new ToolFailureException( e.getMessage(), e );
+        }
     }
 
     private static Config readTuningConfiguration( Args arguments ) throws ToolFailureException
     {
-        Map<String, String> specifiedProperties = stringMap();
+        Map<String,String> specifiedProperties = stringMap();
 
         String propertyFilePath = arguments.get( CONFIG, null );
         if ( propertyFilePath != null )
@@ -321,7 +332,8 @@ public class BackupTool
 
         try
         {
-            return service.resolve( from, args, new SimpleLogService( FormattedLogProvider.toOutputStream( System.out ), NullLogProvider.getInstance() ) );
+            return service.resolve( from, args, new SimpleLogService( FormattedLogProvider.toOutputStream( System.out ),
+                    NullLogProvider.getInstance() ) );
         }
         catch ( Throwable t )
         {
@@ -351,8 +363,8 @@ public class BackupTool
         {
             throw new IOException( "Trouble making target backup directory " + backupDir.getAbsolutePath() );
         }
-        StoreFile.fileOperation( MOVE, fs, toDir, backupDir, StoreFile.currentStoreFiles(),
-                false, false, StoreFileType.values() );
+        StoreFile.fileOperation( MOVE, fs, toDir, backupDir, StoreFile.currentStoreFiles(), false, false,
+                StoreFileType.values() );
         LogFiles.move( fs, toDir, backupDir );
     }
 
