@@ -21,6 +21,9 @@ package org.neo4j.cypher.internal.compiler.v2_3
 
 import java.lang.Iterable
 import java.util
+
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult
+import org.act.temporalProperty.query.range.TimeRangeQuery
 import org.neo4j.cypher.internal.compiler.v2_3.mutation.{CreateUniqueAction, UniqueLink}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
 import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
@@ -188,4 +191,16 @@ class PausingNode(n: Node, afterGetRelationship: Node => Unit) extends Node {
   def getDegree( relType:RelationshipType ):Int = ???
 
   def getDegree( relType:RelationshipType, direction:Direction ):Int = ???
+
+  override def getTemporalProperty(key: String, time: Int): AnyRef = ???
+
+  override def getTemporalProperty(key: String, startTime: Int, endTime: Int, callBack: TimeRangeQuery): AnyRef = ???
+
+  override def getTemporalPropertyWithIndex(key: String, start: Int, end: Int, indexId: Long): AggregationIndexQueryResult = ???
+
+  override def setTemporalProperty(key: String, time: Int, value: scala.Any): Unit = ???
+
+  override def setTemporalProperty(key: String, start: Int, end: Int, value: scala.Any): Unit = ???
+
+  override def removeTemporalProperty(key: String): Unit = ???
 }

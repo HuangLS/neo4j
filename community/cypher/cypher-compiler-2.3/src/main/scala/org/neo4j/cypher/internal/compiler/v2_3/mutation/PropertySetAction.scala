@@ -23,8 +23,9 @@ import org.neo4j.cypher.internal.compiler.v2_3._
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions._
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.Effects
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
+import org.neo4j.cypher.internal.compiler.v2_3.spi.Operations
 import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
-import org.neo4j.graphdb.{Node, Relationship}
+import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
 import org.neo4j.helpers.ThisShouldNotHappenError
 
 case class PropertySetAction(prop: Property, valueExpression: Expression)
@@ -46,14 +47,49 @@ case class PropertySetAction(prop: Property, valueExpression: Expression)
         case (e: Node) => (e.getId, qtx.nodeOps)
         case _ => throw new ThisShouldNotHappenError("Stefan", "This should be a node or a relationship")
       }
-
-      makeValueNeoSafe(valueExpression(context)) match {
+      val v = valueExpression(context)
+      if (isTemporalValue(v)){
+        setTemporalVal(id, propertyKey.getOrCreateId(qtx), v, ops )
+      }else makeValueNeoSafe(v) match {
         case null => propertyKey.getOptId(qtx).foreach(ops.removeProperty(id, _))
         case value => ops.setProperty(id, propertyKey.getOrCreateId(qtx), value)
       }
     }
 
     Iterator(context)
+  }
+
+// TGraph: union type definition: https://stackoverflow.com/questions/3508077/how-to-define-type-disjunction-union-types
+  type ¬[A] = A => Nothing
+  type ∨[T, U] = ¬[¬[T] with ¬[U]]
+  type ¬¬[A] = ¬[¬[A]]
+  type |∨|[T, U] = { type λ[X] = ¬¬[X] <:< (T ∨ U) }
+
+//  private def setTemporalVal(entityId:Long, propId:Int, value:Any, op:Operations[ Node |∨| Relationship]) = {
+  private def setTemporalVal(entityId:Long, propId:Int, value:Any, op:Operations[ _ >: Node with Relationship <: PropertyContainer]) = {
+    value match {
+      case v:Seq[(Long, Long, Long)] => v.foreach(i =>{
+        val start = Math.toIntExact(i._1)
+        val end = Math.toIntExact(i._2)
+        op.setTemporalProperty(entityId, propId, start, end, i._3)
+      })
+      case v:Seq[(Long, Long, Double)] => v.foreach(i =>{
+        val start = Math.toIntExact(i._1)
+        val end = Math.toIntExact(i._2)
+        op.setTemporalProperty(entityId, propId, start, end, i._3)
+      })
+      case v:Seq[(Long, Long, String)] => v.foreach(i =>{
+        val start = Math.toIntExact(i._1)
+        val end = Math.toIntExact(i._2)
+        op.setTemporalProperty(entityId, propId, start, end, i._3)
+      })
+      case _ => throw new RuntimeException("TGraph SNH: type mismatch")
+    }
+  }
+
+  private def isTemporalValue(value:Any):Boolean = value match {
+    case i:Seq[(Int, Int, Any)] => true
+    case _ => false
   }
 
   def identifiers = Nil

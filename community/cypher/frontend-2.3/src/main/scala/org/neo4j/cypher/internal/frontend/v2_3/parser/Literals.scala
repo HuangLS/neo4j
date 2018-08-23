@@ -20,6 +20,7 @@
 package org.neo4j.cypher.internal.frontend.v2_3.parser
 
 import org.neo4j.cypher.internal.frontend.v2_3.ast
+import org.neo4j.cypher.internal.frontend.v2_3.ast.TimeInterval
 import org.parboiled.scala._
 
 trait Literals extends Parser
@@ -53,6 +54,21 @@ trait Literals extends Parser
     group(
       ch('{') ~~ zeroOrMore(PropertyKeyName ~~ ch(':') ~~ Expression, separator = CommaSep) ~~ ch('}')
     ) ~~>> (ast.MapExpression(_))
+  }
+
+  def TimePointLiteral: Rule1[ast.TimePoint] = rule {
+    UnsignedIntegerLiteral ~~>> (ast.TimePoint(_)) |
+      StringLiteral ~~>> (ast.TimePoint(_))
+  }
+
+  def TimeIntervalLiteral : Rule1[ast.TimeInterval] = rule {
+    TimePointLiteral ~~ ch('~') ~~ TimePointLiteral  ~~>> (ast.TimeInterval(_, _))
+  }
+
+  def TemporalValueLiteral: Rule1[ast.TemporalValueExpression] = rule {
+    group(
+      "TV(" ~~ oneOrMore( TimeIntervalLiteral ~~ ch(':') ~~ Expression, separator = CommaSep) ~~ ch(')')
+    ) ~~>> (ast.TemporalValueExpression(_))
   }
 
   def Parameter: Rule1[ast.Parameter] = rule("a parameter") {

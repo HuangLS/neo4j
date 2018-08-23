@@ -27,6 +27,9 @@ package object symbols {
   val CTFloat = FloatType.instance
   val CTInteger = IntegerType.instance
   val CTMap = MapType.instance
+  val CTTValue = TemporalValueType.instance
+  val CTTimePoint = TimePointType.instance
+  val CTTimeRange = TimeIntervalType.instance
   val CTNode = NodeType.instance
   val CTRelationship = RelationshipType.instance
   val CTPath = PathType.instance

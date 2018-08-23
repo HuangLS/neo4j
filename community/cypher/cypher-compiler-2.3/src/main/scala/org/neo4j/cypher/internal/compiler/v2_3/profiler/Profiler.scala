@@ -122,6 +122,10 @@ final class ProfilingQueryContext(val inner: QueryContext, val p: Pipe)
   class ProfilerOperations[T <: PropertyContainer](inner: Operations[T]) extends DelegatingOperations[T](inner) {
     override protected def singleDbHit[A](value: A): A = self.singleDbHit(value)
     override protected def manyDbHits[A](value: Iterator[A]): Iterator[A] = self.manyDbHits(value)
+
+    override def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: Int, timeEnd: Int, value: Any): Unit = singleDbHit(inner.setTemporalProperty(obj, propertyKey, timeStart, timeEnd, value))
+
+    override def getTemporalProperty(obj: Long, propertyKey: Int, time: Int): Any = singleDbHit(inner.getTemporalProperty(obj, propertyKey, time))
   }
 
   override def nodeOps: Operations[Node] = new ProfilerOperations(inner.nodeOps)

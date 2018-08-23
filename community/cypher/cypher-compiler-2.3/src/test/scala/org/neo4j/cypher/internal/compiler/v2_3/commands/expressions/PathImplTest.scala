@@ -22,6 +22,8 @@ package org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 import java.lang.Iterable
 import java.util
 
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult
+import org.act.temporalProperty.query.range.TimeRangeQuery
 import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.graphdb.Traverser.Order
@@ -122,6 +124,18 @@ class PathImplTest extends CypherFunSuite {
     def getAllProperties: util.Map[String, AnyRef] = null
 
     override def toString: String = "Rel"
+
+    override def getTemporalProperty(key: String, time: Int): AnyRef = ???
+
+    override def getTemporalProperty(key: String, startTime: Int, endTime: Int, callBack: TimeRangeQuery): AnyRef = ???
+
+    override def getTemporalPropertyWithIndex(key: String, start: Int, end: Int, indexId: Long): AggregationIndexQueryResult = ???
+
+    override def setTemporalProperty(key: String, time: Int, value: scala.Any): Unit = ???
+
+    override def setTemporalProperty(key: String, start: Int, end: Int, value: scala.Any): Unit = ???
+
+    override def removeTemporalProperty(key: String): Unit = ???
   }
 
   class FakeNode extends Node {
@@ -196,5 +210,17 @@ class PathImplTest extends CypherFunSuite {
     def getDegree( relType:RelationshipType ):Int = ???
 
     def getDegree( relType:RelationshipType, direction:Direction ):Int = ???
+
+    override def getTemporalProperty(key: String, time: Int): AnyRef = ???
+
+    override def getTemporalProperty(key: String, startTime: Int, endTime: Int, callBack: TimeRangeQuery): AnyRef = ???
+
+    override def getTemporalPropertyWithIndex(key: String, start: Int, end: Int, indexId: Long): AggregationIndexQueryResult = ???
+
+    override def setTemporalProperty(key: String, time: Int, value: scala.Any): Unit = ???
+
+    override def setTemporalProperty(key: String, start: Int, end: Int, value: scala.Any): Unit = ???
+
+    override def removeTemporalProperty(key: String): Unit = ???
   }
 }

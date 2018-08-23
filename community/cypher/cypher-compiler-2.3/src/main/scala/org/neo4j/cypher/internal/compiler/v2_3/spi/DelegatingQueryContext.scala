@@ -186,4 +186,8 @@ class DelegatingOperations[T <: PropertyContainer](protected val inner: Operatio
   def all: Iterator[T] = manyDbHits(inner.all)
 
   def isDeleted(obj: T): Boolean = inner.isDeleted(obj)
+
+  override def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: Int, timeEnd: Int, value: Any): Unit = singleDbHit(inner.setTemporalProperty(obj, propertyKey, timeStart, timeEnd, value))
+
+  override def getTemporalProperty(obj: Long, propertyKey: Int, time: Int): Any = singleDbHit(inner.getTemporalProperty(obj, propertyKey, time))
 }

@@ -79,15 +79,55 @@ trait GraphElementPropertyFunctions extends CollectionSupport {
   private def setSingleValue(expression: Expression, context: ExecutionContext, pc: PropertyContainer, key: String, state: QueryState) {
     val unsafeValue: Any = expression(context)(state)
     if (unsafeValue != null) {
-      val value = makeValueNeoSafe(unsafeValue)
-      pc match {
-        case n: Node  =>
-          state.query.nodeOps.setProperty(n.getId, state.query.getOrCreatePropertyKeyId(key), value)
+      if (isTemporalValue(unsafeValue)){
+        pc match {
+          case n: Node  => {
+            val propertyName = state.query.getOrCreatePropertyKeyId(key)
+            unsafeValue match {
+              case v:Seq[(Long, Long, Long)] => v.foreach(i =>{
+                val start = Math.toIntExact(i._1)
+                val end = Math.toIntExact(i._2)
+                state.query.nodeOps.setTemporalProperty(n.getId, propertyName, start, end, i._3)
+              })
+              case v:Seq[(Long, Long, Double)] => v.foreach(i =>{
+                val start = Math.toIntExact(i._1)
+                val end = Math.toIntExact(i._2)
+                state.query.nodeOps.setTemporalProperty(n.getId, propertyName, start, end, i._3)
+              })
+              case v:Seq[(Long, Long, String)] => v.foreach(i =>{
+                val start = Math.toIntExact(i._1)
+                val end = Math.toIntExact(i._2)
+                state.query.nodeOps.setTemporalProperty(n.getId, propertyName, start, end, i._3)
+              })
+              case _ => throw new RuntimeException("TGraph SNH: type mismatch")
+            }
+          }
+          case r: Relationship => {
+            val propertyName = state.query.getOrCreatePropertyKeyId(key)
+            unsafeValue match {
+              case v:Seq[(Int, Int, Any)] => v.foreach(i =>
+                state.query.relationshipOps.setTemporalProperty(r.getId, propertyName,  i._1, i._2, i._3)
+              )
+              case _ => throw new RuntimeException("TGraph SNH: type mismatch")
+            }
+          }
+        }
+      } else {
+        val value = makeValueNeoSafe(unsafeValue)
+        pc match {
+          case n: Node  =>
+            state.query.nodeOps.setProperty(n.getId, state.query.getOrCreatePropertyKeyId(key), value)
 
-        case r: Relationship =>
-          state.query.relationshipOps.setProperty(r.getId, state.query.getOrCreatePropertyKeyId(key), value)
+          case r: Relationship =>
+            state.query.relationshipOps.setProperty(r.getId, state.query.getOrCreatePropertyKeyId(key), value)
+        }
       }
     }
+  }
+
+  private def isTemporalValue(value:Any):Boolean = value match {
+    case i:Seq[(Int, Int, Any)] => true
+    case _ => false
   }
 
   def makeValueNeoSafe(a: Any): Any = if (isCollection(a)) {

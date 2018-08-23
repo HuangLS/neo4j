@@ -6,9 +6,11 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Map;
 
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Result;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.event.ErrorState;
 import org.neo4j.graphdb.event.KernelEventHandler;
@@ -21,12 +23,21 @@ import org.neo4j.graphdb.factory.GraphDatabaseFactory;
  */
 public class Neo4jTest
 {
+    public static void deleteFile(File element) {
+        if (element.isDirectory()) {
+            for (File sub : element.listFiles()) {
+                deleteFile(sub);
+            }
+        }
+        element.delete();
+    }
+
     public GraphDatabaseService db( boolean fromScratch ) throws IOException
     {
         File dir = new File( System.getProperty( "java.io.tmpdir" ), "TGRAPH-db" );
         if ( fromScratch )
         {
-            Files.deleteIfExists( dir.toPath() );
+            deleteFile( dir );
         }
         return new GraphDatabaseFactory().newEmbeddedDatabase( dir );
     }
@@ -35,58 +46,26 @@ public class Neo4jTest
     public void createIndexes() throws IOException
     {
         GraphDatabaseService neo4j = db( true );
+        Node node;
         try ( Transaction tx = neo4j.beginTx() )
         {
-            Node node = neo4j.createNode();
+            node = neo4j.createNode();
             node.setProperty( "hehe", "haha" );
-//            neo4j.index().forNodes( "hehe" );
             node.setProperty( "hehe", 1 );
             node.setProperty( "hehe", 2 );
-//            neo4j.registerKernelEventHandler( new KernelEventHandler() {
-//                @Override
-//                public void beforeShutdown()
-//                {
-//                    //
-//                }
-//
-//                @Override
-//                public void kernelPanic( ErrorState error )
-//                {
-//                    //
-//                }
-//
-//                @Override
-//                public Object getResource()
-//                {
-//                    return null;
-//                }
-//
-//                @Override
-//                public ExecutionOrder orderComparedTo( KernelEventHandler other )
-//                {
-//                    return null;
-//                }
-//            } );
-//            neo4j.registerTransactionEventHandler( new TransactionEventHandler<Object>() {
-//                @Override
-//                public Object beforeCommit( TransactionData data ) throws Exception
-//                {
-//                    //return null;
-//                }
-//
-//                @Override
-//                public void afterCommit( TransactionData data, Object state )
-//                {
-//                    //
-//                }
-//
-//                @Override
-//                public void afterRollback( TransactionData data, Object state )
-//                {
-//                    //
-//                }
-//            } )
+            tx.success();
+        }
+
+        try ( Transaction tx = neo4j.beginTx() )
+        {
+            node = neo4j.getNodeById( node.getId() );
+            node.setProperty( "hehe", "haha" );
+            node.setProperty( "hehe", 1 );
+            node.setProperty( "hehe", 2 );
+            tx.success();
         }
         neo4j.shutdown();
     }
+
+
 }

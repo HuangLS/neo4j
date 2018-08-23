@@ -23,6 +23,8 @@ import java.lang.{Iterable => JIterable}
 import java.util
 import java.util.{Iterator => JIterator}
 
+import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult
+import org.act.temporalProperty.query.range.TimeRangeQuery
 import org.junit.Assert._
 import org.mockito.Matchers._
 import org.mockito.Mockito._
@@ -409,6 +411,18 @@ class MonitoredNode(inner: Node, monitor: () => Unit) extends Node {
   def getDegree( relType:RelationshipType ):Int = ???
 
   def getDegree( relType:RelationshipType, direction:Direction ):Int = ???
+
+  override def getTemporalProperty(key: String, time: Int): AnyRef = ???
+
+  override def getTemporalProperty(key: String, startTime: Int, endTime: Int, callBack: TimeRangeQuery): AnyRef = ???
+
+  override def getTemporalPropertyWithIndex(key: String, start: Int, end: Int, indexId: Long): AggregationIndexQueryResult = ???
+
+  override def setTemporalProperty(key: String, time: Int, value: scala.Any): Unit = ???
+
+  override def setTemporalProperty(key: String, start: Int, end: Int, value: scala.Any): Unit = ???
+
+  override def removeTemporalProperty(key: String): Unit = ???
 }
 
 

@@ -156,6 +156,12 @@ trait Operations[T <: PropertyContainer] {
 
   def setProperty(obj: Long, propertyKeyId: Int, value: Any)
 
+  def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: Int, timeEnd:Int, value:Any ): Unit
+
+  def getTemporalProperty(obj: Long, propertyKey: Int, time: Int): Any
+
+//  def
+
   def removeProperty(obj: Long, propertyKeyId: Int)
 
   def getProperty(obj: Long, propertyKeyId: Int): Any

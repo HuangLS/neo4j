@@ -262,6 +262,7 @@ object ExpressionConverters {
     case e: ast.CountStar => commandexpressions.CountStar()
     case e: ast.Property => toCommandProperty(e)
     case e: ast.Parameter => toCommandParameter(e)
+    case e: ast.TemporalValueExpression => toCommandTemporalValue(e)
     case e: ast.CaseExpression => caseExpression(e)
     case e: ast.PatternExpression => commands.PathExpression(e.pattern.asLegacyPatterns)
     case e: ast.ShortestPathExpression => commandexpressions.ShortestPathExpression(e.pattern.asLegacyPatterns(None).head)
@@ -298,6 +299,8 @@ object ExpressionConverters {
       case c => predicates.CoercedPredicate(c)
     }
   }
+
+  def toCommandTemporalValue(e: ast.TemporalValueExpression) = commandexpressions.TemporalValueExpression(e.items)
 
   def toCommandParameter(e: ast.Parameter) = commandexpressions.ParameterExpression(e.name)
 
