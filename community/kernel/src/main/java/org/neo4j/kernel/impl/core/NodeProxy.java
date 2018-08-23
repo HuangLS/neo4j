@@ -519,14 +519,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                ValueType valueType;
-                if(value==null)
-                {
-                    valueType = INVALID;
-                }else{
-                    valueType = ValueType.fromValueContentType(TemporalPropertyValueConvertor.str2type( value.getClass().getSimpleName() ));
-                }
-                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, time, TemporalPropertyWriteOperation.NOW, valueType, value );
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, time, TemporalPropertyWriteOperation.NOW, value );
                 statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
             }
             catch ( IllegalArgumentException e )
@@ -562,14 +555,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                ValueType valueType;
-                if(value==null)
-                {
-                    valueType = INVALID;
-                }else{
-                    valueType = ValueType.fromValueContentType(TemporalPropertyValueConvertor.str2type( value.getClass().getSimpleName() ));
-                }
-                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, start, end, valueType, value );
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, start, end, value );
                 statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
             }
             catch ( ConstraintValidationKernelException e )
@@ -605,7 +591,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, INVALID, null );
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, null );
                 statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
             }
             catch ( ConstraintValidationKernelException e )

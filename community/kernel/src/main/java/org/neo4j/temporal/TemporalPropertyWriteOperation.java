@@ -3,6 +3,7 @@ package org.neo4j.temporal;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.util.Slice;
+import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
 
 /**
  * supported operations: set( create new temporal property, set value for one entity)
@@ -16,8 +17,15 @@ public class TemporalPropertyWriteOperation
     private final InternalKey startKey;
     private Slice valueSlice;
 
-    public TemporalPropertyWriteOperation( long entityId, int proId, int start, int end, ValueType valueType, Object value )
+    public TemporalPropertyWriteOperation( long entityId, int proId, int start, int end, Object value )
     {
+        ValueType valueType;
+        if(value==null)
+        {
+            valueType = ValueType.INVALID;
+        }else{
+            valueType = ValueType.fromValueContentType( TemporalPropertyValueConvertor.str2type( value.getClass().getSimpleName() ) );
+        }
         this.startKey = new InternalKey( proId, entityId, start, valueType);
         this.end = end;
         this.value = value;

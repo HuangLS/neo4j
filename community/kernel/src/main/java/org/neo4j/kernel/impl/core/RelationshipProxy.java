@@ -388,15 +388,8 @@ public class RelationshipProxy
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                ValueType valueType;
-                if(value==null)
-                {
-                    valueType = INVALID;
-                }else{
-                    valueType = ValueType.fromValueContentType( TemporalPropertyValueConvertor.str2type( value.getClass().getSimpleName() ));
-                }
                 TemporalPropertyWriteOperation
-                        tpOp = new TemporalPropertyWriteOperation( this.getId(), propertyKeyId, time, TemporalPropertyWriteOperation.NOW, valueType, value );
+                        tpOp = new TemporalPropertyWriteOperation( this.getId(), propertyKeyId, time, TemporalPropertyWriteOperation.NOW, value );
                 statement.dataWriteOperations().relationshipSetTemporalProperty( tpOp );
             }
             catch ( ConstraintValidationKernelException e )
@@ -432,15 +425,8 @@ public class RelationshipProxy
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                ValueType valueType;
-                if(value==null)
-                {
-                    valueType = INVALID;
-                }else{
-                    valueType = ValueType.fromValueContentType(TemporalPropertyValueConvertor.str2type( value.getClass().getSimpleName() ));
-                }
                 TemporalPropertyWriteOperation
-                        tpOp = new TemporalPropertyWriteOperation( this.getId(), propertyKeyId, start, end, valueType, value );
+                        tpOp = new TemporalPropertyWriteOperation( this.getId(), propertyKeyId, start, end, value );
                 statement.dataWriteOperations().relationshipSetTemporalProperty( tpOp );
             }
             catch ( ConstraintValidationKernelException e )
@@ -476,7 +462,7 @@ public class RelationshipProxy
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( getId(), propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, INVALID, null );
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( getId(), propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, null );
                 statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
             }
             catch ( ConstraintValidationKernelException e )
