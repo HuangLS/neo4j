@@ -33,7 +33,7 @@ case class TemporalValueExpression(items: Seq[(TimeInterval, ASTExpression)]) ex
 
   def arguments = Seq()
 
-  def calculateType(symbols: SymbolTable) = CTAny
+  def calculateType(symbols: SymbolTable) = CTTValue
 
   def symbolTableDependencies = Set()
 }

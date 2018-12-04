@@ -64,6 +64,14 @@ case class Not(rhs: Expression)(val position: InputPosition) extends Expression 
   )
 }
 
+case class TemporalContains(lhs: Expression, rhs: Expression)(val position: InputPosition) extends Expression with BinaryOperatorExpression with InfixFunctionTyping {
+  val signatures = Vector(
+    Signature(argumentTypes = Vector(CTAny, CTAny), outputType = CTBoolean)
+  )
+
+  override def canonicalOperatorSymbol = "~="
+}
+
 case class Equals(lhs: Expression, rhs: Expression)(val position: InputPosition) extends Expression with BinaryOperatorExpression with InfixFunctionTyping {
   val signatures = Vector(
     Signature(argumentTypes = Vector(CTAny, CTAny), outputType = CTBoolean)
