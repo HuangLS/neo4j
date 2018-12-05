@@ -50,7 +50,7 @@ import org.neo4j.kernel.api.{exceptions, _}
 import org.neo4j.kernel.impl.api.KernelStatement
 import org.neo4j.kernel.impl.core.{NodeManager, ThreadToStatementContextBridge}
 import org.neo4j.kernel.security.URLAccessValidationError
-import org.neo4j.temporal.TemporalPropertyWriteOperation
+import org.neo4j.temporal.{TemporalPropertyReadOperation, TemporalPropertyWriteOperation}
 import org.neo4j.tooling.GlobalGraphOperations
 
 import scala.collection.JavaConverters._
@@ -362,6 +362,13 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
       case _: org.neo4j.kernel.api.exceptions.EntityNotFoundException => //ignore
     }
 
+    def getTemporalProperty(id: Long, propertyKeyId: Int, start:Int) = try {
+      val op = new TemporalPropertyReadOperation(id, propertyKeyId, start)
+      statement.readOperations().nodeGetTemporalProperty( op )
+    } catch {
+      case _: org.neo4j.kernel.api.exceptions.EntityNotFoundException => //ignore
+    }
+
     def getById(id: Long) = try {
       graph.getNodeById(id)
     } catch {
@@ -422,6 +429,13 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
     def setTemporalProperty(id: Long, propertyKeyId: Int, start:Int, end:Int, value: Any) = try {
       val op = new TemporalPropertyWriteOperation(id, propertyKeyId, start, end, value)
       statement.dataWriteOperations().nodeSetTemporalProperty( op )
+    } catch {
+      case _: org.neo4j.kernel.api.exceptions.EntityNotFoundException => //ignore
+    }
+
+    def getTemporalProperty(id: Long, propertyKeyId: Int, start:Int) = try {
+      val op = new TemporalPropertyReadOperation(id, propertyKeyId, start)
+      statement.readOperations().relationshipGetTemporalProperty( op )
     } catch {
       case _: org.neo4j.kernel.api.exceptions.EntityNotFoundException => //ignore
     }
