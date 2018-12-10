@@ -262,6 +262,7 @@ object ExpressionConverters {
     case e: ast.CountStar => commandexpressions.CountStar()
     case e: ast.Property => toCommandProperty(e)
     case e: ast.Parameter => toCommandParameter(e)
+    case e: ast.TemporalContains => predicates.TemporalContains(toCommandExpression(e.lhs), toCommandExpression(e.rhs))
     case e: ast.TemporalValueExpression => toCommandTemporalValue(e)
     case e: ast.CaseExpression => caseExpression(e)
     case e: ast.PatternExpression => commands.PathExpression(e.pattern.asLegacyPatterns)

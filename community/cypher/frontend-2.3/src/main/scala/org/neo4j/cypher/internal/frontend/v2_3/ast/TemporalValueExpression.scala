@@ -1,6 +1,6 @@
 package org.neo4j.cypher.internal.frontend.v2_3.ast
 
-import org.neo4j.cypher.internal.frontend.v2_3.InputPosition
+import org.neo4j.cypher.internal.frontend.v2_3.{InputPosition, SemanticCheck}
 import org.neo4j.cypher.internal.frontend.v2_3.ast.Expression.SemanticContext
 import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 
@@ -12,7 +12,7 @@ case class TemporalValueExpression (items: Seq[(TimeInterval, Expression)])(val 
 
   var tpVal: Seq[(Int, Int, Any)] = List()
 
-  override def semanticCheck(ctx: SemanticContext) = {
+  override def semanticCheck(ctx: SemanticContext): SemanticCheck = {
       this.tpVal = items.map(i => {
         // TODO: check expression type
 //        i._2 match {
@@ -21,8 +21,7 @@ case class TemporalValueExpression (items: Seq[(TimeInterval, Expression)])(val 
         i._1.semanticCheck(ctx) chain i._2.semanticCheck(ctx)
         (i._1.items._1.time, i._1.items._2.time, i._2)
       })
-    items.map(_._2).semanticCheck(ctx) chain
-      super.semanticCheck(ctx)
+    items.map(_._2).semanticCheck(ctx)
   }
 
 
@@ -35,7 +34,7 @@ case class TimePoint (item: Expression)(val position: InputPosition) extends Exp
 
   var time:Int = 0
 
-  override def semanticCheck(ctx: SemanticContext) ={
+  override def semanticCheck(ctx: SemanticContext): SemanticCheck ={
     item match {
       case i:UnsignedIntegerLiteral => {
         this.time = Math.toIntExact(i.value)
@@ -61,7 +60,7 @@ case class TimeInterval (items: (TimePoint, TimePoint))(val position: InputPosit
   var start:Int = 0
   var end:Int = 0
 
-  override def semanticCheck(ctx: SemanticContext) = {
+  override def semanticCheck(ctx: SemanticContext): SemanticCheck = {
     items._1.semanticCheck(ctx) chain items._2.semanticCheck(ctx)
     // assert time inc.
     if(items._1.time > items._2.time){

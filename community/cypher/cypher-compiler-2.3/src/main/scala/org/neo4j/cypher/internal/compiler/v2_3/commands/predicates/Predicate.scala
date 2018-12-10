@@ -20,11 +20,12 @@
 package org.neo4j.cypher.internal.compiler.v2_3.commands.predicates
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expression, Literal}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expression, Literal, TemporalValueExpression}
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.KeyToken
-import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{ReadsNodesWithLabels, Effects}
-import org.neo4j.cypher.internal.compiler.v2_3.helpers.{IsMap, CastSupport, CollectionSupport, IsCollection}
+import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, ReadsNodesWithLabels}
+import org.neo4j.cypher.internal.compiler.v2_3.helpers.{CastSupport, CollectionSupport, IsCollection, IsMap}
 import org.neo4j.cypher.internal.compiler.v2_3.pipes.QueryState
+import org.neo4j.cypher.internal.compiler.v2_3.spi.Operations
 import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
 import org.neo4j.cypher.internal.frontend.v2_3.CypherTypeException
 import org.neo4j.cypher.internal.frontend.v2_3.helpers.NonEmptyList
@@ -203,6 +204,47 @@ case class Contains(lhs: Expression, rhs: Expression) extends Predicate with Str
   override def compare(a: String, b: String) = a.contains(b)
 
   override def rewrite(f: (Expression) => Expression) = f(copy(lhs.rewrite(f), rhs.rewrite(f)))
+}
+
+/**
+  * Created by song on 2018-12-10.
+  */
+case class TemporalContains(lhs: Expression, rhs: Expression) extends Predicate{
+
+
+  override def isMatch(m: ExecutionContext)(implicit state: QueryState): Option[Boolean] = (lhs,rhs) match {
+    case (org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Property(mapExpr, propertyKey), tv: TemporalValueExpression) =>
+      mapExpr(m) match {
+        case n: Node =>{
+          val propId = propertyKey.getOrCreateId(state.query)
+          val temporalValue = tv(m)
+          Some(temporalPropertyValueMatch(state.query.nodeOps, n.getId, propId, temporalValue))
+        }
+        case r: Relationship => Some(temporalPropertyValueMatch(state.query.relationshipOps, r.getId, propertyKey.getOrCreateId(state.query), tv(m)))
+      }
+    case (l, r) => throw new CypherTypeException(s"Expect temporal value type, but got $l and $r")
+  }
+
+  def temporalPropertyValueMatch[T <: PropertyContainer](op: Operations[T], entityId: Long, propertyId: Int, temporalValue: Seq[Tuple3[Long, Long, Any]]): Boolean = {
+    for (i <- temporalValue){
+      val startTime = i._1
+      val endTime = i._2
+      val valExpect = i._3
+      for(time <- startTime to endTime){
+        val value = op.getTemporalProperty(entityId, propertyId, time.toInt)
+        if(value!=valExpect) return false
+      }
+    }
+    true
+  }
+
+  override def containsIsNull: Boolean = false
+
+  override def rewrite(f: (Expression) => Expression): Expression = f(copy(lhs.rewrite(f), rhs.rewrite(f)))
+
+  override def arguments: Seq[Expression] = Seq(lhs, rhs)
+
+  override def symbolTableDependencies: Set[String] = lhs.symbolTableDependencies ++ rhs.symbolTableDependencies
 }
 
 case class LiteralRegularExpression(lhsExpr: Expression, regexExpr: Literal)(implicit converter: String => String = identity) extends Predicate {

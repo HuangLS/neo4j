@@ -10,13 +10,16 @@ import org.neo4j.cypher.internal.frontend.v2_3.symbols._
   * Created by song on 2018-08-20.
   */
 case class TemporalValueExpression(items: Seq[(TimeInterval, ASTExpression)]) extends Expression {
-  def apply(ctx: ExecutionContext)(implicit state: QueryState):Any = {
+  def apply(ctx: ExecutionContext)(implicit state: QueryState):Seq[Tuple3[Long,Long,Any]] = {
     items.map(entry=>{
       val timeInterval = entry._1.items
-      val startT = timeInterval._1.item
-      val endT = timeInterval._2.item
-      val value = entry._2
-      (parVal(startT), parVal(endT), parVal(value))
+      val startT = parVal(timeInterval._1.item)
+      val endT = parVal(timeInterval._2.item)
+      val value = parVal(entry._2)
+      (startT, endT) match {
+        case (s:Long,e:Long) => (s, e, value)
+        case _ => throw new RuntimeException("TGraph SNH: type mismatch.")
+      }
     })
   }
 
