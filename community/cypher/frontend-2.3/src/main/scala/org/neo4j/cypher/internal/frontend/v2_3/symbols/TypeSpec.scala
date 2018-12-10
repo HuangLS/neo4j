@@ -36,7 +36,10 @@ object TypeSpec {
     CTNumber,
     CTPath,
     CTRelationship,
-    CTString
+    CTString,
+    CTTValue,
+    CTTimePoint,
+    CTTimeRange
   )
 
   private def apply(range: TypeRange): TypeSpec = new TypeSpec(Vector(range))
