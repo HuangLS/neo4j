@@ -226,6 +226,7 @@ object ExpressionConverters {
       case Trim => commandexpressions.TrimFunction(toCommandExpression(invocation.arguments.head))
       case Type => commandexpressions.RelationshipTypeFunction(toCommandExpression(invocation.arguments.head))
       case Upper => commandexpressions.UpperFunction(toCommandExpression(invocation.arguments.head))
+      case TemporalContainsFunc => commandexpressions.TemporalContainsFunction(toCommandExpression(invocation.arguments.head), toCommandExpression(invocation.arguments(1)))
     }
 
   def toCommandExpression(expression: ast.Expression): CommandExpression = expression match {
