@@ -213,6 +213,12 @@ public class PhysicalLogNeoCommandReaderV2_2 implements CommandReader
     private class PhysicalNeoCommandReader implements CommandHandler
     {
         @Override
+        public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
+        {
+            throw new UnsupportedOperationException( "TGraph: not implement." );
+        }
+
+        @Override
         public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
             throw new UnsupportedOperationException( "TGraph: not implement." );
         }

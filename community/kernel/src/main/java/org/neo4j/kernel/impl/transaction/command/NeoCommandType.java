@@ -49,4 +49,5 @@ public interface NeoCommandType
 //    byte REL_TEMPORAL_PRO_DELETE =  (byte) 49;
     byte NODE_TEMPORAL_PROPERTY_COMMAND = (byte) 50;
     byte REL_TEMPORAL_PROPERTY_COMMAND =  (byte) 51;
+    byte NODE_TEMPORAL_PROPERTY_INDEX_COMMAND = (byte) 52;
 }

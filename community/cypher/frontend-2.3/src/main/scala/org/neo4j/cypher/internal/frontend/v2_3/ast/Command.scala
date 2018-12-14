@@ -19,6 +19,7 @@
  */
 package org.neo4j.cypher.internal.frontend.v2_3.ast
 
+import org.neo4j.cypher.internal.frontend.v2_3
 import org.neo4j.cypher.internal.frontend.v2_3._
 import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 import org.neo4j.cypher.internal.frontend.v2_3.symbols.CypherType
@@ -31,6 +32,14 @@ case class CreateIndex(label: LabelName, property: PropertyKeyName)(val position
 
 case class DropIndex(label: LabelName, property: PropertyKeyName)(val position: InputPosition) extends Command {
   def semanticCheck = Seq()
+}
+
+case class CreateTemporalMinMaxIndex(property: PropertyKeyName, range: TimeInterval)(val position: InputPosition) extends Command{
+  override def semanticCheck: SemanticCheck = Seq()
+}
+
+case class CreateTemporalValueIndex(property: Seq[PropertyKeyName], range: TimeInterval)(val position: InputPosition) extends Command with SemanticChecking{
+  override def semanticCheck: SemanticCheck = Seq()
 }
 
 trait PropertyConstraintCommand extends Command with SemanticChecking {

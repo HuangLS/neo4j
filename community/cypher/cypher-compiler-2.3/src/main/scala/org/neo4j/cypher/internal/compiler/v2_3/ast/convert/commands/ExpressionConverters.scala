@@ -264,7 +264,7 @@ object ExpressionConverters {
     case e: ast.Property => toCommandProperty(e)
     case e: ast.Parameter => toCommandParameter(e)
     case e: ast.TemporalContains => predicates.TemporalContains(toCommandExpression(e.lhs), toCommandExpression(e.rhs))
-    case e: ast.TemporalValueExpression => toCommandTemporalValue(e)
+    case e: ast.TemporalValueExpression => commandexpressions.TemporalValueLiteral(e.items)
     case e: ast.CaseExpression => caseExpression(e)
     case e: ast.PatternExpression => commands.PathExpression(e.pattern.asLegacyPatterns)
     case e: ast.ShortestPathExpression => commandexpressions.ShortestPathExpression(e.pattern.asLegacyPatterns(None).head)
@@ -302,7 +302,6 @@ object ExpressionConverters {
     }
   }
 
-  def toCommandTemporalValue(e: ast.TemporalValueExpression) = commandexpressions.TemporalValueExpression(e.items)
 
   def toCommandParameter(e: ast.Parameter) = commandexpressions.ParameterExpression(e.name)
 

@@ -66,6 +66,8 @@ public interface CommandHandler extends AutoCloseable
 //
 //    boolean visitRelationshipTemporalPropertyDeleteCommand( Command.RelationshipTemporalPropertyDeleteCommand command ) throws IOException;
 
+    boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException;
+
     boolean visitNodeTemporalPropertyCommand( Command.NodeTemporalPropertyCommand command ) throws IOException;
 
     boolean visitRelationshipTemporalPropertyCommand( Command.RelationshipTemporalPropertyCommand command ) throws IOException;
@@ -148,6 +150,12 @@ public interface CommandHandler extends AutoCloseable
 //        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
 //            return false;
 //        }
+
+        @Override
+        public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
+        {
+            return false;
+        }
 
         @Override
         public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
@@ -291,6 +299,12 @@ public interface CommandHandler extends AutoCloseable
 //        public boolean visitRelationshipTemporalPropertyDeleteCommand(Command.RelationshipTemporalPropertyDeleteCommand command) throws IOException {
 //            return delegate.visitRelationshipTemporalPropertyDeleteCommand(command);
 //        }
+
+        @Override
+        public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
+        {
+            return delegate.visitNodeTemporalPropertyIndexCommand( command );
+        }
 
         @Override
         public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {

@@ -110,6 +110,14 @@ public class DataIntegrityValidatingStatementOperations implements
     }
 
     @Override
+    public IndexDescriptor temporalIndexCreate( KernelStatement state, int type, int propertyKey, int from, int to )
+            throws AlreadyIndexedException, AlreadyConstrainedException
+    {
+        // no need to check existence, if exist, then ignore create request in low level storage.
+        return schemaWriteDelegate.temporalIndexCreate( state, type, propertyKey, from, to );
+    }
+
+    @Override
     public IndexDescriptor indexCreate( KernelStatement state, int labelId, int propertyKey )
             throws AlreadyIndexedException, AlreadyConstrainedException
     {

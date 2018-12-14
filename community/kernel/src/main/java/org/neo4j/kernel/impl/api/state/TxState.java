@@ -22,6 +22,7 @@ package org.neo4j.kernel.impl.api.state;
 import org.act.temporalProperty.exception.TGraphNotImplementedException;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.query.TemporalValue;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -78,6 +79,7 @@ import org.neo4j.kernel.impl.util.diffsets.DiffSetsVisitor;
 import org.neo4j.kernel.impl.util.diffsets.ReadableDiffSets;
 import org.neo4j.kernel.impl.util.diffsets.ReadableRelationshipDiffSets;
 import org.neo4j.kernel.impl.util.diffsets.RelationshipDiffSets;
+import org.neo4j.temporal.TemporalIndexDescriptor;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
@@ -309,6 +311,20 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
         dataChanged();
     }
 
+    // these are only for nodes, edges are not supported to index.
+    private Map<Integer,TemporalValue<Boolean>> minMaxTemporalIndexes = null;
+
+    @Override
+    public void nodeTemporalPropertyIndexAdd( TemporalIndexDescriptor indexDescriptor ){
+        if(indexDescriptor instanceof TemporalIndexDescriptor.MinMax){
+            if(minMaxTemporalIndexes==null) minMaxTemporalIndexes = new HashMap<>();
+            TemporalValue<Boolean> indexedTime = minMaxTemporalIndexes.get(indexDescriptor.getPropertyKeyId());
+            if(indexedTime==null){
+                indexedTime = new TemporalValue<>( false );
+            }
+            indexedTime.put(indexDescriptor.timeInterval(), true);
+        }
+    }
 
     @Override
     public void accept( final TxStateVisitor visitor )
@@ -418,6 +434,10 @@ public final class TxState implements TransactionState, RelationshipVisitor.Home
         if ( relTemporalProperties != null )
         {
             visitor.visitRelationshipTemporalPropertyChanges( relTemporalProperties );
+        }
+
+        if (minMaxTemporalIndexes != null){
+            visitor.visitNodeTemporalPropertyIndexChange( minMaxTemporalIndexes );
         }
     }
 

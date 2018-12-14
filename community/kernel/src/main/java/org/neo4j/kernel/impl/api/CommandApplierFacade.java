@@ -111,6 +111,20 @@ public class CommandApplierFacade implements CommandHandler, Visitor<Command,IOE
 //    }
 
     @Override
+    public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
+    {
+        boolean result = false;
+        for ( CommandHandler handler : handlers )
+        {
+            if ( handler.visitNodeTemporalPropertyIndexCommand( command ) )
+            {
+                result = true;
+            }
+        }
+        return result;
+    }
+
+    @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
         boolean result = false;
         for ( CommandHandler handler : handlers )

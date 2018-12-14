@@ -85,6 +85,9 @@ class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
   def getOrCreatePropertyKeyId(propertyKey: String) = singleDbHit(inner.getOrCreatePropertyKeyId(propertyKey))
 
+  override def addTemporalIndexRule(indexType: Int, propertyKeyId: Int, from: Int, to: Int): IdempotentResult[IndexDescriptor] =
+    singleDbHit(inner.addTemporalIndexRule(indexType, propertyKeyId, from, to))
+
   def addIndexRule(labelId: Int, propertyKeyId: Int) = singleDbHit(inner.addIndexRule(labelId, propertyKeyId))
 
   def dropIndexRule(labelId: Int, propertyKeyId: Int) = singleDbHit(inner.dropIndexRule(labelId, propertyKeyId))

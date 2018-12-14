@@ -193,4 +193,6 @@ class SnitchingQueryContext extends QueryContext {
   override def allShortestPath(left: Node, right: Node, depth: Int, expander: Expander, pathPredicate: KernelPredicate[Path], filters: Seq[KernelPredicate[PropertyContainer]]): Iterator[Path] = ???
 
   override def detachDeleteNode(node: Node): Int = ???
+
+  override def addTemporalIndexRule(indexType: Int, propertyKeyId: Int, from: Int, to: Int): IdempotentResult[IndexDescriptor] = ???
 }

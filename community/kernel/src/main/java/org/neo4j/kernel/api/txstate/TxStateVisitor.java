@@ -20,6 +20,7 @@
 package org.neo4j.kernel.api.txstate;
 
 import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.query.TemporalValue;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -101,6 +102,8 @@ public interface TxStateVisitor
     void visitNodeTemporalPropertyChanges( MemTable changes );
 
     void visitRelationshipTemporalPropertyChanges( MemTable changes );
+
+    void visitNodeTemporalPropertyIndexChange( Map<Integer, TemporalValue<Boolean>> minMaxTemporalIndexes );
 
     class Adapter implements TxStateVisitor
     {
@@ -359,6 +362,10 @@ public interface TxStateVisitor
             }
         }
 
-
+        @Override
+        public void visitNodeTemporalPropertyIndexChange( Map<Integer,TemporalValue<Boolean>> minMaxTemporalIndexes )
+        {
+            if(next!=null) next.visitNodeTemporalPropertyIndexChange( minMaxTemporalIndexes );
+        }
     }
 }

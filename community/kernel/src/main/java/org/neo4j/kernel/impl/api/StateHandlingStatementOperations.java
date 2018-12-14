@@ -108,6 +108,7 @@ import org.neo4j.kernel.impl.util.PrimitiveLongResourceIterator;
 import org.neo4j.kernel.impl.util.diffsets.ReadableDiffSets;
 import org.neo4j.temporal.IntervalEntry;
 import org.neo4j.temporal.TGraphUserInputException;
+import org.neo4j.temporal.TemporalIndexDescriptor;
 import org.neo4j.temporal.TemporalIndexManager;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
@@ -910,6 +911,14 @@ public class StateHandlingStatementOperations
         }
 
         return storeLayer.nodesGetForLabel( state, labelId );
+    }
+
+    @Override
+    public IndexDescriptor temporalIndexCreate( KernelStatement state, int type, int propertyKey, int from, int to )
+    {
+        TemporalIndexDescriptor rule = new TemporalIndexDescriptor.MinMax( propertyKey, from, to );
+        state.txState().nodeTemporalPropertyIndexAdd( rule );
+        return rule;
     }
 
     @Override

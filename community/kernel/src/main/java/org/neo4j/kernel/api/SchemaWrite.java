@@ -44,6 +44,9 @@ interface SchemaWrite
     IndexDescriptor indexCreate( int labelId, int propertyKeyId )
             throws AlreadyIndexedException, AlreadyConstrainedException;
 
+    IndexDescriptor temporalIndexCreate( int indexType, int propertyKeyId, int from, int to )
+            throws AlreadyIndexedException, AlreadyConstrainedException;
+
     /** Drops a {@link IndexDescriptor} from the database */
     void indexDrop( IndexDescriptor descriptor ) throws DropIndexFailureException;
 

@@ -36,7 +36,15 @@ trait Command extends Parser
       | DropNodePropertyExistenceConstraint
       | DropRelationshipPropertyExistenceConstraint
       | DropIndex
+      | CreateTemporalIndex
   )
+
+  def CreateTemporalIndex: Rule1[ast.CreateTemporalMinMaxIndex] = rule {
+    group(
+      keyword("CREATE TEMPORAL MinMax INDEX ON") ~~ "(" ~~ PropertyKeyName ~~ ")" ~~ "DURING"  ~~ TimeIntervalLiteral
+    ) ~~>> ((pName, timeRange) => ast.CreateTemporalMinMaxIndex(pName, timeRange))
+  }
+
 
   def CreateIndex: Rule1[ast.CreateIndex] = rule {
     group(keyword("CREATE INDEX ON") ~~ NodeLabel ~~ "(" ~~ PropertyKeyName ~~ ")") ~~>> (ast.CreateIndex(_, _))

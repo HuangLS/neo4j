@@ -73,6 +73,8 @@ trait QueryContext extends TokenContext {
 
   def getOrCreatePropertyKeyId(propertyKey: String): Int
 
+  def addTemporalIndexRule(indexType: Int, propertyKeyId: Int, from:Int, to:Int): IdempotentResult[IndexDescriptor]
+
   def addIndexRule(labelId: Int, propertyKeyId: Int): IdempotentResult[IndexDescriptor]
 
   def dropIndexRule(labelId: Int, propertyKeyId: Int)

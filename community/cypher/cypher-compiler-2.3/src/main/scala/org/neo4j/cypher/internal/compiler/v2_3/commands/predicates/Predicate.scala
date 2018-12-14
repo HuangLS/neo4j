@@ -20,7 +20,7 @@
 package org.neo4j.cypher.internal.compiler.v2_3.commands.predicates
 
 import org.neo4j.cypher.internal.compiler.v2_3._
-import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expression, Literal, TemporalValueExpression}
+import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.{Expression, Literal, TemporalValueLiteral}
 import org.neo4j.cypher.internal.compiler.v2_3.commands.values.KeyToken
 import org.neo4j.cypher.internal.compiler.v2_3.executionplan.{Effects, ReadsNodesWithLabels}
 import org.neo4j.cypher.internal.compiler.v2_3.helpers.{CastSupport, CollectionSupport, IsCollection, IsMap}
@@ -213,7 +213,7 @@ case class TemporalContains(lhs: Expression, rhs: Expression) extends Predicate{
 
 
   override def isMatch(m: ExecutionContext)(implicit state: QueryState): Option[Boolean] = (lhs,rhs) match {
-    case (org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Property(mapExpr, propertyKey), tv: TemporalValueExpression) =>
+    case (org.neo4j.cypher.internal.compiler.v2_3.commands.expressions.Property(mapExpr, propertyKey), tv: TemporalValueLiteral) =>
       mapExpr(m) match {
         case n: Node =>{
           val propId = propertyKey.getOrCreateId(state.query)

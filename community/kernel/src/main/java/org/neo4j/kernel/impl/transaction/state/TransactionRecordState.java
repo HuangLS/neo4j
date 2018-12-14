@@ -25,6 +25,8 @@ import java.util.Map.Entry;
 import com.google.common.collect.PeekingIterator;
 import org.act.temporalProperty.impl.InternalKey;
 import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.query.TemporalValue;
+import org.act.temporalProperty.query.TimeInterval;
 import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.util.Slice;
 
@@ -78,6 +80,13 @@ import static org.neo4j.kernel.impl.store.NodeLabelsField.parseLabelsField;
  */
 public class TransactionRecordState implements RecordState
 {
+    private Map<Integer,TemporalValue<Boolean>> nodeTemporalPropertyIndexChanges;
+
+    public void nodeTemporalPropertyIndexChange( Map<Integer, TemporalValue<Boolean>> minMaxTemporalIndexes )
+    {
+        this.nodeTemporalPropertyIndexChanges = minMaxTemporalIndexes;
+    }
+
     public void nodeTemporalPropertyChange( MemTable changes )
     {
         this.nodeTemporalPropertyChanges = changes;
@@ -162,6 +171,20 @@ public class TransactionRecordState implements RecordState
                 context.getSchemaRuleChanges().changeSize() + context.getPropertyKeyTokenRecords().changeSize() + context.getLabelTokenRecords().changeSize() +
                 context.getRelationshipTypeTokenRecords().changeSize() + context.getRelGroupRecords().changeSize() +
                 (neoStoreRecord != null ? neoStoreRecord.changeSize() : 0);
+
+        if (nodeTemporalPropertyIndexChanges !=null){
+            for(Entry<Integer, TemporalValue<Boolean>> entry : nodeTemporalPropertyIndexChanges.entrySet()){
+                TemporalValue<Boolean> intervals = entry.getValue();
+                PeekingIterator<Entry<TimeInterval,Boolean>> iter = intervals.intervalEntries();
+                while(iter.hasNext()){
+                    Entry<TimeInterval,Boolean> intervalEntry = iter.next();
+                    if(intervalEntry.getValue()){
+                        commands.add( new Command.NodeTemporalPropertyIndexCommand().init( entry.getKey(), intervalEntry.getKey().fromInt(), intervalEntry.getKey().toInt() ));
+                        noOfCommands++;
+                    }
+                }
+            }
+        }
 
         if ( nodeTemporalPropertyChanges != null )
         {
@@ -491,6 +514,7 @@ public class TransactionRecordState implements RecordState
     {
         context.createRelationshipTypeToken( name, id );
     }
+
 
     private static class CommandSorter implements Comparator<Command>
     {

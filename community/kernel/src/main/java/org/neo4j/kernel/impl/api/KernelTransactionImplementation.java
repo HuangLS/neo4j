@@ -24,6 +24,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.query.TemporalValue;
 
 import org.neo4j.collection.pool.Pool;
 import org.neo4j.collection.primitive.PrimitiveIntCollections;
@@ -977,6 +978,12 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
             recordState.relationshipTemporalPropertyChange( changes );
 //            recordState.relationshipDeleteTemporalPropertyPoint( relationshipId, deletedlist.iterator() );
 //            recordState.relationshipDeleteTemporalProperty( relationshipId, delProp );
+        }
+
+        @Override
+        public void visitNodeTemporalPropertyIndexChange( Map<Integer,TemporalValue<Boolean>> minMaxTemporalIndexes )
+        {
+            recordState.nodeTemporalPropertyIndexChange( minMaxTemporalIndexes );
         }
 
         @Override

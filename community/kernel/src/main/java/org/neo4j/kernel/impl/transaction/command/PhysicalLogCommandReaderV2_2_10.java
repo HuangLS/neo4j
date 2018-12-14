@@ -60,6 +60,7 @@ import org.neo4j.kernel.impl.transaction.log.ReadPastEndException;
 import org.neo4j.kernel.impl.transaction.log.ReadableLogChannel;
 
 import static org.neo4j.helpers.collection.IteratorUtil.first;
+import static org.neo4j.helpers.collection.IteratorUtil.firstOrNull;
 import static org.neo4j.kernel.impl.transaction.command.CommandReaderFactory.COLLECTION_DYNAMIC_RECORD_ADDER;
 import static org.neo4j.kernel.impl.transaction.command.CommandReaderFactory.PROPERTY_BLOCK_DYNAMIC_RECORD_ADDER;
 import static org.neo4j.kernel.impl.transaction.command.CommandReaderFactory.PROPERTY_DELETED_DYNAMIC_RECORD_ADDER;
@@ -141,7 +142,8 @@ public class PhysicalLogCommandReaderV2_2_10 implements CommandReader, CommandHa
 //            return new Command.RelationshipTemporalPropertyDeleteCommand();
         case NeoCommandType.REL_TEMPORAL_PROPERTY_COMMAND:
             return new Command.RelationshipTemporalPropertyCommand();
-
+        case NeoCommandType.NODE_TEMPORAL_PROPERTY_INDEX_COMMAND:
+            return new Command.NodeTemporalPropertyIndexCommand();
         default:
             LogPositionMarker position = new LogPositionMarker();
             channel.getCurrentPosition( position );
@@ -188,6 +190,16 @@ public class PhysicalLogCommandReaderV2_2_10 implements CommandReader, CommandHa
 //        command.init( new Slice( id ) );
 //        return false;
 //    }
+
+    @Override
+    public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
+    {
+        int propertyId = channel.getInt();
+        int from = channel.getInt();
+        int to  = channel.getInt();
+        command.init( propertyId, from, to );
+        return false;
+    }
 
     @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {

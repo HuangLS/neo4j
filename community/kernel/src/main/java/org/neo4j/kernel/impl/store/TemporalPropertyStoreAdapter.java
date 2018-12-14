@@ -3,6 +3,7 @@ package org.neo4j.kernel.impl.store;
 import org.act.temporalProperty.TemporalPropertyStore;
 import org.act.temporalProperty.TemporalPropertyStoreFactory;
 import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.index.IndexType;
 import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.util.Slice;
 
@@ -12,6 +13,8 @@ import org.neo4j.temporal.TemporalPropertyReadOperation;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Calendar;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by song on 17-7-7.
@@ -116,6 +119,11 @@ public class TemporalPropertyStoreAdapter extends LifecycleAdapter
         store.setProperty( intervalKey, value );
     }
 
+    public void createNodeAggrMinMaxIndex( int propertyId, int start, int end )
+    {
+        nodeStore.createAggrMinMaxIndex( propertyId, start, end, 100, Calendar.MINUTE, IndexType.AGGR_MIN_MAX );
+    }
+
     public void flushAll()
     {
         if ( this.relStore != null )
@@ -139,4 +147,5 @@ public class TemporalPropertyStoreAdapter extends LifecycleAdapter
     {
         return relStore;
     }
+
 }

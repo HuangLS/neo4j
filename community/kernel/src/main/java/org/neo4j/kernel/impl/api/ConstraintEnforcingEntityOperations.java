@@ -551,6 +551,13 @@ public class ConstraintEnforcingEntityOperations implements EntityOperations, Sc
     }
 
     @Override
+    public IndexDescriptor temporalIndexCreate( KernelStatement state, int type, int propertyKeyId, int from, int to )
+            throws AlreadyIndexedException, AlreadyConstrainedException
+    {
+        return schemaWriteOperations.temporalIndexCreate( state, type, propertyKeyId, from, to );
+    }
+
+    @Override
     public IndexDescriptor indexCreate( KernelStatement state, int labelId, int propertyKeyId )
             throws AlreadyIndexedException, AlreadyConstrainedException
     {

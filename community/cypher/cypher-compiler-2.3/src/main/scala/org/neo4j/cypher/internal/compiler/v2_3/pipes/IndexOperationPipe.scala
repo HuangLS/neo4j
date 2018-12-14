@@ -30,17 +30,23 @@ case class IndexOperationPipe(indexOp: IndexOperation)(implicit val monitor: Pip
   protected def internalCreateResults(state: QueryState): Iterator[ExecutionContext] = {
     val queryContext = state.query
 
-    val labelId = queryContext.getOrCreateLabelId(indexOp.label)
+
 
     indexOp match {
-      case CreateIndex(_, propertyKeys, _) =>
+      case CreateIndex(label, propertyKeys, _) =>
+        val labelId = queryContext.getOrCreateLabelId(label)
         val propertyKeyIds: Seq[Int] = propertyKeys.map( queryContext.getOrCreatePropertyKeyId )
         queryContext.addIndexRule(labelId, single(propertyKeyIds))
 
-      case DropIndex(_, propertyKeys, _) =>
+      case DropIndex(label, propertyKeys, _) =>
+        val labelId = queryContext.getOrCreateLabelId(label)
         val propertyKeyIds: Seq[Int] = propertyKeys.map( queryContext.getOrCreatePropertyKeyId )
         queryContext.dropIndexRule(labelId, single(propertyKeyIds))
 
+      case CreateTemporalMinMaxIndex(propertyKeys, from, to, _) => {
+        val propertyKeyId: Int = queryContext.getOrCreatePropertyKeyId(propertyKeys)
+        queryContext.addTemporalIndexRule(propertyKeyId, from, to, 0)
+      }
       case _ =>
         throw new UnsupportedOperationException("Unknown IndexOperation encountered")
     }

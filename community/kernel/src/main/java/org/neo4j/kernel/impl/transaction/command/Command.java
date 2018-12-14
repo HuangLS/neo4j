@@ -44,6 +44,7 @@ import static java.util.Collections.unmodifiableCollection;
 
 import static org.neo4j.helpers.collection.IteratorUtil.first;
 import static org.neo4j.kernel.impl.util.IdPrettyPrinter.label;
+import static org.neo4j.kernel.impl.util.IdPrettyPrinter.propertyKey;
 import static org.neo4j.kernel.impl.util.IdPrettyPrinter.relationshipType;
 
 /**
@@ -311,6 +312,47 @@ public abstract class Command
         public long getRelId()
         {
             return after.getRelId();
+        }
+    }
+
+    public static class NodeTemporalPropertyIndexCommand extends Command{
+
+        private int propertyId;
+        private int from;
+        private int to;
+
+        public NodeTemporalPropertyIndexCommand init( int propertyId, int from, int to ){
+            this.propertyId = propertyId;
+            this.from = from;
+            this.to = to;
+            return this;
+        }
+
+        @Override
+        public String toString()
+        {
+            return "Node Temporal Property("+propertyId+") Index During("+from+", "+to+")";
+        }
+
+        @Override
+        public boolean handle( CommandHandler handler ) throws IOException
+        {
+            return handler.visitNodeTemporalPropertyIndexCommand( this );
+        }
+
+        public int getPropertyId()
+        {
+            return propertyId;
+        }
+
+        public int getEnd()
+        {
+            return to;
+        }
+
+        public int getStart()
+        {
+            return from;
         }
     }
 

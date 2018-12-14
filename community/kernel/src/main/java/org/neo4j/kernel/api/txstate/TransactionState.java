@@ -32,6 +32,7 @@ import org.neo4j.kernel.api.procedures.ProcedureSignature;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.api.properties.TemporalProperty;
+import org.neo4j.temporal.TemporalIndexDescriptor;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 /**
@@ -48,6 +49,7 @@ public interface TransactionState extends ReadableTxState
     void nodeDoSetTemporalProperty( TemporalPropertyWriteOperation op );
     void relationshipDoSetTemporalProperty( TemporalPropertyWriteOperation op );
 
+    void nodeTemporalPropertyIndexAdd( TemporalIndexDescriptor indexDescriptor );
 //    void nodeDoCreateTemporalPropertyRecord( long nodeId, TemporalProperty temporalProperty );
 //    void nodeDoCreateTemporalPropertyInvalidRecord( long nodeId, TemporalProperty temporalProperty );
 //    void nodeDoDeleteTemporalPropertyRecord( long nodeId, TemporalProperty temporalProperty );

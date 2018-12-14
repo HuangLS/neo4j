@@ -20,8 +20,13 @@
 package org.neo4j.cypher.internal.compiler.v2_3.commands
 
 sealed abstract class IndexOperation extends AbstractQuery {
-  val label: String
+
 }
+
+final case class CreateTemporalMinMaxIndex(propertyKeys: String, start:Int, end:Int, queryString: QueryString = QueryString.empty) extends IndexOperation {
+  override def setQueryText(t: String): CreateTemporalMinMaxIndex = copy(queryString = QueryString(t))
+}
+
 
 // TODO use label: LabelValue?
 final case class CreateIndex(label: String, propertyKeys: Seq[String], queryString: QueryString = QueryString.empty) extends IndexOperation {

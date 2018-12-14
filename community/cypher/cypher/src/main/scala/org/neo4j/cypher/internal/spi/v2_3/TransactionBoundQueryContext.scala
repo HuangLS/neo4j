@@ -490,6 +490,14 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
     statement.readOperations().schemaStateGetOrCreate(key, javaCreator)
   }
 
+  override def addTemporalIndexRule(indexType: Int, propertyKeyId: Int, from: Int, to: Int): IdempotentResult[IndexDescriptor] = try {
+    IdempotentResult(statement.schemaWriteOperations().temporalIndexCreate(indexType, propertyKeyId, from, to))
+  }catch {
+    case _: Exception =>
+      val indexDescriptor = statement.readOperations().indexesGetForLabelAndPropertyKey(indexType, propertyKeyId)
+      IdempotentResult(indexDescriptor, wasCreated = false)
+  }
+
   def addIndexRule(labelId: Int, propertyKeyId: Int): IdempotentResult[IndexDescriptor] = try {
     IdempotentResult(statement.schemaWriteOperations().indexCreate(labelId, propertyKeyId))
   } catch {

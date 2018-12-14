@@ -1068,6 +1068,14 @@ public class OperationsFacade implements ReadOperations, DataWriteOperations, Sc
 
     // <SchemaWrite>
     @Override
+    public IndexDescriptor temporalIndexCreate( int type, int propertyKeyId, int from, int to )
+            throws AlreadyIndexedException, AlreadyConstrainedException
+    {
+        statement.assertOpen();
+        return schemaWrite().temporalIndexCreate( statement, type, propertyKeyId, from, to );
+    }
+
+    @Override
     public IndexDescriptor indexCreate( int labelId, int propertyKeyId )
             throws AlreadyIndexedException, AlreadyConstrainedException
     {

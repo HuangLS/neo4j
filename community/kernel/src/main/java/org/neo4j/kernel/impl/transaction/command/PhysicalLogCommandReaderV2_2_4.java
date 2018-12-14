@@ -180,6 +180,12 @@ public class PhysicalLogCommandReaderV2_2_4 implements CommandReader, CommandHan
 //    }
 
     @Override
+    public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
+    {
+        return false;
+    }
+
+    @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
         int len = channel.getInt();
         byte[] raw = new byte[ len ];

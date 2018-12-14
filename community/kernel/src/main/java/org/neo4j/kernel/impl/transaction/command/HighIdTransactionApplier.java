@@ -68,6 +68,12 @@ public class HighIdTransactionApplier implements CommandHandler
     }
 
     @Override
+    public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
+    {
+        return delegate.visitNodeTemporalPropertyIndexCommand( command );
+    }
+
+    @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
         return delegate.visitNodeTemporalPropertyCommand( command );
     }

@@ -237,6 +237,12 @@ public class PhysicalLogCommandReaderV2_1 implements CommandReader
 //        }
 
         @Override
+        public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
+        {
+            throw new TGraphNoImplementationException( "this should not be used" );
+        }
+
+        @Override
         public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
             int len = channel.getInt();
             byte[] raw = new byte[ len ];

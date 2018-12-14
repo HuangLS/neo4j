@@ -126,6 +126,15 @@ public class LockingStatementOperations implements
     }
 
     @Override
+    public IndexDescriptor temporalIndexCreate( KernelStatement state, int type, int propertyKey, int from, int to )
+            throws AlreadyIndexedException, AlreadyConstrainedException
+    {
+        acquireExclusiveSchemaLock( state );
+        state.assertOpen();
+        return schemaWriteDelegate.temporalIndexCreate( state, type, propertyKey, from, to );
+    }
+
+    @Override
     public IndexDescriptor indexCreate( KernelStatement state, int labelId, int propertyKey )
             throws AlreadyIndexedException, AlreadyConstrainedException
     {

@@ -38,6 +38,10 @@ import org.neo4j.kernel.impl.api.KernelStatement;
 
 public interface SchemaWriteOperations
 {
+
+    IndexDescriptor temporalIndexCreate( KernelStatement statement, int type, int propertyKeyId, int from, int to )
+            throws AlreadyIndexedException, AlreadyConstrainedException;
+
     /**
      * Creates an index, indexing properties with the given {@code propertyKeyId} for nodes with the given
      * {@code labelId}.
@@ -73,4 +77,5 @@ public interface SchemaWriteOperations
             throws ProcedureException, ProcedureConstraintViolation;
 
     void procedureDrop( KernelStatement statement, ProcedureName name ) throws ProcedureException, ProcedureConstraintViolation;
+
 }

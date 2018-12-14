@@ -84,6 +84,16 @@ public class CommandWriter implements CommandHandler
 //    }
 
     @Override
+    public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
+    {
+        channel.putInt( NeoCommandType.NODE_TEMPORAL_PROPERTY_INDEX_COMMAND );
+        channel.putInt( command.getPropertyId() );
+        channel.putInt( command.getStart() );
+        channel.putInt( command.getEnd() );
+        return false;
+    }
+
+    @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
         channel.put( NeoCommandType.NODE_TEMPORAL_PROPERTY_COMMAND );
         Slice key = MemTable.encode( command.getIntervalKey(), command.getValue() );
