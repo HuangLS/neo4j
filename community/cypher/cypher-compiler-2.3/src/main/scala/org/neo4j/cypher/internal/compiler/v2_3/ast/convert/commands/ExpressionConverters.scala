@@ -227,6 +227,9 @@ object ExpressionConverters {
       case Type => commandexpressions.RelationshipTypeFunction(toCommandExpression(invocation.arguments.head))
       case Upper => commandexpressions.UpperFunction(toCommandExpression(invocation.arguments.head))
       case TemporalContainsFunc => commandexpressions.TemporalContainsFunction(toCommandExpression(invocation.arguments.head), toCommandExpression(invocation.arguments(1)))
+      case SnapshotValueFunc => commandexpressions.SnapshotValueFunction(toCommandExpression(invocation.arguments.head), toCommandExpression(invocation.arguments(1)))
+      case TemporalAggregationMinFunc => commandexpressions.TemporalAggregationMinFunction(
+        toCommandExpression(invocation.arguments.head), toCommandExpression(invocation.arguments(1)), toCommandExpression(invocation.arguments(2)))
     }
 
   def toCommandExpression(expression: ast.Expression): CommandExpression = expression match {

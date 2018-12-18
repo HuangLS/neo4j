@@ -95,7 +95,10 @@ object Function {
     functions.Trim,
     functions.Type,
     functions.Upper,
-    functions.TemporalContainsFunc
+    functions.TemporalContainsFunc,
+    functions.TemporalProjectionFunc,
+    functions.SnapshotValueFunc,
+    functions.TemporalAggregationMinFunc
   )
 
   val lookup: Map[String, Function] = knownFunctions.map { f => (f.name.toLowerCase, f) }.toMap
