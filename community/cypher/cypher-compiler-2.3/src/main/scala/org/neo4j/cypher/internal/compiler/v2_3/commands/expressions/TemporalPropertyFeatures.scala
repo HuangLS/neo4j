@@ -96,9 +96,9 @@ case class TemporalAggregationMinFunction(property: Expression, tStart: Expressi
         (mapExpr(ctx), s, e) match {
           case (n: Node, start:Long, end:Long) =>{
             val propId = propertyKey.getOrCreateId(state.query)
-            Some(temporalPropertyValueMatch(state.query.nodeOps, n.getId, propId, start, end))
+            temporalPropertyValueMatch(state.query.nodeOps, n.getId, propId, start, end)
           }
-          case (r: Relationship, start:Long, end:Long) => Some(temporalPropertyValueMatch(state.query.relationshipOps, r.getId, propertyKey.getOrCreateId(state.query), start, end))
+          case (r: Relationship, start:Long, end:Long) => temporalPropertyValueMatch(state.query.relationshipOps, r.getId, propertyKey.getOrCreateId(state.query), start, end)
         }
     }
   }
