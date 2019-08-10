@@ -19,9 +19,7 @@
  */
 package org.neo4j.cypher.internal.compiler.v2_3.commands
 
-sealed abstract class IndexOperation extends AbstractQuery {
-
-}
+sealed abstract class IndexOperation extends AbstractQuery
 
 final case class CreateTemporalMinMaxIndex(propertyKeys: String, start:Int, end:Int, queryString: QueryString = QueryString.empty) extends IndexOperation {
   override def setQueryText(t: String): CreateTemporalMinMaxIndex = copy(queryString = QueryString(t))
