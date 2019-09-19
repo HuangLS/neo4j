@@ -57,8 +57,9 @@ trait Literals extends Parser
   }
 
   def TimePointLiteral: Rule1[ast.TimePoint] = rule {
-    UnsignedIntegerLiteral ~~>> (ast.TimePoint(_)) |
-      StringLiteral ~~>> (ast.TimePoint(_))
+    UnsignedIntegerLiteral ~~>> (ast.TimePointRegular(_)) |
+    keyword("init") ~ push(ast.TimePointInit()(_)) |
+    keyword("now") ~ push(ast.TimePointNow()(_))
   }
 
   def TimeIntervalLiteral : Rule1[ast.TimeInterval] = rule {
