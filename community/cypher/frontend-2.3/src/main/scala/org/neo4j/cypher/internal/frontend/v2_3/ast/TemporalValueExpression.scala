@@ -9,9 +9,6 @@ import org.neo4j.cypher.internal.frontend.v2_3.symbols._
   */
 case class TemporalValueExpression (items: Seq[(TimeInterval, Expression)])(val position: InputPosition) extends Expression with SimpleTyping {
   protected def possibleTypes: TypeSpec = CTTValue
-
-  var tpVal: Seq[(Int, Int, Any)] = List()
-
   /**
    * 可能的错误情况：
    * 1. Now不在最后
@@ -28,10 +25,7 @@ case class TemporalValueExpression (items: Seq[(TimeInterval, Expression)])(val 
       if( t<s && s<=e ) t = e
       else return SemanticError("time decrease!", position)
     }
-    if(t>=Int.MaxValue) return SemanticError("time too large! must less than Int.max_value", position)
-    this.tpVal = items.map(i => {
-      (i._1.start, i._1.end, i._2)
-    })
+    if(t>Int.MaxValue) return SemanticError("time too large! must less than Int.max_value", position)
     SemanticCheckResult.success
   }
 }
@@ -75,7 +69,7 @@ case class TimePointInit()(val position: InputPosition) extends TimePoint with S
   override def semanticCheck(ctx: SemanticContext): SemanticCheck = SemanticCheckResult.success
 }
 
-case class TimeInterval (items: (TimePoint, TimePoint))(val position: InputPosition) extends Expression with SimpleTyping {
+case class TimeInterval (startT: TimePoint, endT: TimePoint)(val position: InputPosition) extends Expression with SimpleTyping {
   protected def possibleTypes: TypeSpec = CTTimeRange
   var start:Int = 0
   var end:Int = 0

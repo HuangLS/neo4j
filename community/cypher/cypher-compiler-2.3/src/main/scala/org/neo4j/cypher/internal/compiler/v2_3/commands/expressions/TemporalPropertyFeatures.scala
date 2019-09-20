@@ -23,9 +23,9 @@ abstract class TemporalValueCommandExpression extends Expression {
 case class TemporalValueLiteral(items: Seq[(TimeInterval, ASTExpression)]) extends TemporalValueCommandExpression{
   def apply(ctx: ExecutionContext)(implicit state: QueryState):Seq[Tuple3[Long,Long,Any]] = {
     items.map(entry=>{
-      val timeInterval = entry._1.items
-      val startT = parVal(timeInterval._1.item)
-      val endT = parVal(timeInterval._2.item)
+      val timeInterval = entry._1
+      val startT = parVal(timeInterval.startT)
+      val endT = parVal(timeInterval.endT)
       val value = parVal(entry._2)
       (startT, endT) match {
         case (s:Long,e:Long) => (s, e, value)
