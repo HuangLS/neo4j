@@ -428,7 +428,7 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
 
     def setTemporalProperty(id: Long, propertyKeyId: Int, start:Int, end:Int, value: Any) = try {
       val op = new TemporalPropertyWriteOperation(id, propertyKeyId, start, end, value)
-      statement.dataWriteOperations().nodeSetTemporalProperty( op )
+      statement.dataWriteOperations().relationshipSetTemporalProperty( op )
     } catch {
       case _: org.neo4j.kernel.api.exceptions.EntityNotFoundException => //ignore
     }
