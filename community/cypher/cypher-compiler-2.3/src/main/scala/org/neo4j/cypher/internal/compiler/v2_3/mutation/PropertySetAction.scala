@@ -66,21 +66,21 @@ case class PropertySetAction(prop: Property, valueExpression: Expression)
   type |∨|[T, U] = { type λ[X] = ¬¬[X] <:< (T ∨ U) }
 
 //  private def setTemporalVal(entityId:Long, propId:Int, value:Any, op:Operations[ Node |∨| Relationship]) = {
-  private def setTemporalVal(entityId:Long, propId:Int, value:Any, op:Operations[ _ >: Node with Relationship <: PropertyContainer]) = {
+  private def setTemporalVal(entityId:Long, propId:Int, value:Any, op:Operations[ _ >: Node with Relationship <: PropertyContainer]): Unit = {
     value match {
-      case v:Seq[(Long, Long, Long)] => v.foreach(i =>{
-        val start = Math.toIntExact(i._1)
-        val end = Math.toIntExact(i._2)
+      case v:Seq[(Int, Int, Long)] => v.foreach(i =>{
+        val start = i._1
+        val end = i._2
         op.setTemporalProperty(entityId, propId, start, end, i._3)
       })
-      case v:Seq[(Long, Long, Double)] => v.foreach(i =>{
-        val start = Math.toIntExact(i._1)
-        val end = Math.toIntExact(i._2)
+      case v:Seq[(Int, Int, Double)] => v.foreach(i =>{
+        val start = i._1
+        val end = i._2
         op.setTemporalProperty(entityId, propId, start, end, i._3)
       })
-      case v:Seq[(Long, Long, String)] => v.foreach(i =>{
-        val start = Math.toIntExact(i._1)
-        val end = Math.toIntExact(i._2)
+      case v:Seq[(Int, Int, String)] => v.foreach(i =>{
+        val start = i._1
+        val end = i._2
         op.setTemporalProperty(entityId, propId, start, end, i._3)
       })
       case _ => throw new RuntimeException("TGraph SNH: type mismatch")

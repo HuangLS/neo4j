@@ -7,7 +7,7 @@ import org.neo4j.cypher.internal.compiler.v2_3.spi.Operations
 import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
 import org.neo4j.cypher.internal.frontend.v2_3.symbols.CypherType
 import org.neo4j.cypher.internal.frontend.v2_3.symbols.CTBoolean
-import org.neo4j.cypher.internal.frontend.v2_3.ast.{Parameter, Start, TimeInterval, Expression => ASTExpression}
+import org.neo4j.cypher.internal.frontend.v2_3.ast.{Parameter, TimeInterval, TimePoint, TimePointInit, TimePointNow, TimePointRegular, Expression => ASTExpression}
 import org.neo4j.cypher.internal.frontend.v2_3.symbols._
 import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
 
@@ -15,24 +15,38 @@ import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
   * Created by song on 2018-08-20.
   */
 abstract class TemporalValueCommandExpression extends Expression {
-
-  def calculateType(symbols: SymbolTable) = CTTValue
-
+  def calculateType(symbols: SymbolTable): TemporalValueType = CTTValue
 }
 
 case class TemporalValueLiteral(items: Seq[(TimeInterval, ASTExpression)]) extends TemporalValueCommandExpression{
-  def apply(ctx: ExecutionContext)(implicit state: QueryState):Seq[Tuple3[Long,Long,Any]] = {
+  def apply(ctx: ExecutionContext)(implicit state: QueryState):Seq[(Int, Int, Any)] = {
     items.map(entry=>{
       val timeInterval = entry._1
-      val startT = timeInterval.startT.time
-      val endT = timeInterval.endT.time
+      val startT = parTime(timeInterval.startT)
+      val endT = parTime(timeInterval.endT)
       val value = parVal(entry._2)
       value match {
         case v:Double => (startT, endT, v)
         case v:Long => (startT, endT, v)
-        case v => throw new RuntimeException("TGraph SNH: type mismatch. got "+v.getClass.getName)
+        case x => throw new RuntimeException("TCypher Input Error: temporal value type must be Double or Long. got "+x.getClass.getName)
       }
     })
+  }
+
+  private def parTime(t:TimePoint)(implicit state:QueryState):Int = {
+//    if(t.isInstanceOf[TimePointRegular]){}
+    t match {
+      case tt:TimePointRegular => tt.item match {
+        case i:Parameter => state.getParam(i.name) match {
+          case ttt: Long => Math.toIntExact(ttt)
+          case x => throw new RuntimeException("TCypher SNH: value type mismatch. got "+ x.getClass.getName)
+        }
+        case x => throw new RuntimeException("TCypher SNH: value type mismatch. got "+ x.getClass.getName)
+      }
+      case tt:TimePointInit => tt.time
+      case tt:TimePointNow => tt.time
+      case x => throw new RuntimeException("TCypher SNH: value type mismatch. got "+ x.getClass.getName)
+    }
   }
 
   private def parVal(e:ASTExpression)(implicit state:QueryState):Any = {

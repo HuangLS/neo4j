@@ -41,7 +41,7 @@ object StatementConverters {
           case Some(hint) => PeriodicCommitQuery(innerQuery, hint.size.map(_.value))
           case _          => innerQuery
         }
-      case s: ast.CreateTemporalMinMaxIndex => commands.CreateTemporalMinMaxIndex( s.property.name, s.range.start, s.range.end)
+      case s: ast.CreateTemporalMinMaxIndex => commands.CreateTemporalMinMaxIndex( s.property.name, s.range.startT.time, s.range.endT.time)
       case s: ast.CreateIndex =>
         commands.CreateIndex(s.label.name, Seq(s.property.name))
       case s: ast.DropIndex =>
