@@ -32,7 +32,7 @@ case class TemporalValueExpression (items: Seq[(TimeInterval, Expression)])(val 
 
 
 sealed trait TimePoint extends Expression {
-  var time:Int = 0
+  var time:Long = 0
   def possibleTypes: TypeSpec = CTTimePoint
   override def semanticCheck(ctx: SemanticContext): SemanticCheck = SemanticCheckResult.success
 }
@@ -41,7 +41,8 @@ case class TimePointRegular (item: Expression)(val position: InputPosition) exte
   override def semanticCheck(ctx: SemanticContext): SemanticCheck ={
     item match {
       case i:UnsignedIntegerLiteral => {
-        this.time = Math.toIntExact(i.value)
+        if(i.value > Int.MaxValue) return SemanticError("TCypher: TimePoint timestamp should less than Int.Max", position)
+        else this.time = i.value
       }
       case i:StringLiteral => {
         // TODO: parse date time strings.
@@ -49,9 +50,8 @@ case class TimePointRegular (item: Expression)(val position: InputPosition) exte
       case i:Parameter => {
         //
       }
-      case _ => {
-        new RuntimeException("TGraph SNH: item type mismatch")
-        SemanticError("invalid literal number", position)
+      case i => {
+        return SemanticError("TGraph SNH: TimePoint value type mismatch. got "+i.getClass.getName, position)
       }
     }
     SemanticCheckResult.success

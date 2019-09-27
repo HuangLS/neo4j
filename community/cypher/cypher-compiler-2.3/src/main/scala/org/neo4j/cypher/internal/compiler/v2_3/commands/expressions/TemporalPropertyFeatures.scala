@@ -24,12 +24,13 @@ case class TemporalValueLiteral(items: Seq[(TimeInterval, ASTExpression)]) exten
   def apply(ctx: ExecutionContext)(implicit state: QueryState):Seq[Tuple3[Long,Long,Any]] = {
     items.map(entry=>{
       val timeInterval = entry._1
-      val startT = parVal(timeInterval.startT)
-      val endT = parVal(timeInterval.endT)
+      val startT = timeInterval.startT.time
+      val endT = timeInterval.endT.time
       val value = parVal(entry._2)
-      (startT, endT) match {
-        case (s:Long,e:Long) => (s, e, value)
-        case _ => throw new RuntimeException("TGraph SNH: type mismatch.")
+      value match {
+        case v:Double => (startT, endT, v)
+        case v:Long => (startT, endT, v)
+        case v => throw new RuntimeException("TGraph SNH: type mismatch. got "+v.getClass.getName)
       }
     })
   }
@@ -37,7 +38,7 @@ case class TemporalValueLiteral(items: Seq[(TimeInterval, ASTExpression)]) exten
   private def parVal(e:ASTExpression)(implicit state:QueryState):Any = {
     e match {
       case i:Parameter => state.getParam(i.name)
-      case _ => throw new RuntimeException("TGraph SNH: type mismatch")
+      case x => throw new RuntimeException("TCypher SNH: value type mismatch. got "+ x.getClass.getName)
     }
   }
 
