@@ -225,7 +225,7 @@ case class TemporalContains(lhs: Expression, rhs: Expression) extends Predicate{
     case (l, r) => throw new CypherTypeException(s"Expect temporal value type, but got $l and $r")
   }
 
-  def temporalPropertyValueMatch[T <: PropertyContainer](op: Operations[T], entityId: Long, propertyId: Int, temporalValue: Seq[Tuple3[Long, Long, Any]]): Boolean = {
+  def temporalPropertyValueMatch[T <: PropertyContainer](op: Operations[T], entityId: Long, propertyId: Int, temporalValue: Seq[(Int, Int, Any)]): Boolean = {
     for (i <- temporalValue){
       val startTime = i._1
       val endTime = i._2
