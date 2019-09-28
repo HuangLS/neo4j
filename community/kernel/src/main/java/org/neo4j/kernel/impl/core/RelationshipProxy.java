@@ -463,7 +463,7 @@ public class RelationshipProxy
             try
             {
                 TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( getId(), propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, null );
-                statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
+                statement.dataWriteOperations().relationshipSetTemporalProperty( tpOp );
             }
             catch ( ConstraintValidationKernelException e )
             {
