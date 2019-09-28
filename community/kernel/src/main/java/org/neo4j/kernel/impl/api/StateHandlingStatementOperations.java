@@ -664,8 +664,6 @@ public class StateHandlingStatementOperations
             RelationshipItem relationship = cursor.get();
             try ( Cursor<PropertyItem> properties = relationship.property( op.getProId() ) )
             {
-
-                String thisValType = op.getValue().getClass().getSimpleName();
                 if ( !properties.next() )
                 {
                     String propertyMetaString = buildTemporalPropertyMeta( op.getInternalKey().getValueType().toValueContentType() );
