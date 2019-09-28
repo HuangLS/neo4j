@@ -355,14 +355,19 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
       case _: org.neo4j.kernel.api.exceptions.EntityNotFoundException => //ignore
     }
 
-    def setTemporalProperty(id: Long, propertyKeyId: Int, start:Int, end:Int, value: Any) = try {
-      val op = new TemporalPropertyWriteOperation(id, propertyKeyId, start, end, value)
+    def setTemporalProperty(id: Long, propertyKeyId: Int, start:Int, end:Int, value: Any): Unit = try {
+      val op:TemporalPropertyWriteOperation = (start, end) match{
+        case (-1, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, value)
+        case (_, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, start, TemporalPropertyWriteOperation.NOW, value)
+        case (-1, _) => new TemporalPropertyWriteOperation(id, propertyKeyId, 0, end, value)
+        case _ => new TemporalPropertyWriteOperation(id, propertyKeyId, start, end, value)
+      }
       statement.dataWriteOperations().nodeSetTemporalProperty( op )
     } catch {
       case _: org.neo4j.kernel.api.exceptions.EntityNotFoundException => //ignore
     }
 
-    def getTemporalProperty(id: Long, propertyKeyId: Int, start:Int) = try {
+    def getTemporalProperty(id: Long, propertyKeyId: Int, start:Int): Any = try {
       val op = new TemporalPropertyReadOperation(id, propertyKeyId, start)
       statement.readOperations().nodeGetTemporalProperty( op )
     } catch {
@@ -426,14 +431,19 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
       case _: exceptions.EntityNotFoundException => //ignore
     }
 
-    def setTemporalProperty(id: Long, propertyKeyId: Int, start:Int, end:Int, value: Any) = try {
-      val op = new TemporalPropertyWriteOperation(id, propertyKeyId, start, end, value)
+    def setTemporalProperty(id: Long, propertyKeyId: Int, start:Int, end:Int, value: Any): Unit = try {
+      val op:TemporalPropertyWriteOperation = (start, end) match{
+        case (-1, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, value)
+        case (_, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, start, TemporalPropertyWriteOperation.NOW, value)
+        case (-1, _) => new TemporalPropertyWriteOperation(id, propertyKeyId, 0, end, value)
+        case _ => new TemporalPropertyWriteOperation(id, propertyKeyId, start, end, value)
+      }
       statement.dataWriteOperations().relationshipSetTemporalProperty( op )
     } catch {
       case _: org.neo4j.kernel.api.exceptions.EntityNotFoundException => //ignore
     }
 
-    def getTemporalProperty(id: Long, propertyKeyId: Int, start:Int) = try {
+    def getTemporalProperty(id: Long, propertyKeyId: Int, start:Int): Any = try {
       val op = new TemporalPropertyReadOperation(id, propertyKeyId, start)
       statement.readOperations().relationshipGetTemporalProperty( op )
     } catch {
