@@ -68,17 +68,7 @@ case class PropertySetAction(prop: Property, valueExpression: Expression)
 //  private def setTemporalVal(entityId:Long, propId:Int, value:Any, op:Operations[ Node |∨| Relationship]) = {
   private def setTemporalVal(entityId:Long, propId:Int, value:Any, op:Operations[ _ >: Node with Relationship <: PropertyContainer]): Unit = {
     value match {
-      case v:Seq[(Int, Int, Long)] => v.foreach(i =>{
-        val start = i._1
-        val end = i._2
-        op.setTemporalProperty(entityId, propId, start, end, i._3)
-      })
-      case v:Seq[(Int, Int, Double)] => v.foreach(i =>{
-        val start = i._1
-        val end = i._2
-        op.setTemporalProperty(entityId, propId, start, end, i._3)
-      })
-      case v:Seq[(Int, Int, String)] => v.foreach(i =>{
+      case v:Seq[(Int, Int, _)] => v.foreach(i =>{
         val start = i._1
         val end = i._2
         op.setTemporalProperty(entityId, propId, start, end, i._3)
@@ -88,7 +78,7 @@ case class PropertySetAction(prop: Property, valueExpression: Expression)
   }
 
   private def isTemporalValue(value:Any):Boolean = value match {
-    case i:Seq[(Int, Int, Any)] => true
+    case _:Seq[(Int, Int, Any)] => true
     case _ => false
   }
 
