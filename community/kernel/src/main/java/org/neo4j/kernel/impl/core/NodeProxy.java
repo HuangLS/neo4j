@@ -67,15 +67,12 @@ import org.neo4j.temporal.TemporalPropertyReadOperation;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
 
 import org.act.temporalProperty.exception.TPSNHException;
-import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.range.TimeRangeQuery;
-import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
+import org.neo4j.temporal.TimePoint;
 
 import static java.lang.String.format;
 
-import static org.act.temporalProperty.impl.ValueType.INVALID;
-import static org.act.temporalProperty.impl.ValueType.VALUE;
 import static org.neo4j.collection.primitive.PrimitiveIntCollections.map;
 import static org.neo4j.graphdb.DynamicLabel.label;
 import static org.neo4j.helpers.collection.IteratorUtil.asList;
@@ -451,7 +448,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
     }
 
     @Override
-    public Object getTemporalProperty( String key, int time )
+    public Object getTemporalProperty( String key, TimePoint time )
     {
         if ( null == key )
         {
@@ -470,7 +467,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
     }
 
     @Override
-    public Object getTemporalProperty( String key, int startTime, int endTime, TimeRangeQuery callBack )
+    public Object getTemporalProperty( String key, TimePoint startTime, TimePoint endTime, TimeRangeQuery callBack )
     {
         if ( null == key )
         {
@@ -490,7 +487,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
     }
 
     @Override
-    public AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, int startTime, int endTime, long indexId )
+    public AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, TimePoint startTime, TimePoint endTime, long indexId )
     {
         if ( null == key )
         {
@@ -512,14 +509,14 @@ public class NodeProxy extends PropertyContainerProxy implements Node
     }
 
     @Override
-    public void setTemporalProperty( String key, int time, Object value )
+    public void setTemporalProperty(String key, TimePoint time, Object value )
     {
         try ( Statement statement = actions.statement() )
         {
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, time, TemporalPropertyWriteOperation.NOW, value );
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, time, TimePoint.NOW, value );
                 statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
             }
             catch ( IllegalArgumentException e )
@@ -548,7 +545,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
     }
 
     @Override
-    public void setTemporalProperty( String key, int start, int end, Object value )
+    public void setTemporalProperty(String key, TimePoint start, TimePoint end, Object value )
     {
         try ( Statement statement = actions.statement() )
         {
@@ -591,7 +588,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, null );
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( nodeId, propertyKeyId, TimePoint.INIT, TimePoint.NOW, null );
                 statement.dataWriteOperations().nodeSetTemporalProperty( tpOp );
             }
             catch ( ConstraintValidationKernelException e )

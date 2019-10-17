@@ -21,13 +21,13 @@ public class TemporalPropertyReadOperation
 
     private long entityId;
     private int proId;
-    private int start;
-    private int end = -1;
+    private TimePoint start;
+    private TimePoint end;
     private long indexId = -1;
     private InternalEntryRangeQueryCallBack callBack;
 
     // constructor for entity time point query
-    public TemporalPropertyReadOperation( long entityId, int proId, int time )
+    public TemporalPropertyReadOperation( long entityId, int proId, TimePoint time )
     {
         this.entityId = entityId;
         this.proId = proId;
@@ -36,7 +36,7 @@ public class TemporalPropertyReadOperation
     }
 
     // constructor for entity time range query
-    public TemporalPropertyReadOperation( long entityId, int proId, int startTime, int endTime, TimeRangeQuery callBack )
+    public TemporalPropertyReadOperation( long entityId, int proId, TimePoint startTime, TimePoint endTime, TimeRangeQuery callBack )
     {
         this.entityId = entityId;
         this.proId = proId;
@@ -47,7 +47,7 @@ public class TemporalPropertyReadOperation
     }
 
     // constructor for entity index aggregation query
-    public TemporalPropertyReadOperation( long entityId, int proId, int startTime, int endTime, long indexId )
+    public TemporalPropertyReadOperation( long entityId, int proId, TimePoint startTime, TimePoint endTime, long indexId )
     {
         this.entityId = entityId;
         this.proId = proId;
@@ -73,12 +73,12 @@ public class TemporalPropertyReadOperation
 
     public boolean isIndexQuery(){return type==AGGR_INDEX;}
 
-    public int getStart()
+    public TimePoint getStart()
     {
         return start;
     }
 
-    public int getEnd()
+    public TimePoint getEnd()
     {
         return end;
     }

@@ -26,10 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.act.temporalProperty.exception.TPSNHException;
-import org.act.temporalProperty.impl.ValueType;
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.range.TimeRangeQuery;
-import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
 
 import org.neo4j.collection.primitive.PrimitiveIntIterator;
 import org.neo4j.cursor.Cursor;
@@ -51,9 +49,7 @@ import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.api.operations.KeyReadOperations;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
-
-import static org.act.temporalProperty.impl.ValueType.INVALID;
-import static org.act.temporalProperty.impl.ValueType.VALUE;
+import org.neo4j.temporal.TimePoint;
 
 public class RelationshipProxy
         extends PropertyContainerProxy
@@ -321,7 +317,7 @@ public class RelationshipProxy
 
 
     @Override
-    public Object getTemporalProperty(String key, int time) {
+    public Object getTemporalProperty(String key, TimePoint time) {
         if ( null == key )
         {
             throw new IllegalArgumentException( "(null) property key is not allowed" );
@@ -340,7 +336,7 @@ public class RelationshipProxy
     }
 
     @Override
-    public Object getTemporalProperty(String key, int startTime, int endTime, TimeRangeQuery callBack) {
+    public Object getTemporalProperty(String key, TimePoint startTime, TimePoint endTime, TimeRangeQuery callBack) {
         if ( null == key )
         {
             throw new IllegalArgumentException( "(null) property key is not allowed" );
@@ -359,7 +355,7 @@ public class RelationshipProxy
     }
 
     @Override
-    public AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, int startTime, int endTime, long indexId )
+    public AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, TimePoint startTime, TimePoint endTime, long indexId )
     {
         if ( null == key )
         {
@@ -381,7 +377,7 @@ public class RelationshipProxy
     }
 
     @Override
-    public void setTemporalProperty(String key, int time, Object value)
+    public void setTemporalProperty(String key, TimePoint time, Object value)
     {
         try ( Statement statement = actions.statement() )
         {
@@ -389,7 +385,7 @@ public class RelationshipProxy
             try
             {
                 TemporalPropertyWriteOperation
-                        tpOp = new TemporalPropertyWriteOperation( this.getId(), propertyKeyId, time, TemporalPropertyWriteOperation.NOW, value );
+                        tpOp = new TemporalPropertyWriteOperation( this.getId(), propertyKeyId, time, TimePoint.NOW, value );
                 statement.dataWriteOperations().relationshipSetTemporalProperty( tpOp );
             }
             catch ( ConstraintValidationKernelException e )
@@ -418,7 +414,7 @@ public class RelationshipProxy
     }
 
     @Override
-    public void setTemporalProperty(String key, int start, int end, Object value)
+    public void setTemporalProperty(String key, TimePoint start, TimePoint end, Object value)
     {
         try ( Statement statement = actions.statement() )
         {
@@ -462,7 +458,7 @@ public class RelationshipProxy
             int propertyKeyId = statement.tokenWriteOperations().propertyKeyGetOrCreateForName( key );
             try
             {
-                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( getId(), propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, null );
+                TemporalPropertyWriteOperation tpOp = new TemporalPropertyWriteOperation( getId(), propertyKeyId, TimePoint.INIT, TimePoint.NOW, null );
                 statement.dataWriteOperations().relationshipSetTemporalProperty( tpOp );
             }
             catch ( ConstraintValidationKernelException e )

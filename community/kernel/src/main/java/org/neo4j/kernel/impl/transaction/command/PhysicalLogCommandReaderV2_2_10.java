@@ -26,10 +26,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.query.TimePointL;
+import org.act.temporalProperty.vo.TimeIntervalValueEntry;
 import org.act.temporalProperty.util.Slice;
-import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
 import org.neo4j.kernel.impl.index.IndexCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
@@ -190,34 +189,32 @@ public class PhysicalLogCommandReaderV2_2_10 implements CommandReader, CommandHa
 //        command.init( new Slice( id ) );
 //        return false;
 //    }
+    private Slice getSliceEntry(ReadableLogChannel channel) throws IOException {
+        int len = channel.getInt();
+        byte[] raw = new byte[ len ];
+        channel.get( raw, len );
+        return new Slice( raw );
+    }
 
     @Override
     public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
     {
         int propertyId = channel.getInt();
-        int from = channel.getInt();
-        int to  = channel.getInt();
+        TimePointL from = TimePointL.decode(getSliceEntry(channel));
+        TimePointL to = TimePointL.decode(getSliceEntry(channel));
         command.init( propertyId, from, to );
         return false;
     }
 
     @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
-        int len = channel.getInt();
-        byte[] raw = new byte[ len ];
-        channel.get( raw, len );
-        MemTable.TimeIntervalValueEntry entry = MemTable.decode( new Slice( raw ).input() );
-        command.init( entry.getKey(), entry.getValue() );
+        command.init( TimeIntervalValueEntry.decode( getSliceEntry(channel).input() ) );
         return false;
     }
 
     @Override
     public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
-        int len = channel.getInt();
-        byte[] raw = new byte[ len ];
-        channel.get( raw, len );
-        MemTable.TimeIntervalValueEntry entry = MemTable.decode( new Slice( raw ).input() );
-        command.init( entry.getKey(), entry.getValue() );
+        command.init( TimeIntervalValueEntry.decode( getSliceEntry(channel).input() ) );
         return false;
     }
 

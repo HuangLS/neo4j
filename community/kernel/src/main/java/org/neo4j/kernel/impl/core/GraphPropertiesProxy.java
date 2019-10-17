@@ -43,6 +43,7 @@ import org.neo4j.kernel.impl.api.operations.KeyReadOperations;
 
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.range.TimeRangeQuery;
+import org.neo4j.temporal.TimePoint;
 
 import static java.lang.String.format;
 
@@ -245,35 +246,35 @@ public class GraphPropertiesProxy implements GraphProperties
     }
 
     @Override
-    public Object getTemporalProperty(String key, int time) {
+    public Object getTemporalProperty(String key, TimePoint time) {
         //TODO TGraph: can graph have temporal property? current not implement
-        throw new TGraphNoImplementationException();
+        throw new UnsupportedOperationException(new TGraphNoImplementationException());
     }
 
     @Override
-    public Object getTemporalProperty(String key, int startTime, int endTime, TimeRangeQuery callBack) {
-        throw new TGraphNoImplementationException();
+    public Object getTemporalProperty(String key, TimePoint startTime, TimePoint endTime, TimeRangeQuery callBack) {
+        throw new UnsupportedOperationException(new TGraphNoImplementationException());
     }
 
     @Override
-    public AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, int start, int end, long indexId )
+    public AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, TimePoint start, TimePoint end, long indexId )
     {
-        throw new TGraphNoImplementationException();
+        throw new UnsupportedOperationException(new TGraphNoImplementationException());
     }
 
     @Override
-    public void setTemporalProperty(String key, int time, Object value) {
-        throw new TGraphNoImplementationException();
+    public void setTemporalProperty(String key, TimePoint time, Object value) {
+        throw new UnsupportedOperationException(new TGraphNoImplementationException());
     }
 
     @Override
-    public void setTemporalProperty(String key, int start, int end, Object value) {
-        throw new TGraphNoImplementationException();
+    public void setTemporalProperty(String key, TimePoint start, TimePoint end, Object value) {
+        throw new UnsupportedOperationException(new TGraphNoImplementationException());
     }
 
     @Override
     public void removeTemporalProperty(String key) {
-        throw new TGraphNoImplementationException();
+        throw new UnsupportedOperationException(new TGraphNoImplementationException());
     }
 
     @Override

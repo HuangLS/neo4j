@@ -11,13 +11,12 @@ import org.act.temporalProperty.util.TemporalPropertyValueConvertor;
  */
 public class TemporalPropertyWriteOperation
 {
-    public static int NOW = -1;
-    private final int end;
+    private final TimePoint end;
     private final Object value;
     private final InternalKey startKey;
     private Slice valueSlice;
 
-    public TemporalPropertyWriteOperation( long entityId, int proId, int start, int end, Object value )
+    public TemporalPropertyWriteOperation(long entityId, int proId, TimePoint start, TimePoint end, Object value )
     {
         ValueType valueType;
         if(value==null)
@@ -51,12 +50,12 @@ public class TemporalPropertyWriteOperation
         return startKey;
     }
 
-    public int getEnd(){
+    public TimePoint getEnd(){
         return end;
     }
 
     public boolean isEndEqNow(){
-        return end==NOW;
+        return end.isNow();
     }
 
     public void setValueSlice( Slice valueSlice )

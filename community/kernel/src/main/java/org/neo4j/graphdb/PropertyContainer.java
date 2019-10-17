@@ -21,6 +21,7 @@ package org.neo4j.graphdb;
 
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.range.TimeRangeQuery;
+import org.neo4j.temporal.TimePoint;
 
 import java.util.Map;
 
@@ -150,15 +151,15 @@ public interface PropertyContainer
     Map<String, Object> getAllProperties();
 
 
-    Object getTemporalProperty(String key, int time);
+    Object getTemporalProperty(String key, TimePoint time);
 
-    Object getTemporalProperty(String key, int startTime, int endTime, TimeRangeQuery callBack);
+    Object getTemporalProperty(String key, TimePoint startTime, TimePoint endTime, TimeRangeQuery callBack);
 
-    AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, int start, int end, long indexId );
+    AggregationIndexQueryResult getTemporalPropertyWithIndex( String key, TimePoint start, TimePoint end, long indexId );
 
-    void setTemporalProperty(String key, int time, Object value);
+    void setTemporalProperty(String key, TimePoint time, Object value);
 
-    void setTemporalProperty(String key, int start, int end, Object value);
+    void setTemporalProperty(String key, TimePoint start, TimePoint end, Object value);
 
     void removeTemporalProperty(String key);
 }

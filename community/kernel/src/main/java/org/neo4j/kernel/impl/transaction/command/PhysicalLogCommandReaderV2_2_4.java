@@ -26,10 +26,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.act.temporalProperty.impl.InternalKey;
-import org.act.temporalProperty.impl.MemTable;
+import org.act.temporalProperty.vo.TimeIntervalValueEntry;
 import org.act.temporalProperty.util.Slice;
-import org.neo4j.graphdb.TGraphNoImplementationException;
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
 import org.neo4j.kernel.impl.index.IndexCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
@@ -182,27 +180,17 @@ public class PhysicalLogCommandReaderV2_2_4 implements CommandReader, CommandHan
     @Override
     public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
     {
-        return false;
+        throw new UnsupportedOperationException( "this should not be used" );
     }
 
     @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
-        int len = channel.getInt();
-        byte[] raw = new byte[ len ];
-        channel.get( raw, len );
-        MemTable.TimeIntervalValueEntry entry = MemTable.decode( new Slice( raw ).input() );
-        command.init( entry.getKey(), entry.getValue() );
-        return false;
+        throw new UnsupportedOperationException( "this should not be used" );
     }
 
     @Override
     public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
-        int len = channel.getInt();
-        byte[] raw = new byte[ len ];
-        channel.get( raw, len );
-        MemTable.TimeIntervalValueEntry entry = MemTable.decode( new Slice( raw ).input() );
-        command.init( entry.getKey(), entry.getValue() );
-        return false;
+        throw new UnsupportedOperationException( "this should not be used" );
     }
 
     @Override

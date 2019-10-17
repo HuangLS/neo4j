@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
+import org.act.temporalProperty.vo.TimeIntervalValueEntry;
 import org.neo4j.kernel.impl.index.IndexCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddNodeCommand;
 import org.neo4j.kernel.impl.index.IndexCommand.AddRelationshipCommand;
@@ -82,32 +83,32 @@ public class CommandWriter implements CommandHandler
 //        channel.put( command.getId().getBytes(), command.getId().length() );
 //        return false;
 //    }
+    private void putSliceEntry(WritableLogChannel channel, Slice in) throws IOException {
+        channel.putInt( in.length() );
+        channel.put( in.getBytes(), in.length() );
+    }
 
     @Override
     public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
     {
         channel.putInt( NeoCommandType.NODE_TEMPORAL_PROPERTY_INDEX_COMMAND );
         channel.putInt( command.getPropertyId() );
-        channel.putInt( command.getStart() );
-        channel.putInt( command.getEnd() );
+        putSliceEntry(channel, command.getStart().encode() );
+        putSliceEntry(channel, command.getEnd().encode() );
         return false;
     }
 
     @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException {
         channel.put( NeoCommandType.NODE_TEMPORAL_PROPERTY_COMMAND );
-        Slice key = MemTable.encode( command.getIntervalKey(), command.getValue() );
-        channel.putInt( key.length() );
-        channel.put( key.getBytes(), key.length() );
+        putSliceEntry(channel, command.getIntervalEntry().encode());
         return false;
     }
 
     @Override
     public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException {
         channel.put( NeoCommandType.REL_TEMPORAL_PROPERTY_COMMAND );
-        Slice key = MemTable.encode( command.getIntervalKey(), command.getValue() );
-        channel.putInt( key.length() );
-        channel.put( key.getBytes(), key.length() );
+        putSliceEntry(channel, command.getIntervalEntry().encode());
         return false;
     }
 

@@ -19,12 +19,8 @@
  */
 package org.neo4j.kernel.impl.transaction.command;
 
-import java.io.IOException;
-import java.util.Collection;
-
-import org.act.temporalProperty.query.TimeIntervalKey;
-import org.act.temporalProperty.util.Slice;
-
+import org.act.temporalProperty.query.TimePointL;
+import org.act.temporalProperty.vo.TimeIntervalValueEntry;
 import org.neo4j.kernel.impl.store.record.AbstractBaseRecord;
 import org.neo4j.kernel.impl.store.record.DynamicRecord;
 import org.neo4j.kernel.impl.store.record.LabelTokenRecord;
@@ -39,12 +35,13 @@ import org.neo4j.kernel.impl.store.record.SchemaRule;
 import org.neo4j.kernel.impl.store.record.TokenRecord;
 import org.neo4j.kernel.impl.transaction.state.PropertyRecordChange;
 
+import java.io.IOException;
+import java.util.Collection;
+
 import static java.lang.String.format;
 import static java.util.Collections.unmodifiableCollection;
-
 import static org.neo4j.helpers.collection.IteratorUtil.first;
 import static org.neo4j.kernel.impl.util.IdPrettyPrinter.label;
-import static org.neo4j.kernel.impl.util.IdPrettyPrinter.propertyKey;
 import static org.neo4j.kernel.impl.util.IdPrettyPrinter.relationshipType;
 
 /**
@@ -318,10 +315,10 @@ public abstract class Command
     public static class NodeTemporalPropertyIndexCommand extends Command{
 
         private int propertyId;
-        private int from;
-        private int to;
+        private TimePointL from;
+        private TimePointL to;
 
-        public NodeTemporalPropertyIndexCommand init( int propertyId, int from, int to ){
+        public NodeTemporalPropertyIndexCommand init(int propertyId, TimePointL from, TimePointL to ){
             this.propertyId = propertyId;
             this.from = from;
             this.to = to;
@@ -345,12 +342,12 @@ public abstract class Command
             return propertyId;
         }
 
-        public int getEnd()
+        public TimePointL getEnd()
         {
             return to;
         }
 
-        public int getStart()
+        public TimePointL getStart()
         {
             return from;
         }
@@ -358,30 +355,16 @@ public abstract class Command
 
     public static class NodeTemporalPropertyCommand extends Command
     {
+        private TimeIntervalValueEntry entry;
 
-        private TimeIntervalKey key;
-        private Slice value;
-
-        public NodeTemporalPropertyCommand( TimeIntervalKey key, Slice value ) {
-            this.key = key;
-            this.value = value;
-        }
-
-        public NodeTemporalPropertyCommand(){}
-
-        public TimeIntervalKey getIntervalKey()
+        public TimeIntervalValueEntry getIntervalEntry()
         {
-            return key;
-        }
-
-        public Slice getValue()
-        {
-            return value;
+            return entry;
         }
 
         @Override
         public String toString() {
-            return key.toString()+ value.toString();
+            return entry.toString();
         }
 
         @Override
@@ -389,38 +372,23 @@ public abstract class Command
             return handler.visitNodeTemporalPropertyCommand(this);
         }
 
-        public void init(TimeIntervalKey key, Slice value ) {
-            this.key = key;
-            this.value = value;
+        public void init(TimeIntervalValueEntry entry) {
+            this.entry = entry;
         }
     }
 
     public static class RelationshipTemporalPropertyCommand extends Command
     {
-        private TimeIntervalKey key;
-        private Slice value;
+        private TimeIntervalValueEntry entry;
 
-        public RelationshipTemporalPropertyCommand(TimeIntervalKey key, Slice value )
+        public TimeIntervalValueEntry getIntervalEntry()
         {
-            this.key = key;
-            this.value = value;
-        }
-
-        public RelationshipTemporalPropertyCommand() {}
-
-        public TimeIntervalKey getIntervalKey()
-        {
-            return key;
-        }
-
-        public Slice getValue()
-        {
-            return value;
+            return entry;
         }
 
         @Override
         public String toString() {
-            return key.toString()+ value.toString();
+            return entry.toString();
         }
 
         @Override
@@ -428,9 +396,8 @@ public abstract class Command
             return handler.visitRelationshipTemporalPropertyCommand(this);
         }
 
-        public void init(TimeIntervalKey key, Slice value ) {
-            this.key = key;
-            this.value = value;
+        public void init(TimeIntervalValueEntry entry) {
+            this.entry = entry;
         }
     }
 

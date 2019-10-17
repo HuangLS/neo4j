@@ -89,25 +89,6 @@ public interface PropertyContainerState
         private final EntityType entityType;
         private static final ResourceIterator<DefinedProperty> NO_PROPERTIES = emptyIterator();
 
-        private final TreeMap<InternalKey,Slice> temporalProperty = new TreeMap<>( new Comparator<InternalKey>()
-        {
-            @Override
-            public int compare( InternalKey o1, InternalKey o2 )
-            {
-                int r = o1.getPropertyId() - o2.getPropertyId();
-                if(r==0){
-                    r = (int) (o1.getEntityId() - o2.getEntityId());
-                    if(r==0){
-                        return o1.getStartTime() - o2.getStartTime();
-                    }else{
-                        return r;
-                    }
-                }else{
-                    return r;
-                }
-            }
-        });
-
         private VersionedHashMap<Integer, DefinedProperty> addedProperties;
         private VersionedHashMap<Integer, DefinedProperty> changedProperties;
         private VersionedHashMap<Integer, DefinedProperty> removedProperties;
@@ -314,46 +295,5 @@ public interface PropertyContainerState
             }
         }
 
-    }
-
-    class TemporalPropertyRecordKey
-    {
-        private int propertyId;
-        private int time;
-
-        TemporalPropertyRecordKey(int proId, int t )
-        {
-            this.propertyId = proId;
-            this.time = t;
-        }
-
-        public int getPropertyId()
-        {
-            return propertyId;
-        }
-
-        public int getTime()
-        {
-            return time;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            int result = propertyId;
-            result = 31 * result + time;
-            return result;
-        }
-
-        @Override
-        public boolean equals(Object o)
-        {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-
-            TemporalPropertyRecordKey that = (TemporalPropertyRecordKey) o;
-
-            return propertyId == that.propertyId && time == that.time;
-        }
     }
 }

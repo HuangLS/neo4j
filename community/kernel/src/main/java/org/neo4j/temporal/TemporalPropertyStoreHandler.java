@@ -35,21 +35,21 @@ public class TemporalPropertyStoreHandler extends CommandHandler.Adapter
     @Override
     public boolean visitNodeTemporalPropertyIndexCommand( Command.NodeTemporalPropertyIndexCommand command ) throws IOException
     {
-        this.store.createNodeAggrMinMaxIndex( command.getPropertyId(), command.getStart(), command.getEnd() );
+        this.store.createAggrMinMaxIndex( store.nodeStore(), command.getPropertyId(), command.getStart(), command.getEnd() );
         return false;
     }
 
     @Override
     public boolean visitNodeTemporalPropertyCommand(Command.NodeTemporalPropertyCommand command) throws IOException
     {
-        this.store.setValue( store.nodeStore(), command.getIntervalKey(), command.getValue());
+        this.store.setValue( store.nodeStore(), command.getIntervalEntry().getKey(), command.getIntervalEntry().getValue());
         return false;
     }
 
     @Override
     public boolean visitRelationshipTemporalPropertyCommand(Command.RelationshipTemporalPropertyCommand command) throws IOException
     {
-        this.store.setValue( store.relStore(), command.getIntervalKey(), command.getValue());
+        this.store.setValue( store.relStore(), command.getIntervalEntry().getKey(), command.getIntervalEntry().getValue());
         return false;
     }
 }

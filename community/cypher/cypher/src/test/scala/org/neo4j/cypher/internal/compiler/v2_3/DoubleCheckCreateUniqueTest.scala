@@ -30,6 +30,7 @@ import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.graphdb.Traverser.Order
 import org.neo4j.graphdb._
+import org.neo4j.temporal.TimePoint
 import org.neo4j.test.ImpermanentGraphDatabase
 
 import scala.collection.JavaConverters._
@@ -192,15 +193,15 @@ class PausingNode(n: Node, afterGetRelationship: Node => Unit) extends Node {
 
   def getDegree( relType:RelationshipType, direction:Direction ):Int = ???
 
-  override def getTemporalProperty(key: String, time: Int): AnyRef = ???
+  override def getTemporalProperty(key: String, time: TimePoint): AnyRef = ???
 
-  override def getTemporalProperty(key: String, startTime: Int, endTime: Int, callBack: TimeRangeQuery): AnyRef = ???
+  override def getTemporalProperty(key: String, startTime: TimePoint, endTime: TimePoint, callBack: TimeRangeQuery): AnyRef = ???
 
-  override def getTemporalPropertyWithIndex(key: String, start: Int, end: Int, indexId: Long): AggregationIndexQueryResult = ???
+  override def getTemporalPropertyWithIndex(key: String, start: TimePoint, end: TimePoint, indexId: Long): AggregationIndexQueryResult = ???
 
-  override def setTemporalProperty(key: String, time: Int, value: scala.Any): Unit = ???
+  override def setTemporalProperty(key: String, time: TimePoint, value: AnyRef): Unit = ???
 
-  override def setTemporalProperty(key: String, start: Int, end: Int, value: scala.Any): Unit = ???
+  override def setTemporalProperty(key: String, start: TimePoint, end: TimePoint, value: AnyRef): Unit = ???
 
   override def removeTemporalProperty(key: String): Unit = ???
 }

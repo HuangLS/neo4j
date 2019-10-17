@@ -2,7 +2,6 @@ package org.neo4j.temporal;
 
 import org.act.temporalProperty.index.IndexType;
 import org.act.temporalProperty.index.value.IndexMetaData;
-import org.act.temporalProperty.index.value.IndexQueryRegion;
 import org.act.temporalProperty.query.aggr.ValueGroupingMap;
 import org.apache.commons.lang3.tuple.Triple;
 
@@ -44,22 +43,22 @@ public class TemporalIndexManager
         return tpStore().getNodeStore().listIndex();
     }
 
-    public PropertyValueIntervalBuilder nodeQueryValueIndex( int start, int end )
+    public PropertyValueIntervalBuilder nodeQueryValueIndex( TimePoint start, TimePoint end )
     {
         return new PropertyValueIntervalBuilder( start, end, true );
     }
 
-    public long nodeCreateValueIndex( int start, int end, String... proNames )
+    public long nodeCreateValueIndex( TimePoint start, TimePoint end, String... proNames )
     {
         return tpStore().getNodeStore().createValueIndex( start, end, proName2Id( proNames ) );
     }
 
-    public long nodeCreateDurationIndex( int start, int end, String proName, int every, int timeUnit, ValueGroupingMap valueGroup )
+    public long nodeCreateDurationIndex( TimePoint start, TimePoint end, String proName, int every, int timeUnit, ValueGroupingMap valueGroup )
     {
         return tpStore().getNodeStore().createAggrDurationIndex( proName2Id( proName ), start, end, valueGroup, every, timeUnit );
     }
 
-    public long nodeCreateMinMaxIndex( int start, int end, String proName, int every, int timeUnit, IndexType type )
+    public long nodeCreateMinMaxIndex( TimePoint start, TimePoint end, String proName, int every, int timeUnit, IndexType type )
     {
         return tpStore().getNodeStore().createAggrMinMaxIndex( proName2Id( proName ), start, end, every, timeUnit, type );
     }
@@ -69,22 +68,22 @@ public class TemporalIndexManager
         return tpStore().getRelStore().listIndex();
     }
 
-    public PropertyValueIntervalBuilder relQueryValueIndex( int start, int end )
+    public PropertyValueIntervalBuilder relQueryValueIndex( TimePoint start, TimePoint end )
     {
         return new PropertyValueIntervalBuilder( start, end, false );
     }
 
-    public long relCreateValueIndex( int start, int end, String... proNames )
+    public long relCreateValueIndex( TimePoint start, TimePoint end, String... proNames )
     {
         return tpStore().getRelStore().createValueIndex( start, end, proName2Id( proNames ) );
     }
 
-    public long relCreateDurationIndex( int start, int end, String proName, int every, int timeUnit, ValueGroupingMap valueGroup )
+    public long relCreateDurationIndex( TimePoint start, TimePoint end, String proName, int every, int timeUnit, ValueGroupingMap valueGroup )
     {
         return tpStore().getRelStore().createAggrDurationIndex( proName2Id( proName ), start, end, valueGroup, every, timeUnit );
     }
 
-    public long relCreateMinMaxIndex( int start, int end, String proName, int every, int timeUnit, IndexType type )
+    public long relCreateMinMaxIndex( TimePoint start, TimePoint end, String proName, int every, int timeUnit, IndexType type )
     {
         return tpStore().getRelStore().createAggrMinMaxIndex( proName2Id( proName ), start, end, every, timeUnit, type );
     }
@@ -116,12 +115,12 @@ public class TemporalIndexManager
 
     public class PropertyValueIntervalBuilder
     {
-        private final int start;
-        private final int end;
+        private final TimePoint start;
+        private final TimePoint end;
         private final boolean isNode;
         private final Map<Integer,Triple<String,Object,Object>> valInterval;//proId, minVal, maxVal;
 
-        PropertyValueIntervalBuilder( int start, int end, boolean isNode )
+        PropertyValueIntervalBuilder(TimePoint start, TimePoint end, boolean isNode )
         {
             this.start = start;
             this.end = end;
@@ -153,12 +152,12 @@ public class TemporalIndexManager
             return valInterval;
         }
 
-        public int getStart()
+        public TimePoint getStart()
         {
             return start;
         }
 
-        public int getEnd()
+        public TimePoint getEnd()
         {
             return end;
         }

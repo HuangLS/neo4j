@@ -50,7 +50,7 @@ import org.neo4j.kernel.api.{exceptions, _}
 import org.neo4j.kernel.impl.api.KernelStatement
 import org.neo4j.kernel.impl.core.{NodeManager, ThreadToStatementContextBridge}
 import org.neo4j.kernel.security.URLAccessValidationError
-import org.neo4j.temporal.{TemporalPropertyReadOperation, TemporalPropertyWriteOperation}
+import org.neo4j.temporal.{TemporalPropertyReadOperation, TemporalPropertyWriteOperation, TimePoint}
 import org.neo4j.tooling.GlobalGraphOperations
 
 import scala.collection.JavaConverters._
@@ -357,10 +357,10 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
 
     def setTemporalProperty(id: Long, propertyKeyId: Int, start:Int, end:Int, value: Any): Unit = try {
       val op:TemporalPropertyWriteOperation = (start, end) match{
-        case (-1, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, value)
-        case (_, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, start, TemporalPropertyWriteOperation.NOW, value)
-        case (-1, _) => new TemporalPropertyWriteOperation(id, propertyKeyId, 0, end, value)
-        case _ => new TemporalPropertyWriteOperation(id, propertyKeyId, start, end, value)
+        case (-1, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, TimePoint.INIT, TimePoint.NOW, value)
+        case (_, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, new TimePoint(start), TimePoint.NOW, value)
+        case (-1, _) => new TemporalPropertyWriteOperation(id, propertyKeyId, TimePoint.INIT, new TimePoint(end), value)
+        case _ => new TemporalPropertyWriteOperation(id, propertyKeyId, new TimePoint(start), new TimePoint(end), value)
       }
       statement.dataWriteOperations().nodeSetTemporalProperty( op )
     } catch {
@@ -433,10 +433,10 @@ final class TransactionBoundQueryContext(graph: GraphDatabaseAPI,
 
     def setTemporalProperty(id: Long, propertyKeyId: Int, start:Int, end:Int, value: Any): Unit = try {
       val op:TemporalPropertyWriteOperation = (start, end) match{
-        case (-1, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, 0, TemporalPropertyWriteOperation.NOW, value)
-        case (_, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, start, TemporalPropertyWriteOperation.NOW, value)
-        case (-1, _) => new TemporalPropertyWriteOperation(id, propertyKeyId, 0, end, value)
-        case _ => new TemporalPropertyWriteOperation(id, propertyKeyId, start, end, value)
+        case (-1, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, TimePoint.INIT, TimePoint.NOW, value)
+        case (_, Int.MaxValue) => new TemporalPropertyWriteOperation(id, propertyKeyId, new TimePoint(start), TimePoint.NOW, value)
+        case (-1, _) => new TemporalPropertyWriteOperation(id, propertyKeyId, TimePoint.INIT, new TimePoint(end), value)
+        case _ => new TemporalPropertyWriteOperation(id, propertyKeyId, new TimePoint(start), new TimePoint(end), value)
       }
       statement.dataWriteOperations().relationshipSetTemporalProperty( op )
     } catch {

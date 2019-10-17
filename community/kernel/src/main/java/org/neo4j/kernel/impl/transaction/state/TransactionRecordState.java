@@ -30,6 +30,7 @@ import org.act.temporalProperty.query.TimeInterval;
 import org.act.temporalProperty.query.TimeIntervalKey;
 import org.act.temporalProperty.util.Slice;
 
+import org.act.temporalProperty.vo.TimeIntervalValueEntry;
 import org.neo4j.kernel.api.KernelTransaction;
 import org.neo4j.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.kernel.api.properties.DefinedProperty;
@@ -179,7 +180,7 @@ public class TransactionRecordState implements RecordState
                 while(iter.hasNext()){
                     Entry<TimeInterval,Boolean> intervalEntry = iter.next();
                     if(intervalEntry.getValue()){
-                        commands.add( new Command.NodeTemporalPropertyIndexCommand().init( entry.getKey(), intervalEntry.getKey().fromInt(), intervalEntry.getKey().toInt() ));
+                        commands.add( new Command.NodeTemporalPropertyIndexCommand().init( entry.getKey(), intervalEntry.getKey().start(), intervalEntry.getKey().end() ));
                         noOfCommands++;
                     }
                 }
@@ -192,7 +193,8 @@ public class TransactionRecordState implements RecordState
             while ( nodeTpIter.hasNext() )
             {
                 Entry<TimeIntervalKey,Slice> entry = nodeTpIter.next();
-                Command.NodeTemporalPropertyCommand command = new Command.NodeTemporalPropertyCommand( entry.getKey(), entry.getValue() );
+                Command.NodeTemporalPropertyCommand command = new Command.NodeTemporalPropertyCommand();
+                command.init(new TimeIntervalValueEntry(entry.getKey(), entry.getValue() ));
                 commands.add( command );
                 noOfCommands++;
             }
@@ -203,7 +205,8 @@ public class TransactionRecordState implements RecordState
             while ( relTpIter.hasNext() )
             {
                 Entry<TimeIntervalKey,Slice> entry = relTpIter.next();
-                Command.RelationshipTemporalPropertyCommand command = new Command.RelationshipTemporalPropertyCommand( entry.getKey(), entry.getValue() );
+                Command.RelationshipTemporalPropertyCommand command = new Command.RelationshipTemporalPropertyCommand();
+                command.init(new TimeIntervalValueEntry(entry.getKey(), entry.getValue() ));
                 commands.add( command );
                 noOfCommands++;
             }
