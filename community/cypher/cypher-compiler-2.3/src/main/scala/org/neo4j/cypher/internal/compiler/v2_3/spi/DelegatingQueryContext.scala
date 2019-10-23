@@ -26,6 +26,7 @@ import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.PatternNode
 import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.IndexDescriptor
 import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 import org.neo4j.graphdb.{Node, Path, PropertyContainer, Relationship}
+import org.neo4j.temporal.TimePoint
 
 class DelegatingQueryContext(inner: QueryContext) extends QueryContext {
 
@@ -190,7 +191,7 @@ class DelegatingOperations[T <: PropertyContainer](protected val inner: Operatio
 
   def isDeleted(obj: T): Boolean = inner.isDeleted(obj)
 
-  override def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: Int, timeEnd: Int, value: Any): Unit = singleDbHit(inner.setTemporalProperty(obj, propertyKey, timeStart, timeEnd, value))
+  override def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: TimePoint, timeEnd: TimePoint, value: Any): Unit = singleDbHit(inner.setTemporalProperty(obj, propertyKey, timeStart, timeEnd, value))
 
-  override def getTemporalProperty(obj: Long, propertyKey: Int, time: Int): Any = singleDbHit(inner.getTemporalProperty(obj, propertyKey, time))
+  override def getTemporalProperty(obj: Long, propertyKey: Int, time: TimePoint): Any = singleDbHit(inner.getTemporalProperty(obj, propertyKey, time))
 }

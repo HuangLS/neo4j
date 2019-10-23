@@ -20,9 +20,11 @@
 package org.neo4j.cypher.internal.compiler.v2_3.spi
 
 import java.util.concurrent.atomic.AtomicInteger
+
 import org.neo4j.cypher.internal.compiler.v2_3.InternalQueryStatistics
 import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
-import org.neo4j.graphdb.{PropertyContainer, Relationship, Node}
+import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
+import org.neo4j.temporal.TimePoint
 
 class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryContext(inner) {
 
@@ -171,7 +173,7 @@ class UpdateCountingQueryContext(inner: QueryContext) extends DelegatingQueryCon
       inner.setProperty(id, propertyKeyId, value)
     }
 
-    override def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: Int, timeEnd: Int, value: Any): Unit = {
+    override def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: TimePoint, timeEnd: TimePoint, value: Any): Unit = {
       propertiesSet.increase()
       inner.setTemporalProperty(obj, propertyKey, timeStart, timeEnd, value)
     }

@@ -1,16 +1,18 @@
 package org.neo4j.temporal;
 
+import org.act.temporalProperty.query.TimePointL;
+
 /**
  * Created by song on 2018-05-12.
  */
 public class IntervalEntry
 {
-    private final int start;
-    private final int end;
+    private final TimePointL start;
+    private final TimePointL end;
     private final long entityId;
     private final Object[] val;
 
-    public IntervalEntry( int start, int end, long entityId, Object[] val )
+    public IntervalEntry(TimePointL start, TimePointL end, long entityId, Object[] val )
     {
         this.start = start;
         this.end = end;
@@ -18,12 +20,12 @@ public class IntervalEntry
         this.val = val;
     }
 
-    public int getStart()
+    public TimePointL getStart()
     {
         return start;
     }
 
-    public int getEnd()
+    public TimePointL getEnd()
     {
         return end;
     }

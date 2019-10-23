@@ -27,6 +27,7 @@ import org.neo4j.cypher.internal.compiler.v2_3.spi.Operations
 import org.neo4j.cypher.internal.compiler.v2_3.symbols.SymbolTable
 import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
 import org.neo4j.helpers.ThisShouldNotHappenError
+import org.neo4j.temporal.TimePoint
 
 case class PropertySetAction(prop: Property, valueExpression: Expression)
   extends SetAction {
@@ -71,7 +72,12 @@ case class PropertySetAction(prop: Property, valueExpression: Expression)
       case v:Seq[(Int, Int, _)] => v.foreach(i =>{
         val start = i._1
         val end = i._2
-        op.setTemporalProperty(entityId, propId, start, end, i._3)
+        (start, end) match{
+          case (-1, Int.MaxValue) => op.setTemporalProperty(entityId, propId, TimePoint.INIT, TimePoint.NOW, i._3);
+          case (_, Int.MaxValue) => op.setTemporalProperty(entityId, propId, new TimePoint(start), TimePoint.NOW, i._3)
+          case (-1, _) => op.setTemporalProperty(entityId, propId, TimePoint.INIT, new TimePoint(end), i._3)
+          case _ => op.setTemporalProperty(entityId, propId, new TimePoint(start), new TimePoint(end), i._3)
+        }
       })
       case _ => throw new RuntimeException("TGraph SNH: type mismatch")
     }

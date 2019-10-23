@@ -27,6 +27,7 @@ import org.neo4j.cypher.internal.compiler.v2_3.pipes.matching.PatternNode
 import org.neo4j.cypher.internal.compiler.v2_3.spi.SchemaTypes.{IndexDescriptor, NodePropertyExistenceConstraint, RelationshipPropertyExistenceConstraint, UniquenessConstraint}
 import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 import org.neo4j.graphdb.{Node, Path, PropertyContainer, Relationship}
+import org.neo4j.temporal.TimePoint
 
 /*
  * Developer note: This is an attempt at an internal graph database API, which defines a clean cut between
@@ -158,9 +159,9 @@ trait Operations[T <: PropertyContainer] {
 
   def setProperty(obj: Long, propertyKeyId: Int, value: Any)
 
-  def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: Int, timeEnd:Int, value:Any ): Unit
+  def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: TimePoint, timeEnd:TimePoint, value:Any ): Unit
 
-  def getTemporalProperty(obj: Long, propertyKey: Int, time: Int): Any
+  def getTemporalProperty(obj: Long, propertyKey: Int, time: TimePoint): Any
 
 //  def
 

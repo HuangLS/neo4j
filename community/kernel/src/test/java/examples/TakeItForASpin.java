@@ -28,6 +28,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.temporal.TemporalIndexManager;
+import org.neo4j.temporal.TimePoint;
 
 import static java.lang.System.getProperty;
 import static java.util.Calendar.SECOND;
@@ -50,11 +51,11 @@ public class TakeItForASpin
         try ( Transaction tx = db.beginTx() )
         {
             TemporalIndexManager ti = db.temporalIndex();
-            ti.nodeCreateValueIndex(10, 20, "hehe");
+            ti.nodeCreateValueIndex(new TimePoint(10), new TimePoint(20), "hehe");
             ValueGroupingMap vMap = new ValueGroupingMap.IntValueGroupMap();
             // fixme: should add group here.
-            ti.nodeCreateDurationIndex( 10, 20, "haha", 2, SECOND, vMap );
-            ti.nodeQueryValueIndex( 10, 20 ).propertyValRange( "hehe", 2, 20 ).propertyValRange( "haha", 4, 30 ).query();
+            ti.nodeCreateDurationIndex( new TimePoint(10), new TimePoint(20), "haha", 2, SECOND, vMap );
+            ti.nodeQueryValueIndex( new TimePoint(10), new TimePoint(20) ).propertyValRange( "hehe", 2, 20 ).propertyValRange( "haha", 4, 30 ).query();
             Node node = db.getNodeById(i);
             node.setProperty("hehe", "haha");
             node.getProperty("hehe");
@@ -69,9 +70,9 @@ public class TakeItForASpin
             System.out.println(s);
 
             int t = time();
-            node.getTemporalPropertyWithIndex("haha", t, t+4, 1 );
-            node.setTemporalProperty("haha", t, "hehe");
-            Object v = node.getTemporalProperty("haha", t);
+            node.getTemporalPropertyWithIndex("haha", new TimePoint(t), new TimePoint(t+4), 1 );
+            node.setTemporalProperty("haha", new TimePoint(t), "hehe");
+            Object v = node.getTemporalProperty("haha", new TimePoint(t));
             if(v instanceof String){
                 System.out.println(v);
             }

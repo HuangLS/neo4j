@@ -80,26 +80,27 @@ trait GraphElementPropertyFunctions extends CollectionSupport {
     val unsafeValue = expression(context)(state)
     if (unsafeValue != null) {
       if (isTemporalValue(unsafeValue)){
-        pc match {
-          case n: Node  => {
-            val propertyName = state.query.getOrCreatePropertyKeyId(key)
-            unsafeValue match {
-              case v:Seq[(Int, Int, _)] => v.foreach(i =>{
-                state.query.nodeOps.setTemporalProperty(n.getId, propertyName, i._1, i._2, i._3)
-              })
-              case _ => throw new RuntimeException("TGraph SNH: type mismatch")
-            }
-          }
-          case r: Relationship => {
-            val propertyName = state.query.getOrCreatePropertyKeyId(key)
-            unsafeValue match {
-              case v:Seq[(Int, Int, Any)] => v.foreach(i =>
-                state.query.relationshipOps.setTemporalProperty(r.getId, propertyName,  i._1, i._2, i._3)
-              )
-              case _ => throw new RuntimeException("TGraph SNH: type mismatch")
-            }
-          }
-        }
+        throw new UnsupportedOperationException("Temporal property not support on graph")
+//        pc match {
+//          case n: Node  => {
+//            val propertyName = state.query.getOrCreatePropertyKeyId(key)
+//            unsafeValue match {
+//              case v:Seq[(Int, Int, _)] => v.foreach(i =>{
+//                state.query.nodeOps.setTemporalProperty(n.getId, propertyName, i._1, i._2, i._3)
+//              })
+//              case _ => throw new RuntimeException("TGraph SNH: type mismatch")
+//            }
+//          }
+//          case r: Relationship => {
+//            val propertyName = state.query.getOrCreatePropertyKeyId(key)
+//            unsafeValue match {
+//              case v:Seq[(Int, Int, Any)] => v.foreach(i =>
+//                state.query.relationshipOps.setTemporalProperty(r.getId, propertyName,  i._1, i._2, i._3)
+//              )
+//              case _ => throw new RuntimeException("TGraph SNH: type mismatch")
+//            }
+//          }
+//        }
       } else {
         val value = makeValueNeoSafe(unsafeValue)
         pc match {

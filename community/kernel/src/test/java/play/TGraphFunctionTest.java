@@ -9,6 +9,7 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
+import org.neo4j.temporal.TimePoint;
 
 /**
  * Created by song on 2019-07-08.
@@ -26,7 +27,7 @@ public class TGraphFunctionTest
             for(int i=0; i<100; i++){
                 Node node = tgraph.createNode();
                 for(int j=0; j<2000; j++){
-                    node.setTemporalProperty( "test", j, 0 );
+                    node.setTemporalProperty( "test", TimePoint.unixMilli(j), 0 );
                 }
 
                 node.setProperty( "hehe", 1 );

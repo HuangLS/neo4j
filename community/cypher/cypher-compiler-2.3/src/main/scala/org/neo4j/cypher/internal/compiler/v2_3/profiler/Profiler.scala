@@ -26,6 +26,7 @@ import org.neo4j.cypher.internal.compiler.v2_3.planDescription.InternalPlanDescr
 import org.neo4j.cypher.internal.compiler.v2_3.spi.{DelegatingOperations, DelegatingQueryContext, Operations, QueryContext}
 import org.neo4j.cypher.internal.frontend.v2_3.ProfilerStatisticsNotReadyException
 import org.neo4j.graphdb.{Node, PropertyContainer, Relationship}
+import org.neo4j.temporal.TimePoint
 
 import scala.collection.mutable
 
@@ -123,9 +124,9 @@ final class ProfilingQueryContext(val inner: QueryContext, val p: Pipe)
     override protected def singleDbHit[A](value: A): A = self.singleDbHit(value)
     override protected def manyDbHits[A](value: Iterator[A]): Iterator[A] = self.manyDbHits(value)
 
-    override def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: Int, timeEnd: Int, value: Any): Unit = singleDbHit(inner.setTemporalProperty(obj, propertyKey, timeStart, timeEnd, value))
+    override def setTemporalProperty(obj: Long, propertyKey: Int, timeStart: TimePoint, timeEnd: TimePoint, value: Any): Unit = singleDbHit(inner.setTemporalProperty(obj, propertyKey, timeStart, timeEnd, value))
 
-    override def getTemporalProperty(obj: Long, propertyKey: Int, time: Int): Any = singleDbHit(inner.getTemporalProperty(obj, propertyKey, time))
+    override def getTemporalProperty(obj: Long, propertyKey: Int, time: TimePoint): Any = singleDbHit(inner.getTemporalProperty(obj, propertyKey, time))
   }
 
   override def nodeOps: Operations[Node] = new ProfilerOperations(inner.nodeOps)

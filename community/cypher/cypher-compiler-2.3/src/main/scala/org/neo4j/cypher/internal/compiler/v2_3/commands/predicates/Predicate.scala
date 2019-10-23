@@ -231,7 +231,7 @@ case class TemporalContains(lhs: Expression, rhs: Expression) extends Predicate{
       val endTime = i._2
       val valExpect = i._3
       for(time <- startTime to endTime){
-        val value = op.getTemporalProperty(entityId, propertyId, time.toInt)
+        val value = op.getTemporalProperty(entityId, propertyId, new org.neo4j.temporal.TimePoint(time.toInt))
         if(value!=valExpect) return false
       }
     }

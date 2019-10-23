@@ -121,7 +121,7 @@ case class TemporalAggregationMinFunction(property: Expression, tStart: Expressi
   def temporalPropertyValueMatch[T <: PropertyContainer](op: Operations[T], entityId: Long, propertyId: Int, start: Long, end: Long): Any = {
     var min:Int = Int.MaxValue
     for (t <- start.toInt to end.toInt){
-      val value = op.getTemporalProperty(entityId, propertyId, t)
+      val value = op.getTemporalProperty(entityId, propertyId, new org.neo4j.temporal.TimePoint(t))
       value match {
         case v: Int => if (min > v) min = v
         case v: Long => if (min > v) min = v.toInt

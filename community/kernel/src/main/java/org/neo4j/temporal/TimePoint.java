@@ -25,4 +25,8 @@ public class TimePoint extends TimePointL {
     private TimePoint(boolean isNow){
         super(isNow);
     }
+
+    public static TimePoint unixMilli(long timestampMilliseconds){
+        return new TimePoint(timestampMilliseconds);
+    }
 }

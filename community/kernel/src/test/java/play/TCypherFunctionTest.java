@@ -5,6 +5,7 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
+import org.neo4j.temporal.TimePoint;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,7 +19,7 @@ public class TCypherFunctionTest {
         try(Transaction tx = db.beginTx()){
             Node n = db.createNode();
             nodeId = n.getId();
-            n.setTemporalProperty("travel_time", 0, 0);
+            n.setTemporalProperty("travel_time", new TimePoint(0), 0);
             tx.success();
         }
         try(Transaction tx = db.beginTx()){
@@ -27,7 +28,7 @@ public class TCypherFunctionTest {
         }
         try(Transaction tx = db.beginTx()){
             for(int t : Arrays.asList(0, 1, 2, 3, 4)){
-                Object o = db.getNodeById(nodeId).getTemporalProperty("travel_time", t);
+                Object o = db.getNodeById(nodeId).getTemporalProperty("travel_time", new TimePoint(t));
                 System.out.println(o);
             }
             tx.success();
