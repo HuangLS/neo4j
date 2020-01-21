@@ -49,6 +49,7 @@ import org.neo4j.kernel.impl.api.RelationshipVisitor;
 import org.neo4j.kernel.impl.api.operations.KeyReadOperations;
 import org.neo4j.temporal.TemporalPropertyReadOperation;
 import org.neo4j.temporal.TemporalPropertyWriteOperation;
+import org.neo4j.temporal.TemporalRangeQuery;
 import org.neo4j.temporal.TimePoint;
 
 public class RelationshipProxy
@@ -336,7 +337,7 @@ public class RelationshipProxy
     }
 
     @Override
-    public Object getTemporalProperty(String key, TimePoint startTime, TimePoint endTime, TimeRangeQuery callBack) {
+    public Object getTemporalProperty(String key, TimePoint startTime, TimePoint endTime, TemporalRangeQuery callBack) {
         if ( null == key )
         {
             throw new IllegalArgumentException( "(null) property key is not allowed" );

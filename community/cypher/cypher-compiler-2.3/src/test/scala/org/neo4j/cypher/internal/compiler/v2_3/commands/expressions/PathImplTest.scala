@@ -28,7 +28,7 @@ import org.neo4j.cypher.internal.compiler.v2_3.commands.expressions
 import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.graphdb.Traverser.Order
 import org.neo4j.graphdb._
-import org.neo4j.temporal.TimePoint
+import org.neo4j.temporal.{TemporalRangeQuery, TimePoint}
 
 import scala.collection.JavaConverters._
 
@@ -128,7 +128,7 @@ class PathImplTest extends CypherFunSuite {
 
     override def getTemporalProperty(key: String, time: TimePoint): AnyRef = ???
 
-    override def getTemporalProperty(key: String, startTime: TimePoint, endTime: TimePoint, callBack: TimeRangeQuery): AnyRef = ???
+    override def getTemporalProperty(key: String, startTime: TimePoint, endTime: TimePoint, callBack: TemporalRangeQuery): AnyRef = ???
 
     override def getTemporalPropertyWithIndex(key: String, start: TimePoint, end: TimePoint, indexId: Long): AggregationIndexQueryResult = ???
 
@@ -214,7 +214,7 @@ class PathImplTest extends CypherFunSuite {
 
     override def getTemporalProperty(key: String, time: TimePoint): AnyRef = ???
 
-    override def getTemporalProperty(key: String, startTime: TimePoint, endTime: TimePoint, callBack: TimeRangeQuery): AnyRef = ???
+    override def getTemporalProperty(key: String, startTime: TimePoint, endTime: TimePoint, callBack: TemporalRangeQuery): AnyRef = ???
 
     override def getTemporalPropertyWithIndex(key: String, start: TimePoint, end: TimePoint, indexId: Long): AggregationIndexQueryResult = ???
 

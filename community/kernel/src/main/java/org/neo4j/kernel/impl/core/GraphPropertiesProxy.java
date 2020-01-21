@@ -43,6 +43,7 @@ import org.neo4j.kernel.impl.api.operations.KeyReadOperations;
 
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.range.TimeRangeQuery;
+import org.neo4j.temporal.TemporalRangeQuery;
 import org.neo4j.temporal.TimePoint;
 
 import static java.lang.String.format;
@@ -252,7 +253,7 @@ public class GraphPropertiesProxy implements GraphProperties
     }
 
     @Override
-    public Object getTemporalProperty(String key, TimePoint startTime, TimePoint endTime, TimeRangeQuery callBack) {
+    public Object getTemporalProperty(String key, TimePoint startTime, TimePoint endTime, TemporalRangeQuery callBack) {
         throw new UnsupportedOperationException(new TGraphNoImplementationException());
     }
 

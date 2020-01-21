@@ -27,7 +27,7 @@ public class TGraphFunctionTest
             for(int i=0; i<100; i++){
                 Node node = tgraph.createNode();
                 for(int j=0; j<2000; j++){
-                    node.setTemporalProperty( "test", TimePoint.unixMilli(j), 0 );
+                    node.setTemporalProperty( "test", new TimePoint(j), 0 );
                 }
 
                 node.setProperty( "hehe", 1 );

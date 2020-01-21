@@ -30,7 +30,7 @@ import org.neo4j.cypher.internal.frontend.v2_3.SemanticDirection
 import org.neo4j.cypher.internal.frontend.v2_3.test_helpers.CypherFunSuite
 import org.neo4j.graphdb.Traverser.Order
 import org.neo4j.graphdb._
-import org.neo4j.temporal.TimePoint
+import org.neo4j.temporal.{TemporalRangeQuery, TimePoint}
 import org.neo4j.test.ImpermanentGraphDatabase
 
 import scala.collection.JavaConverters._
@@ -195,7 +195,7 @@ class PausingNode(n: Node, afterGetRelationship: Node => Unit) extends Node {
 
   override def getTemporalProperty(key: String, time: TimePoint): AnyRef = ???
 
-  override def getTemporalProperty(key: String, startTime: TimePoint, endTime: TimePoint, callBack: TimeRangeQuery): AnyRef = ???
+  override def getTemporalProperty(key: String, startTime: TimePoint, endTime: TimePoint, callBack: TemporalRangeQuery): AnyRef = ???
 
   override def getTemporalPropertyWithIndex(key: String, start: TimePoint, end: TimePoint, indexId: Long): AggregationIndexQueryResult = ???
 

@@ -48,7 +48,7 @@ import org.neo4j.kernel.api.{ReadOperations, Statement}
 import org.neo4j.kernel.impl.api.OperationsFacade
 import org.neo4j.kernel.impl.core.{NodeManager, NodeProxy, ThreadToStatementContextBridge}
 import org.neo4j.kernel.impl.transaction.log.TransactionIdStore
-import org.neo4j.temporal.TimePoint
+import org.neo4j.temporal.{TemporalRangeQuery, TimePoint}
 import org.neo4j.tooling.GlobalGraphOperations
 
 import scala.collection.JavaConverters._
@@ -415,7 +415,7 @@ class MonitoredNode(inner: Node, monitor: () => Unit) extends Node {
 
   override def getTemporalProperty(key: String, time: TimePoint): AnyRef = ???
 
-  override def getTemporalProperty(key: String, startTime: TimePoint, endTime: TimePoint, callBack: TimeRangeQuery): AnyRef = ???
+  override def getTemporalProperty(key: String, startTime: TimePoint, endTime: TimePoint, callBack: TemporalRangeQuery): AnyRef = ???
 
   override def getTemporalPropertyWithIndex(key: String, start: TimePoint, end: TimePoint, indexId: Long): AggregationIndexQueryResult = ???
 

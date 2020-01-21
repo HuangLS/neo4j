@@ -69,6 +69,7 @@ import org.neo4j.temporal.TemporalPropertyWriteOperation;
 import org.act.temporalProperty.exception.TPSNHException;
 import org.act.temporalProperty.query.aggr.AggregationIndexQueryResult;
 import org.act.temporalProperty.query.range.TimeRangeQuery;
+import org.neo4j.temporal.TemporalRangeQuery;
 import org.neo4j.temporal.TimePoint;
 
 import static java.lang.String.format;
@@ -467,7 +468,7 @@ public class NodeProxy extends PropertyContainerProxy implements Node
     }
 
     @Override
-    public Object getTemporalProperty( String key, TimePoint startTime, TimePoint endTime, TimeRangeQuery callBack )
+    public Object getTemporalProperty( String key, TimePoint startTime, TimePoint endTime, TemporalRangeQuery callBack )
     {
         if ( null == key )
         {
